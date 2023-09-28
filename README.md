@@ -8,6 +8,7 @@ npm install connect-4-solver
 Or view [connect-4-solver](https://www.npmjs.com/package/connect-4-solver) on NPM
 
 
+
 Exports loadBook, analyzePosition, and onInitialized
 
 Wait for onInitialized before calling other functions, or crashes may occur. 
@@ -15,6 +16,7 @@ Wait for onInitialized before calling other functions, or crashes may occur.
 Loading a book is effectively mandatory to analyze positions with <5 moves played (as otherwise, the search tree is large and could take an extremely long time to analyze)
 
 loadBook takes one parameter, the ArrayBuffer for the bytes of the book file. 
+You can get premade book files from [PascalPons/connect4](https://github.com/PascalPons/connect4/releases/tag/book). 
 
 analyzePosition takes one parameter, the sequence of moves played on the board as a string, with "1" representing first column, "2" second, etc. 
 So "" is an empty board, "4424" is 4th column, 4th column, 2nd column, 4th column, in that order, etc. 
