@@ -2,6 +2,12 @@
 
 C++ Connect 4 Game Solver with JavaScript bindings created using Emscripten. 
 
+```
+npm install connect-4-solver
+```
+Or view [connect-4-solver](https://www.npmjs.com/package/connect-4-solver) on NPM
+
+
 Exports loadBook, analyzePosition, and onInitialized
 
 Wait for onInitialized before calling other functions, or crashes may occur. 
