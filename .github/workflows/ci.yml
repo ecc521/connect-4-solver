@@ -2,9 +2,9 @@ name: Connect 4 Solver CI
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ main ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ main ]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -22,19 +22,18 @@ jobs:
         with:
           node-version: 24
           cache: 'npm'
-          cache-dependency-path: repo_solver/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Setup Emscripten
         uses: mymindstorm/setup-emsdk@v14
 
       - name: Install Dependencies
-        working-directory: repo_solver
-        run: npm ci
+        run: npm install
 
       - name: Build WASM Module
-        working-directory: repo_solver
-        run: ./build.sh
+        run: |
+          chmod +x build.sh
+          ./build.sh
 
       - name: Run Jest Parity Tests
-        working-directory: repo_solver
         run: npm test
