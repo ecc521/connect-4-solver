@@ -17,7 +17,6 @@
  */
 
 #include "Solver.hpp"
-#include <iostream>
 #include <cstdlib>
 
 using namespace GameSolver::Connect4;
@@ -33,6 +32,12 @@ EMSCRIPTEN_KEEPALIVE void loadBook(const char* bookFilePath) {
   solver.loadBook(opening_book);
 }
 
+enum Status {
+  STATUS_VALID = 0,
+  STATUS_WIN = 1,
+  STATUS_INVALID = 2
+};
+
 EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition(const char* positionCharArr) {
   bool weak = false;
 
@@ -45,15 +50,15 @@ EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition(const char* positionCharArr) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
 
     if (P.isWinningMove(lastColPlayed)) {
-      result[0] = 1; // Won
+      result[0] = STATUS_WIN;
     } else {
-      result[0] = 2; // Invalid
+      result[0] = STATUS_INVALID;
     }
     result[1] = P.nbMoves();
     for(int i = 0; i < Position::WIDTH; i++) result[2 + i] = 0;
   } 
   else {
-    result[0] = 0; // Valid/Normal
+    result[0] = STATUS_VALID;
     result[1] = P.nbMoves();
 
     std::vector<int> scores = solver.analyze(P, weak);
