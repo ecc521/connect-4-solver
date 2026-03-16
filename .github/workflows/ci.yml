@@ -31,7 +31,6 @@ jobs:
         run: npm install
 
       - name: Run Formatting Check
-        working-directory: .
         run: npm run format:check
 
       - name: Build WASM Module
