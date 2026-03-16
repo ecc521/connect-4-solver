@@ -27,7 +27,7 @@ async function run() {
 
   // Load an opening book for instant performance (Optional but recommended)
   // Get books from: https://github.com/PascalPons/connect4/releases/tag/book
-  const bookBuffer = fs.readFileSync('7x6.book');
+  const bookBuffer = fs.readFileSync('data/7x6.book');
   await solver.loadBook(new Uint8Array(bookBuffer));
 
   // Analyze a position (column sequence: 1-7)
