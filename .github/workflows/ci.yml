@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        
+    - name: Setup emsdk
+      uses: mymindstorm/setup-emsdk@v14
+        
+    - name: Install dependencies
+      run: npm ci || npm install
+      
+    - name: Build WASM module
+      run: npm run build:wasm
+      
+    - name: Build TS wrapper
+      run: npm run build:ts
+      
+    - name: Run Tests
+      run: npm run test

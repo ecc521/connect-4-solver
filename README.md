@@ -1,37 +1,73 @@
 # Connect 4 Game Solver
 
-C++ Connect 4 Game Solver with JavaScript bindings created using Emscripten. 
+Perfect Connect 4 solver in C++ with a high-performance WebAssembly binary bridge and an object-oriented TypeScript wrapper.
 
-```
+## Installation
+
+```bash
 npm install connect-4-solver
 ```
-Or view [connect-4-solver](https://www.npmjs.com/package/connect-4-solver) on NPM
 
+## Features
 
+- **High Performance**: Native C++ solver compiled to WebAssembly.
+- **Binary Bridge**: Efficient data transfer between WASM and JS (no string parsing).
+- **TypeScript Ready**: Full type definitions included.
+- **Opening Book Support**: Fast analysis even from move 0.
 
-Exports loadBook, analyzePosition, and onInitialized
+## Usage
 
-Wait for onInitialized before calling other functions, or crashes may occur. 
+```typescript
+import { Connect4Solver } from 'connect-4-solver';
+import * as fs from 'fs';
 
-Loading a book is effectively mandatory to analyze positions with <5 moves played (as otherwise, the search tree is large and could take an extremely long time to analyze)
+async function run() {
+  const solver = new Connect4Solver();
+  await solver.init();
 
-loadBook takes one parameter, the ArrayBuffer for the bytes of the book file. 
-You can get premade book files from [PascalPons/connect4](https://github.com/PascalPons/connect4/releases/tag/book). 
+  // Load an opening book for instant performance (Optional but recommended)
+  // Get books from: https://github.com/PascalPons/connect4/releases/tag/book
+  const bookBuffer = fs.readFileSync('7x6.book');
+  await solver.loadBook(new Uint8Array(bookBuffer));
 
-analyzePosition takes one parameter, the sequence of moves played on the board as a string, with "1" representing first column, "2" second, etc. 
-So "" is an empty board, "4424" is 4th column, 4th column, 2nd column, 4th column, in that order, etc. 
+  // Analyze a position (column sequence: 1-7)
+  const result = solver.analyze('4424');
 
-Example Calls:
+  console.log('Evaluation:', result.evaluation); // e.g., "D" for Draw or "Y+15" for Yellow win in 15
+  console.log('Valid Moves:', result.moveOptions.filter(m => m.evaluation !== null));
+}
 
+run();
 ```
-connect4solver = require("connect-4-solver")
-connect4solver.onInitialized.then(() => {
-    connect4solver.loadBook(new Uint8Array(fs.readFileSync("7x6.book").buffer))
-    let evaluation = connect4solver.evaluatePosition("74637")
-    console.log(evaluation)
-})
+
+### Analysis Result Structure
+
+The `analyze` method returns a `PositionAnalysis` object:
+
+```typescript
+interface PositionAnalysis {
+  position: string;         // The position analyzed
+  originalPosition: string; // The input string
+  evaluation: string;       // Best move evaluation (e.g. "Y+5", "R-10", "D")
+  moveOptions: {            // Scores for every column (1-7)
+    column: number;
+    evaluation: string | null; // null if column is full
+  }[];
+}
 ```
 
-This C++ source code is published under AGPL v3 license.
+## Advanced
 
-Read the associated [step by step tutorial to build a perfect Connect 4 AI](http://blog.gamesolver.org) for explanations.
+### Building from source
+
+If you want to recompile the WASM module, ensure you have Emscripten installed:
+
+```bash
+npm run build
+```
+
+## Credits & License
+
+- Core algorithm by [Pascal Pons](http://blog.gamesolver.org).
+- Original C++ source code is published under **AGPL v3** license.
+- Wrapper and distribution by Tucker Willenborg.
