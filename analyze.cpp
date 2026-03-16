@@ -18,6 +18,7 @@
 
 #include "Solver.hpp"
 #include <iostream>
+#include <cstdlib>
 
 using namespace GameSolver::Connect4;
 
@@ -32,40 +33,36 @@ EMSCRIPTEN_KEEPALIVE void loadBook(const char* bookFilePath) {
   solver.loadBook(opening_book);
 }
 
-
-EMSCRIPTEN_KEEPALIVE char * analyzePosition(const char* positionCharArr) {
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition(const char* positionCharArr) {
   bool weak = false;
 
-  //Create the position from positionStr. 
   std::string positionString = std::string(positionCharArr);
   Position P;
 
-  std::string output = "";
+  int32_t* result = (int32_t*)malloc(9 * sizeof(int32_t));
 
   if(P.play(positionString) != positionString.size()) {
-    output = "Invalid Move #" + std::to_string(P.nbMoves() + 1) + ". Last Valid Position " + positionString.substr(0, P.nbMoves()) + ".";
-
-    //Let's check if the invalid move made us win. If so, return the winning combination. 
     int lastColPlayed = positionString[P.nbMoves()] - '1';
 
     if (P.isWinningMove(lastColPlayed)) {
-      output = "Won on Move #" + std::to_string(P.nbMoves() + 1) + ". Ending Position " + positionString.substr(0, P.nbMoves() + 1) + ".";
+      result[0] = 1; // Won
+    } else {
+      result[0] = 2; // Invalid
     }
-
-
+    result[1] = P.nbMoves();
+    for(int i = 0; i < Position::WIDTH; i++) result[2 + i] = 0;
   } 
   else {
+    result[0] = 0; // Valid/Normal
+    result[1] = P.nbMoves();
+
     std::vector<int> scores = solver.analyze(P, weak);
     for(int i = 0; i < Position::WIDTH; i++) {
-      if (output.size() > 0) {
-        output = output + " ";
-      }
-      output = output + std::to_string(scores[i]);
+        result[2 + i] = scores[i];
     }
   }
 
-  char* outputArr = output.data();
-  return outputArr;
+  return result;
 
 }
 

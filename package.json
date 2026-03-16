@@ -2,9 +2,12 @@
   "name": "connect-4-solver",
   "version": "1.0.1",
   "description": "Solver for 7x6 Connect 4 Games",
-  "main": "bindings.js",
+  "main": "dist/index.js",
   "scripts": {
-    "build": "sh build.sh"
+    "build": "npm run build:wasm && npm run build:ts",
+    "build:wasm": "bash build.sh",
+    "build:ts": "tsc",
+    "test": "jest"
   },
   "repository": {
     "type": "git",
@@ -15,5 +18,13 @@
   "bugs": {
     "url": "https://github.com/ecc521/connect4/issues"
   },
-  "homepage": "https://github.com/ecc521/connect4#readme"
+  "homepage": "https://github.com/ecc521/connect4#readme",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.5.0",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.9.3"
+  },
+  "types": "dist/index.d.ts"
 }
