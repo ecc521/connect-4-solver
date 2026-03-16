@@ -18,7 +18,7 @@ npm install connect-4-solver
 ## Usage
 
 ```typescript
-import { Connect4Solver } from 'connect-4-solver';
+import { Connect4Solver, Player, Outcome } from 'connect-4-solver';
 import * as fs from 'fs';
 
 async function run() {
@@ -33,8 +33,22 @@ async function run() {
   // Analyze a position (column sequence: 1-7)
   const result = solver.analyze('4424');
 
-  console.log('Evaluation:', result.evaluation); // e.g., "D" for Draw or "Y+15" for Yellow win in 15
-  console.log('Valid Moves:', result.moveOptions.filter(m => m.evaluation !== null));
+  if (result.evaluation) {
+    if (result.evaluation.outcome === Outcome.Win) {
+      console.log(`${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`);
+    } else if (result.evaluation.outcome === Outcome.Draw) {
+      console.log('The game is a draw');
+    }
+  }
+
+  // Iterate over move options (index 0-6 maps to columns 1-7)
+  result.moveOptions.forEach((ev, index) => {
+    if (ev) {
+      console.log(`Column ${index + 1}: ${ev.outcome} (${ev.score})`);
+    } else {
+      console.log(`Column ${index + 1}: Full`);
+    }
+  });
 }
 
 run();
@@ -45,14 +59,30 @@ run();
 The `analyze` method returns a `PositionAnalysis` object:
 
 ```typescript
-interface PositionAnalysis {
-  position: string;         // The position analyzed
-  originalPosition: string; // The input string
-  evaluation: string;       // Best move evaluation (e.g. "Y+5", "R-10", "D")
-  moveOptions: {            // Scores for every column (1-7)
-    column: number;
-    evaluation: string | null; // null if column is full
-  }[];
+export enum Player {
+  P1 = 'P1', // Moves first
+  P2 = 'P2', // Moves second
+}
+
+export enum Outcome {
+  Win = 'Win',
+  Loss = 'Loss',
+  Draw = 'Draw',
+}
+
+export interface Evaluation {
+  outcome: Outcome;
+  winner: Player | null;     // null when Draw
+  movesToEnd: number | null; // null when Draw
+  score: number;             // raw score (positive = current player winning)
+}
+
+export interface PositionAnalysis {
+  position: string;            // Validated position (may differ if input was invalid)
+  originalPosition: string;    // Raw input string
+  currentPlayer: Player;       // Whose turn it is at the analyzed position
+  evaluation: Evaluation | null; // Overall evaluation of the position
+  moveOptions: (Evaluation | null)[]; // Evaluation for playing in each column (1-7)
 }
 ```
 
