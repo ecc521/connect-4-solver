@@ -1,3 +1,5 @@
 *.book
 *.data
 *.o
+
+node_modules
