@@ -1,4 +1,4 @@
-const BOARD_WIDTH = 7;
+export const BOARD_WIDTH = 7;
 
 export enum Player {
   P1 = 'P1', // Moves first
