@@ -1,21 +1,21 @@
 export const BOARD_WIDTH = 7;
 
 export enum Player {
-  P1 = 'P1', // Moves first
-  P2 = 'P2', // Moves second
+  P1 = "P1", // Moves first
+  P2 = "P2", // Moves second
 }
 
 export enum Outcome {
-  Win = 'Win',
-  Loss = 'Loss',
-  Draw = 'Draw',
+  Win = "Win",
+  Loss = "Loss",
+  Draw = "Draw",
 }
 
 export interface Evaluation {
   outcome: Outcome;
-  winner: Player | null;     // null when Draw
+  winner: Player | null; // null when Draw
   movesToEnd: number | null; // null when Draw
-  score: number;             // raw score
+  score: number; // raw score
 }
 
 export interface PositionAnalysis {
@@ -49,8 +49,8 @@ export interface SolverModule {
 const Module = require("../build/analyze.js");
 
 let concludeInitialize: (() => void) | null = null;
-let _moduleInitPromise = new Promise<void>((resolve) => { 
-  concludeInitialize = resolve; 
+let _moduleInitPromise = new Promise<void>((resolve) => {
+  concludeInitialize = resolve;
 });
 
 (Module as any).onRuntimeInitialized = function () {
@@ -63,13 +63,13 @@ export class Connect4Solver {
 
   async init(): Promise<void> {
     if (this.initialized) return;
-    
+
     // Fallback just in case it's already initialized
     if ((Module as any).calledRun || (Module as any)._analyzePosition) {
       this.initialized = true;
       return;
     }
-    
+
     await _moduleInitPromise;
     this.initialized = true;
   }
@@ -104,16 +104,16 @@ export class Connect4Solver {
     const mod = this.mod as any;
     const allocatedMemory = this.allocateString(positionStr);
     const outputPointer = mod._analyzePosition(allocatedMemory);
-    
+
     // Read the 9 returned Int32 values using getValue
     const finalData = new Int32Array(RESULT_ARRAY_SIZE);
     for (let i = 0; i < RESULT_ARRAY_SIZE; i++) {
-        finalData[i] = mod.getValue(outputPointer + (i * INT32_SIZE), "i32");
+      finalData[i] = mod.getValue(outputPointer + i * INT32_SIZE, "i32");
     }
 
     mod._free(allocatedMemory);
     mod._free(outputPointer); // analyze.cpp returns a malloc'd array
-    
+
     return finalData;
   }
 
@@ -134,32 +134,32 @@ export class Connect4Solver {
         outcome: Outcome.Draw,
         winner: null,
         movesToEnd: null,
-        score: 0
+        score: 0,
       };
     } else if (score > 0) {
       return {
         outcome: Outcome.Win,
         winner: currentPlayer,
         movesToEnd: halfMovesRemaining - score + 1,
-        score: score
+        score: score,
       };
     } else {
       return {
         outcome: Outcome.Loss,
         winner: opponent,
         movesToEnd: halfMovesRemaining + score + 1,
-        score: score
+        score: score,
       };
     }
   }
 
   analyze(positionStr: string): PositionAnalysis {
     const resArr = this.rawAnalyze(positionStr);
-    
+
     const originalPosition = positionStr;
     const status = resArr[0] as number;
     const nbMoves = resArr[1] as number;
-    
+
     let currentPosition = positionStr;
     const currentPlayer = this.getPlayerAt(nbMoves);
     let evaluation: Evaluation | null = null;
@@ -175,12 +175,12 @@ export class Connect4Solver {
         outcome: Outcome.Win,
         winner: winner,
         movesToEnd: 0,
-        score: 22 // Logical max score for a direct win is actually 21-22 depending on how we count
+        score: 22, // Logical max score for a direct win is actually 21-22 depending on how we count
       };
     } else {
       // Valid mid-game position
       evaluation = null; // We'll compute it from moveOptions
-      
+
       for (let i = 0; i < BOARD_WIDTH; i++) {
         const n = resArr[2 + i] as number;
         if (n === UNPLAYABLE_COLUMN_SCORE) {
@@ -202,7 +202,10 @@ export class Connect4Solver {
 
         // Win is better than Draw is better than Loss
         if (ev.outcome === Outcome.Win) {
-          if (bestEval.outcome !== Outcome.Win || (ev.movesToEnd! < bestEval.movesToEnd!)) {
+          if (
+            bestEval.outcome !== Outcome.Win ||
+            ev.movesToEnd! < bestEval.movesToEnd!
+          ) {
             bestEval = ev;
           }
         } else if (ev.outcome === Outcome.Draw) {
@@ -210,7 +213,10 @@ export class Connect4Solver {
             bestEval = ev;
           }
         } else if (ev.outcome === Outcome.Loss) {
-          if (bestEval.outcome === Outcome.Loss && (ev.movesToEnd! > bestEval.movesToEnd!)) {
+          if (
+            bestEval.outcome === Outcome.Loss &&
+            ev.movesToEnd! > bestEval.movesToEnd!
+          ) {
             bestEval = ev;
           }
         }
@@ -223,7 +229,7 @@ export class Connect4Solver {
       originalPosition,
       currentPlayer,
       evaluation,
-      moveOptions
+      moveOptions,
     };
   }
 }
