@@ -1,10 +1,29 @@
 const BOARD_WIDTH = 7;
 
+export enum Player {
+  P1 = 'P1', // Moves first
+  P2 = 'P2', // Moves second
+}
+
+export enum Outcome {
+  Win = 'Win',
+  Loss = 'Loss',
+  Draw = 'Draw',
+}
+
+export interface Evaluation {
+  outcome: Outcome;
+  winner: Player | null;     // null when Draw
+  movesToEnd: number | null; // null when Draw
+  score: number;             // raw score
+}
+
 export interface PositionAnalysis {
   position: string;
   originalPosition: string;
-  evaluation: string;
-  moveOptions: (string | null)[]; // Index maps to column 0-6
+  currentPlayer: Player;
+  evaluation: Evaluation | null;
+  moveOptions: (Evaluation | null)[]; // Index maps to column 0-6
 }
 
 const STATUS_VALID = 0;
@@ -98,73 +117,111 @@ export class Connect4Solver {
     return finalData;
   }
 
+  private getPlayerAt(nbMoves: number): Player {
+    return nbMoves % 2 === 0 ? Player.P1 : Player.P2;
+  }
+
+  private createEvaluation(score: number, nbMoves: number): Evaluation {
+    const isPlayer1Turn = nbMoves % 2 === 0;
+    const currentPlayer = isPlayer1Turn ? Player.P1 : Player.P2;
+    const opponent = isPlayer1Turn ? Player.P2 : Player.P1;
+
+    const movesRemaining = 42 - nbMoves;
+    const halfMovesRemaining = Math.ceil(movesRemaining / 2);
+
+    if (score === 0) {
+      return {
+        outcome: Outcome.Draw,
+        winner: null,
+        movesToEnd: null,
+        score: 0
+      };
+    } else if (score > 0) {
+      return {
+        outcome: Outcome.Win,
+        winner: currentPlayer,
+        movesToEnd: halfMovesRemaining - score + 1,
+        score: score
+      };
+    } else {
+      return {
+        outcome: Outcome.Loss,
+        winner: opponent,
+        movesToEnd: halfMovesRemaining + score + 1,
+        score: score
+      };
+    }
+  }
+
   analyze(positionStr: string): PositionAnalysis {
     const resArr = this.rawAnalyze(positionStr);
     
     const originalPosition = positionStr;
-    let currentPosition = positionStr;
-    let evaluation = "D";
-    let moveOptions: (string | null)[] = [];
-
     const status = resArr[0] as number;
     const nbMoves = resArr[1] as number;
+    
+    let currentPosition = positionStr;
+    const currentPlayer = this.getPlayerAt(nbMoves);
+    let evaluation: Evaluation | null = null;
+    let moveOptions: (Evaluation | null)[] = [];
 
     if (status === STATUS_INVALID) {
       currentPosition = positionStr.slice(0, nbMoves);
-      evaluation = "Invalid";
     } else if (status === STATUS_WIN) {
       currentPosition = positionStr.slice(0, nbMoves + 1);
-      const winner = currentPosition.length % 2 === 1 ? "Y" : "R";
-      evaluation = winner;
+      const winningMoveIndex = nbMoves;
+      const winner = winningMoveIndex % 2 === 0 ? Player.P1 : Player.P2;
+      evaluation = {
+        outcome: Outcome.Win,
+        winner: winner,
+        movesToEnd: 0,
+        score: 22 // Logical max score for a direct win is actually 21-22 depending on how we count
+      };
     } else {
-      const isYellowNext = positionStr.length % 2 === 0;
-      const movesRemaining = 42 - positionStr.length;
-      const halfMovesRemaining = Math.ceil(movesRemaining / 2);
-
-      const moveEvaluations = [];
+      // Valid mid-game position
+      evaluation = null; // We'll compute it from moveOptions
+      
       for (let i = 0; i < BOARD_WIDTH; i++) {
         const n = resArr[2 + i] as number;
-        let evalStr: string | null = null;
-        if (n === UNPLAYABLE_COLUMN_SCORE) evalStr = null;
-        else if (n === 0) evalStr = "D";
-        else if (n > 0) evalStr = (isYellowNext ? "Y" : "R") + "+" + (halfMovesRemaining - n + 1);
-        else if (n < 0) evalStr = (isYellowNext ? "R" : "Y") + "-" + (halfMovesRemaining + n + 1);
-
-        moveEvaluations.push(evalStr);
-        moveOptions.push(evalStr);
-      }
-
-      let bestScore = -Infinity;
-      let bestEvalStr = "D";
-
-      const score = (ev: string | null): number => {
-        if (ev === null) return -2000;
-        if (ev === "D") return 0;
-        const winner = ev.split(/[+-]/)[0]; // "Y" or "R"
-        const sign = ev.includes('+') ? '+' : '-';
-        const moves = parseInt(ev.split(/[+-]/)[1]!, 10);
-        const value = 100 - moves; // Faster wins are better
-        
-        const amIYellow = isYellowNext;
-        const iWin = (amIYellow && winner === "Y") || (!amIYellow && winner === "R");
-        
-        return iWin ? value : -value;
-      };
-
-      for (const ev of moveEvaluations) {
-        if (ev === null) continue;
-        const s = score(ev);
-        if (s > bestScore) {
-          bestScore = s;
-          bestEvalStr = ev;
+        if (n === UNPLAYABLE_COLUMN_SCORE) {
+          moveOptions.push(null);
+        } else {
+          moveOptions.push(this.createEvaluation(n, nbMoves));
         }
       }
-      evaluation = bestEvalStr;
+
+      // Best evaluation for the current player
+      let bestEval: Evaluation | null = null;
+
+      for (const ev of moveOptions) {
+        if (!ev) continue;
+        if (!bestEval) {
+          bestEval = ev;
+          continue;
+        }
+
+        // Win is better than Draw is better than Loss
+        if (ev.outcome === Outcome.Win) {
+          if (bestEval.outcome !== Outcome.Win || (ev.movesToEnd! < bestEval.movesToEnd!)) {
+            bestEval = ev;
+          }
+        } else if (ev.outcome === Outcome.Draw) {
+          if (bestEval.outcome === Outcome.Loss) {
+            bestEval = ev;
+          }
+        } else if (ev.outcome === Outcome.Loss) {
+          if (bestEval.outcome === Outcome.Loss && (ev.movesToEnd! > bestEval.movesToEnd!)) {
+            bestEval = ev;
+          }
+        }
+      }
+      evaluation = bestEval;
     }
 
     return {
       position: currentPosition,
       originalPosition,
+      currentPlayer,
       evaluation,
       moveOptions
     };
