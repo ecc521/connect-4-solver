@@ -8,7 +8,7 @@ describe('Connect4Solver', () => {
   beforeAll(async () => {
     solver = new Connect4Solver();
     await solver.init();
-    const bookPath = path.join(__dirname, '..', '7x6.book');
+    const bookPath = path.join(__dirname, '..', 'data', '7x6.book');
     const bookData = new Uint8Array(fs.readFileSync(bookPath));
     await solver.loadBook(bookData);
   }, 10000); // Give ample time for init
