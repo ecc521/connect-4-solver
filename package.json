@@ -7,9 +7,9 @@
     "build": "npm run build:wasm && npm run build:ts",
     "build:wasm": "bash build.sh",
     "build:ts": "tsc",
-    "test": "jest"
+    "test": "jest",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --check ."
   },
   "repository": {
     "type": "git",
@@ -25,6 +25,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^25.5.0",
     "jest": "^30.3.0",
+    "prettier": "^3.5.2",
     "ts-jest": "^29.4.6",
     "typescript": "^5.9.3"
   },
