@@ -1,14 +1,18 @@
-export interface MoveOption {
-  column: number;
-  evaluation: string | null;
-}
+const BOARD_WIDTH = 7;
 
 export interface PositionAnalysis {
   position: string;
   originalPosition: string;
   evaluation: string;
-  moveOptions: MoveOption[];
+  moveOptions: (string | null)[]; // Index maps to column 0-6
 }
+
+const STATUS_VALID = 0;
+const STATUS_WIN = 1;
+const STATUS_INVALID = 2;
+const UNPLAYABLE_COLUMN_SCORE = -1000;
+const RESULT_ARRAY_SIZE = 9;
+const INT32_SIZE = 4;
 
 export interface SolverModule {
   allocateUTF8(str: string): number;
@@ -83,9 +87,9 @@ export class Connect4Solver {
     const outputPointer = mod._analyzePosition(allocatedMemory);
     
     // Read the 9 returned Int32 values using getValue
-    const finalData = new Int32Array(9);
-    for (let i = 0; i < 9; i++) {
-        finalData[i] = mod.getValue(outputPointer + (i * 4), "i32");
+    const finalData = new Int32Array(RESULT_ARRAY_SIZE);
+    for (let i = 0; i < RESULT_ARRAY_SIZE; i++) {
+        finalData[i] = mod.getValue(outputPointer + (i * INT32_SIZE), "i32");
     }
 
     mod._free(allocatedMemory);
@@ -100,15 +104,15 @@ export class Connect4Solver {
     const originalPosition = positionStr;
     let currentPosition = positionStr;
     let evaluation = "D";
-    let moveOptions: MoveOption[] = [];
+    let moveOptions: (string | null)[] = [];
 
     const status = resArr[0] as number;
     const nbMoves = resArr[1] as number;
 
-    if (status === 2) {
+    if (status === STATUS_INVALID) {
       currentPosition = positionStr.slice(0, nbMoves);
       evaluation = "Invalid";
-    } else if (status === 1) {
+    } else if (status === STATUS_WIN) {
       currentPosition = positionStr.slice(0, nbMoves + 1);
       const winner = currentPosition.length % 2 === 1 ? "Y" : "R";
       evaluation = winner;
@@ -118,19 +122,16 @@ export class Connect4Solver {
       const halfMovesRemaining = Math.ceil(movesRemaining / 2);
 
       const moveEvaluations = [];
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < BOARD_WIDTH; i++) {
         const n = resArr[2 + i] as number;
         let evalStr: string | null = null;
-        if (n === -1000) evalStr = null;
+        if (n === UNPLAYABLE_COLUMN_SCORE) evalStr = null;
         else if (n === 0) evalStr = "D";
         else if (n > 0) evalStr = (isYellowNext ? "Y" : "R") + "+" + (halfMovesRemaining - n + 1);
         else if (n < 0) evalStr = (isYellowNext ? "R" : "Y") + "-" + (halfMovesRemaining + n + 1);
 
         moveEvaluations.push(evalStr);
-        moveOptions.push({
-          column: i + 1,
-          evaluation: evalStr
-        });
+        moveOptions.push(evalStr);
       }
 
       let bestScore = -Infinity;
