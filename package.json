@@ -8,6 +8,8 @@
     "build:wasm": "bash build.sh",
     "build:ts": "tsc",
     "test": "jest"
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
   },
   "repository": {
     "type": "git",
