@@ -25,9 +25,9 @@ async function run() {
   const solver = new Connect4Solver();
   await solver.init();
 
-  // Load an opening book for instant performance (Optional but recommended)
-  // Get books from: https://github.com/PascalPons/connect4/releases/tag/book
-  const bookBuffer = fs.readFileSync("data/7x6.book");
+  // Load an opening book for instant performance (Required for evaluating positions with <= 6 moves in a reasonable amount of time)
+  // Download book files from: https://github.com/ecc521/connect-4-solver/releases/tag/solutionbooks
+  const bookBuffer = fs.readFileSync('path/to/downloaded/7x6.book');
   await solver.loadBook(new Uint8Array(bookBuffer));
 
   // Analyze a position (column sequence: 1-7)
