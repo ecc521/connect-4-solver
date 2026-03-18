@@ -103,6 +103,7 @@ npm run build
 If you don't want to install Emscripten locally, you can use the provided Dockerfile. This creates a complete environment for building both the WASM bridge and the TypeScript wrapper:
 
 1. **Build the image**:
+
    ```bash
    docker build -t connect4-builder .
    ```
