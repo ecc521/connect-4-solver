@@ -46,16 +46,12 @@ export interface SolverModule {
   getValue(ptr: number, type: string): number;
 }
 
-const Module = require("../build/analyze.js");
+const createModule = require("../build/analyze.js");
 
-let concludeInitialize: (() => void) | null = null;
-let _moduleInitPromise = new Promise<void>((resolve) => {
-  concludeInitialize = resolve;
+let Module: any = null;
+let _moduleInitPromise = createModule().then((mod: any) => {
+  Module = mod;
 });
-
-(Module as any).onRuntimeInitialized = function () {
-  if (concludeInitialize) concludeInitialize();
-};
 
 export class Connect4Solver {
   private initialized = false;
@@ -63,12 +59,6 @@ export class Connect4Solver {
 
   async init(): Promise<void> {
     if (this.initialized) return;
-
-    // Fallback just in case it's already initialized
-    if ((Module as any).calledRun || (Module as any)._analyzePosition) {
-      this.initialized = true;
-      return;
-    }
 
     await _moduleInitPromise;
     this.initialized = true;
