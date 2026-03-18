@@ -5,8 +5,7 @@
   "main": "dist/index.js",
   "files": [
     "dist",
-    "build",
-    "data"
+    "build"
   ],
   "scripts": {
     "build": "npm run build:wasm && npm run build:ts",
