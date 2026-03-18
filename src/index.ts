@@ -34,7 +34,7 @@ const RESULT_ARRAY_SIZE = 9;
 const INT32_SIZE = 4;
 
 export interface SolverModule {
-  allocateUTF8(str: string): number;
+  stringToNewUTF8(str: string): number;
   _analyzePosition(pointer: number): number;
   _loadBook(pointer: number): void;
   UTF8ToString(pointer: number): string;
@@ -88,7 +88,7 @@ export class Connect4Solver {
     const bookFilePath = "book.book";
     mod.FS.writeFile(bookFilePath, data);
 
-    const allocatedMemory = mod.allocateUTF8(bookFilePath);
+    const allocatedMemory = mod.stringToNewUTF8(bookFilePath);
     mod._loadBook(allocatedMemory);
 
     mod._free(allocatedMemory);
@@ -97,7 +97,7 @@ export class Connect4Solver {
   }
 
   private allocateString(str: string): number {
-    return this.mod.allocateUTF8(str);
+    return this.mod.stringToNewUTF8(str);
   }
 
   private rawAnalyze(positionStr: string): Int32Array {
