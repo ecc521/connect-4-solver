@@ -92,11 +92,25 @@ export interface PositionAnalysis {
 
 ### Building from source
 
-If you want to recompile the WASM module, ensure you have Emscripten installed:
+If you want to recompile the WASM module and have Emscripten installed:
 
 ```bash
 npm run build
 ```
+
+### Building with Docker
+
+If you don't want to install Emscripten locally, you can use the provided Dockerfile. This creates a complete environment for building both the WASM bridge and the TypeScript wrapper:
+
+1. **Build the image**:
+   ```bash
+   docker build -t connect4-builder .
+   ```
+
+2. **Run the compile**:
+   ```bash
+   docker run --rm -v $(pwd):/workspace connect4-builder npm run build
+   ```
 
 ## Credits & License
 
