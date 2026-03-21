@@ -81,10 +81,17 @@ namespace Connect4 {
  */
 
 
+#ifndef BOARD_WIDTH_MACRO
+#define BOARD_WIDTH_MACRO 7
+#endif
+#ifndef BOARD_HEIGHT_MACRO
+#define BOARD_HEIGHT_MACRO 6
+#endif
+
 class Position {
  public:
-  static constexpr int WIDTH = 7;  // width of the board
-  static constexpr int HEIGHT = 6; // height of the board
+  static constexpr int WIDTH = BOARD_WIDTH_MACRO;  // width of the board
+  static constexpr int HEIGHT = BOARD_HEIGHT_MACRO; // height of the board
 
   // Board size is 64bits or 128 bits depending on WIDTH and HEIGHT
   using position_t = typename std::conditional < WIDTH * (HEIGHT + 1) <= 64, uint64_t, __int128>::type;

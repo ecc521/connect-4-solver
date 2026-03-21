@@ -21,16 +21,17 @@ npm install connect-4-solver
 import { Connect4Solver, Player, Outcome } from "connect-4-solver";
 import * as fs from "fs";
 
-async function run() {
-  const solver = new Connect4Solver();
+  // Initialize the solver for a specific board size (defaults to 7x6)
+  // Supported sizes: 6x5, 6x6, 7x6, 7x7, 8x6, 9x7
+  const solver = new Connect4Solver(7, 6);
   await solver.init();
 
   // Load an opening book for instant performance (Required for evaluating positions with <= 6 moves in a reasonable amount of time)
   // Download book files from: https://github.com/ecc521/connect-4-solver/releases/tag/solutionbooks
-  const bookBuffer = fs.readFileSync("path/to/downloaded/7x6.book");
+  const bookBuffer = fs.readFileSync("path/to/downloaded/book_7x6.book");
   await solver.loadBook(new Uint8Array(bookBuffer));
 
-  // Analyze a position (column sequence: 1-7)
+  // Analyze a position (column sequence: 1 to board width)
   const result = solver.analyze("4424");
 
   if (result.evaluation) {
@@ -84,7 +85,7 @@ export interface PositionAnalysis {
   originalPosition: string; // Raw input string
   currentPlayer: Player; // Whose turn it is at the analyzed position
   evaluation: Evaluation | null; // Overall evaluation of the position
-  moveOptions: (Evaluation | null)[]; // Evaluation for playing in each column (1-7)
+  moveOptions: (Evaluation | null)[]; // Evaluation for playing in each column (1 to board width)
 }
 ```
 
@@ -97,6 +98,27 @@ If you want to recompile the WASM module and have Emscripten installed:
 ```bash
 npm run build
 ```
+
+### Generating Opening Books Natively
+
+Generating opening books for larger board sizes (like `8x6`) can take significant CPU time. You can drastically speed this up by building the books natively in C++ across all your CPU cores using GNU Parallel:
+
+1. Compile the native solver and generator for your target board size (by updating `WIDTH` and `HEIGHT` in `native/Position.hpp`):
+   ```bash
+   make
+   ```
+2. Generate all unique positional configurations up to your desired book depth (e.g. depth 14):
+   ```bash
+   ./generator 14 > positions.txt
+   ```
+3. Use GNU Parallel to instantly multithread the solver across all CPU cores:
+   ```bash
+   cat positions.txt | parallel --jobs $(nproc) ./c4solver > scored.txt
+   ```
+4. Compress the scored outcomes back into a compact `.book` file:
+   ```bash
+   cat scored.txt | ./generator
+   ```
 
 ### Building with Docker
 
