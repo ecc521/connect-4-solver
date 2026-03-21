@@ -1,3 +1,4 @@
+/** @deprecated Use solver.width instead */
 export const BOARD_WIDTH = 7;
 
 export enum Player {
@@ -23,20 +24,29 @@ export interface PositionAnalysis {
   originalPosition: string;
   currentPlayer: Player;
   evaluation: Evaluation | null;
-  moveOptions: (Evaluation | null)[]; // Index maps to column 0-6
+  moveOptions: (Evaluation | null)[]; // Index maps to column
 }
 
 const STATUS_VALID = 0;
 const STATUS_WIN = 1;
 const STATUS_INVALID = 2;
 const UNPLAYABLE_COLUMN_SCORE = -1000;
-const RESULT_ARRAY_SIZE = 9;
 const INT32_SIZE = 4;
 
 export interface SolverModule {
   stringToNewUTF8(str: string): number;
-  _analyzePosition(pointer: number): number;
-  _loadBook(pointer: number): void;
+  _analyzePosition6x5(pointer: number): number;
+  _loadBook6x5(pointer: number): void;
+  _analyzePosition6x6(pointer: number): number;
+  _loadBook6x6(pointer: number): void;
+  _analyzePosition7x6(pointer: number): number;
+  _loadBook7x6(pointer: number): void;
+  _analyzePosition7x7(pointer: number): number;
+  _loadBook7x7(pointer: number): void;
+  _analyzePosition8x6(pointer: number): number;
+  _loadBook8x6(pointer: number): void;
+  _analyzePosition9x7(pointer: number): number;
+  _loadBook9x7(pointer: number): void;
   UTF8ToString(pointer: number): string;
   _free(pointer: number): void;
   onRuntimeInitialized?: () => void;
@@ -56,10 +66,27 @@ let _moduleInitPromise = createModule().then((mod: any) => {
 export class Connect4Solver {
   private initialized = false;
   private bookLoaded = false;
+  public width: number;
+  public height: number;
+
+  constructor(width: number = 7, height: number = 6) {
+    if (width === 6 && height === 5) {
+    } else if (width === 6 && height === 6) {
+    } else if (width === 7 && height === 6) {
+    } else if (width === 7 && height === 7) {
+    } else if (width === 8 && height === 6) {
+    } else if (width === 9 && height === 7) {
+    } else {
+      throw new Error(
+        `Board size ${width}x${height} is not supported by the generated WASM bundle. Supported sizes are 6x5, 6x6, 7x6, 7x7, 8x6, 9x7.`,
+      );
+    }
+    this.width = width;
+    this.height = height;
+  }
 
   async init(): Promise<void> {
     if (this.initialized) return;
-
     await _moduleInitPromise;
     this.initialized = true;
   }
@@ -75,14 +102,25 @@ export class Connect4Solver {
     if (!this.initialized) await this.init();
     const mod = this.mod;
 
-    const bookFilePath = "book.book";
+    const bookFilePath = `book_${this.width}x${this.height}.book`;
     mod.FS.writeFile(bookFilePath, data);
 
     const allocatedMemory = mod.stringToNewUTF8(bookFilePath);
-    mod._loadBook(allocatedMemory);
+
+    if (this.width === 6 && this.height === 5)
+      mod._loadBook6x5(allocatedMemory);
+    else if (this.width === 6 && this.height === 6)
+      mod._loadBook6x6(allocatedMemory);
+    else if (this.width === 7 && this.height === 6)
+      mod._loadBook7x6(allocatedMemory);
+    else if (this.width === 7 && this.height === 7)
+      mod._loadBook7x7(allocatedMemory);
+    else if (this.width === 8 && this.height === 6)
+      mod._loadBook8x6(allocatedMemory);
+    else if (this.width === 9 && this.height === 7)
+      mod._loadBook9x7(allocatedMemory);
 
     mod._free(allocatedMemory);
-
     this.bookLoaded = true;
   }
 
@@ -93,16 +131,29 @@ export class Connect4Solver {
   private rawAnalyze(positionStr: string): Int32Array {
     const mod = this.mod as any;
     const allocatedMemory = this.allocateString(positionStr);
-    const outputPointer = mod._analyzePosition(allocatedMemory);
 
-    // Read the 9 returned Int32 values using getValue
-    const finalData = new Int32Array(RESULT_ARRAY_SIZE);
-    for (let i = 0; i < RESULT_ARRAY_SIZE; i++) {
+    let outputPointer = 0;
+    if (this.width === 6 && this.height === 5)
+      outputPointer = mod._analyzePosition6x5(allocatedMemory);
+    else if (this.width === 6 && this.height === 6)
+      outputPointer = mod._analyzePosition6x6(allocatedMemory);
+    else if (this.width === 7 && this.height === 6)
+      outputPointer = mod._analyzePosition7x6(allocatedMemory);
+    else if (this.width === 7 && this.height === 7)
+      outputPointer = mod._analyzePosition7x7(allocatedMemory);
+    else if (this.width === 8 && this.height === 6)
+      outputPointer = mod._analyzePosition8x6(allocatedMemory);
+    else if (this.width === 9 && this.height === 7)
+      outputPointer = mod._analyzePosition9x7(allocatedMemory);
+
+    const dataLength = 2 + this.width;
+    const finalData = new Int32Array(dataLength);
+    for (let i = 0; i < dataLength; i++) {
       finalData[i] = mod.getValue(outputPointer + i * INT32_SIZE, "i32");
     }
 
     mod._free(allocatedMemory);
-    mod._free(outputPointer); // analyze.cpp returns a malloc'd array
+    mod._free(outputPointer);
 
     return finalData;
   }
@@ -116,7 +167,7 @@ export class Connect4Solver {
     const currentPlayer = isPlayer1Turn ? Player.P1 : Player.P2;
     const opponent = isPlayer1Turn ? Player.P2 : Player.P1;
 
-    const movesRemaining = 42 - nbMoves;
+    const movesRemaining = this.width * this.height - nbMoves;
     const halfMovesRemaining = Math.ceil(movesRemaining / 2);
 
     if (score === 0) {
@@ -165,13 +216,12 @@ export class Connect4Solver {
         outcome: Outcome.Win,
         winner: winner,
         movesToEnd: 0,
-        score: 22, // Logical max score for a direct win is actually 21-22 depending on how we count
+        score: Math.floor((this.width * this.height + 1 - nbMoves) / 2),
       };
     } else {
-      // Valid mid-game position
-      evaluation = null; // We'll compute it from moveOptions
+      evaluation = null;
 
-      for (let i = 0; i < BOARD_WIDTH; i++) {
+      for (let i = 0; i < this.width; i++) {
         const n = resArr[2 + i] as number;
         if (n === UNPLAYABLE_COLUMN_SCORE) {
           moveOptions.push(null);
@@ -180,9 +230,7 @@ export class Connect4Solver {
         }
       }
 
-      // Best evaluation for the current player
       let bestEval: Evaluation | null = null;
-
       for (const ev of moveOptions) {
         if (!ev) continue;
         if (!bestEval) {
@@ -190,7 +238,6 @@ export class Connect4Solver {
           continue;
         }
 
-        // Win is better than Draw is better than Loss
         if (ev.outcome === Outcome.Win) {
           if (
             bestEval.outcome !== Outcome.Win ||

@@ -1,74 +1,159 @@
-/*
- * This file is part of Connect4 Game Solver <http://connect4.gamesolver.org>
- * Copyright (C) 2017-2019 Pascal Pons <contact@gamesolver.org>
- *
- * Connect4 Game Solver is free software: you can redistribute it and/or
- * modify it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * Connect4 Game Solver is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with Connect4 Game Solver. If not, see <http://www.gnu.org/licenses/>.
- */
-
-#include "Solver.hpp"
-#include <cstdlib>
-
-using namespace GameSolver::Connect4;
-
 #include <emscripten/emscripten.h>
+#include <cstdlib>
+#include <string>
+#include <vector>
+#include <cstdint>
+#include <cassert>
+#include <iostream>
+#include <fstream>
+#include <cstring>
 
-extern "C" {
-
-Solver solver;
-
-EMSCRIPTEN_KEEPALIVE void loadBook(const char* bookFilePath) {
-  std::string opening_book = std::string(bookFilePath);
-  solver.loadBook(opening_book);
-}
-
-enum Status {
-  STATUS_VALID = 0,
-  STATUS_WIN = 1,
-  STATUS_INVALID = 2
-};
-
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition(const char* positionCharArr) {
-  bool weak = false;
-
-  std::string positionString = std::string(positionCharArr);
-  Position P;
-
-  int32_t* result = (int32_t*)malloc(9 * sizeof(int32_t));
-
+template <typename CoreSolver, typename CorePosition, int W>
+int32_t* runAnalysis(CoreSolver& solver, const char* positionCharArr) {
+  std::string positionString(positionCharArr);
+  CorePosition P;
+  
+  int32_t* result = (int32_t*)malloc((2 + W) * sizeof(int32_t));
+  
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
-
-    if (P.isWinningMove(lastColPlayed)) {
-      result[0] = STATUS_WIN;
-    } else {
-      result[0] = STATUS_INVALID;
-    }
+    result[0] = P.isWinningMove(lastColPlayed) ? 1 : 2;
     result[1] = P.nbMoves();
-    for(int i = 0; i < Position::WIDTH; i++) result[2 + i] = 0;
+    for(int i = 0; i < W; i++) result[2 + i] = 0;
   } 
   else {
-    result[0] = STATUS_VALID;
+    result[0] = 0;
     result[1] = P.nbMoves();
-
-    std::vector<int> scores = solver.analyze(P, weak);
-    for(int i = 0; i < Position::WIDTH; i++) {
-        result[2 + i] = scores[i];
-    }
+    std::vector<int> scores = solver.analyze(P, false);
+    for(int i = 0; i < W; i++) result[2 + i] = scores[i];
   }
-
   return result;
-
 }
 
-} //extern "C"
+// ==========================================
+// 6x5 Instantiation
+// ==========================================
+#define BOARD_WIDTH_MACRO 6
+#define BOARD_HEIGHT_MACRO 5
+namespace C4_6x5 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+// ==========================================
+// 6x6 Instantiation
+// ==========================================
+#define BOARD_WIDTH_MACRO 6
+#define BOARD_HEIGHT_MACRO 6
+namespace C4_6x6 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+// ==========================================
+// 7x6 Instantiation
+// ==========================================
+#define BOARD_WIDTH_MACRO 7
+#define BOARD_HEIGHT_MACRO 6
+namespace C4_7x6 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+// ==========================================
+// 7x7 Instantiation
+// ==========================================
+#define BOARD_WIDTH_MACRO 7
+#define BOARD_HEIGHT_MACRO 7
+namespace C4_7x7 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+// ==========================================
+// 8x6 Instantiation
+// ==========================================
+#define BOARD_WIDTH_MACRO 8
+#define BOARD_HEIGHT_MACRO 6
+namespace C4_8x6 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+// ==========================================
+// 9x7 Instantiation
+// ==========================================
+#define BOARD_WIDTH_MACRO 9
+#define BOARD_HEIGHT_MACRO 7
+namespace C4_9x7 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+// ==========================================
+// Exposed WebAssembly Bridge
+// ==========================================
+extern "C" {
+
+C4_6x5::GameSolver::Connect4::Solver solver6x5;
+C4_6x6::GameSolver::Connect4::Solver solver6x6;
+C4_7x6::GameSolver::Connect4::Solver solver7x6;
+C4_7x7::GameSolver::Connect4::Solver solver7x7;
+C4_8x6::GameSolver::Connect4::Solver solver8x6;
+C4_9x7::GameSolver::Connect4::Solver solver9x7;
+
+EMSCRIPTEN_KEEPALIVE void loadBook6x5(const char* path) { solver6x5.loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x5(const char* pos) { return runAnalysis<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6>(solver6x5, pos); }
+
+EMSCRIPTEN_KEEPALIVE void loadBook6x6(const char* path) { solver6x6.loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x6(const char* pos) { return runAnalysis<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6>(solver6x6, pos); }
+
+EMSCRIPTEN_KEEPALIVE void loadBook7x6(const char* path) { solver7x6.loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x6(const char* pos) { return runAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7>(solver7x6, pos); }
+
+EMSCRIPTEN_KEEPALIVE void loadBook7x7(const char* path) { solver7x7.loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x7(const char* pos) { return runAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7>(solver7x7, pos); }
+
+EMSCRIPTEN_KEEPALIVE void loadBook8x6(const char* path) { solver8x6.loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition8x6(const char* pos) { return runAnalysis<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8>(solver8x6, pos); }
+
+EMSCRIPTEN_KEEPALIVE void loadBook9x7(const char* path) { solver9x7.loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition9x7(const char* pos) { return runAnalysis<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9>(solver9x7, pos); }
+
+} // extern "C"
