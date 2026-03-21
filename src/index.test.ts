@@ -2,6 +2,73 @@ import { Connect4Solver, Outcome, Player, BOARD_WIDTH } from "../src/index";
 import * as fs from "fs";
 import * as path from "path";
 
+function runParityTest(
+  solver: Connect4Solver,
+  dataPath: string,
+  w: number,
+  h: number,
+  ignoreEarlyGame: boolean = false,
+) {
+  if (!fs.existsSync(dataPath)) {
+    console.warn(`Skipping parity test, ${dataPath} not found.`);
+    return;
+  }
+
+  const lines = fs
+    .readFileSync(dataPath, "utf8")
+    .split("\n")
+    .filter((l) => l.trim().length > 0);
+  expect(lines.length).toBeGreaterThan(0);
+
+  for (const line of lines) {
+    const parts = line.split(" ");
+    const pos = parts[0];
+    const expectedRawScore = parseInt(parts[1]!, 10);
+
+    if (ignoreEarlyGame && pos.length <= 10) {
+      continue;
+    }
+
+    const result = solver.analyze(pos);
+
+    const nbMoves = pos.length;
+    const isP1Turn = nbMoves % 2 === 0;
+    const currentPlayer = isP1Turn ? Player.P1 : Player.P2;
+    const opponent = isP1Turn ? Player.P2 : Player.P1;
+
+    const movesRemaining = w * h - nbMoves;
+    const halfMovesRemaining = Math.ceil(movesRemaining / 2);
+
+    let expectedOutcome: Outcome = Outcome.Draw;
+    let expectedWinner: Player | null = null;
+    let expectedMoves: number | null = null;
+
+    if (expectedRawScore > 0) {
+      expectedOutcome = Outcome.Win;
+      expectedWinner = currentPlayer;
+      expectedMoves = halfMovesRemaining - expectedRawScore + 1;
+    } else if (expectedRawScore < 0) {
+      expectedOutcome = Outcome.Loss;
+      expectedWinner = opponent;
+      expectedMoves = halfMovesRemaining + expectedRawScore + 1;
+    }
+
+    if (
+      !result.evaluation ||
+      result.evaluation.outcome !== expectedOutcome ||
+      result.evaluation.winner !== expectedWinner ||
+      result.evaluation.movesToEnd !== expectedMoves ||
+      result.evaluation.score !== expectedRawScore
+    ) {
+      throw new Error(
+        `Mismatch at position ${pos}. Expected ${expectedOutcome}/${expectedWinner}/${expectedMoves} (score=${expectedRawScore}), got ${result.evaluation?.outcome}/${result.evaluation?.winner}/${result.evaluation?.movesToEnd} (score=${result.evaluation?.score})`,
+      );
+    }
+
+    expect(result.originalPosition).toBe(pos);
+  }
+}
+
 describe("Connect4Solver", () => {
   let solver: Connect4Solver;
   let bookLoaded = false;
@@ -54,63 +121,47 @@ describe("Connect4Solver", () => {
 
   test("should correctly analyze 200 positions against expected C++ raw solver output", () => {
     const dataPath = path.join(__dirname, "..", "test-data", "positions.txt");
-    if (!fs.existsSync(dataPath)) {
-      console.warn("Skipping parity test, test-data/positions.txt not found.");
-      return;
-    }
+    runParityTest(solver, dataPath, 7, 6, !bookLoaded);
+  });
 
-    const lines = fs
-      .readFileSync(dataPath, "utf8")
-      .split("\n")
-      .filter((l) => l.trim().length > 0);
-    expect(lines.length).toBeGreaterThan(0);
+  describe("Generic Board Sizes Support", () => {
+    it("should correctly instantiate and evaluate an 8x6 board at depth 34", async () => {
+      const solver = new Connect4Solver(8, 6);
+      await solver.init();
+      // P1 plays 1, 2, 3, 4. P2 plays 8, 8, 8. P1 Wins on move 7!
+      const result = solver.analyze("1828384");
+      expect(result.evaluation?.outcome).toBe(Outcome.Win);
+    });
 
-    for (const line of lines) {
-      const parts = line.split(" ");
-      const pos = parts[0];
-      const expectedRawScore = parseInt(parts[1]!, 10);
+    it("should correctly instantiate and evaluate a massive 9x7 board using the 128-bit fallback math", async () => {
+      const solver = new Connect4Solver(9, 7);
+      await solver.init();
+      // P1 plays 1, 2, 3, 4. P2 plays 9, 9, 9. P1 Wins on move 7!
+      const result = solver.analyze("1929394");
+      expect(result.evaluation?.outcome).toBe(Outcome.Win);
+    });
 
-      // Skip early game if no book
-      if (!bookLoaded && pos.length <= 10) {
-        continue;
-      }
+    const sizes = [
+      [6, 5],
+      [6, 6],
+      [7, 7],
+      [8, 6],
+      [9, 7],
+    ];
 
-      const result = solver.analyze(pos);
-
-      const nbMoves = pos.length;
-      const isP1Turn = nbMoves % 2 === 0;
-      const currentPlayer = isP1Turn ? Player.P1 : Player.P2;
-      const opponent = isP1Turn ? Player.P2 : Player.P1;
-
-      const movesRemaining = 42 - nbMoves;
-      const halfMovesRemaining = Math.ceil(movesRemaining / 2);
-
-      let expectedOutcome: Outcome = Outcome.Draw;
-      let expectedWinner: Player | null = null;
-      let expectedMoves: number | null = null;
-
-      if (expectedRawScore > 0) {
-        expectedOutcome = Outcome.Win;
-        expectedWinner = currentPlayer;
-        expectedMoves = halfMovesRemaining - expectedRawScore + 1;
-      } else if (expectedRawScore < 0) {
-        expectedOutcome = Outcome.Loss;
-        expectedWinner = opponent;
-        expectedMoves = halfMovesRemaining + expectedRawScore + 1;
-      }
-
-      if (
-        !result.evaluation ||
-        result.evaluation.outcome !== expectedOutcome ||
-        result.evaluation.winner !== expectedWinner ||
-        result.evaluation.movesToEnd !== expectedMoves
-      ) {
-        throw new Error(
-          `Mismatch at position ${pos}. Expected ${expectedOutcome}/${expectedWinner}/${expectedMoves}, got ${result.evaluation?.outcome}/${result.evaluation?.winner}/${result.evaluation?.movesToEnd}`,
+    for (const [w, h] of sizes) {
+      it(`should correctly analyze generated positions for ${w}x${h} against expected solver output`, async () => {
+        const dataPath = path.join(
+          __dirname,
+          "..",
+          "test-data",
+          `positions_${w}x${h}.txt`,
         );
-      }
+        const testSolver = new Connect4Solver(w, h);
+        await testSolver.init();
 
-      expect(result.originalPosition).toBe(pos);
+        runParityTest(testSolver, dataPath, w, h, false);
+      });
     }
   });
 });
