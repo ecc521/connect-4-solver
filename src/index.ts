@@ -27,7 +27,6 @@ export interface PositionAnalysis {
   moveOptions: (Evaluation | null)[]; // Index maps to column
 }
 
-const STATUS_VALID = 0;
 const STATUS_WIN = 1;
 const STATUS_INVALID = 2;
 const UNPLAYABLE_COLUMN_SCORE = -1000;
@@ -56,27 +55,24 @@ export interface SolverModule {
   getValue(ptr: number, type: string): number;
 }
 
-const createModule = require("../build/analyze.js");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const createModule =
+  require("../build/analyze.js") as unknown as () => Promise<SolverModule>;
 
-let Module: any = null;
-let _moduleInitPromise = createModule().then((mod: any) => {
+let Module: SolverModule | null = null;
+const _moduleInitPromise = createModule().then((mod: SolverModule) => {
   Module = mod;
 });
 
 export class Connect4Solver {
-  private initialized = false;
+  protected initialized = false;
   private bookLoaded = false;
   public width: number;
   public height: number;
 
-  constructor(width: number = 7, height: number = 6) {
-    if (width === 6 && height === 5) {
-    } else if (width === 6 && height === 6) {
-    } else if (width === 7 && height === 6) {
-    } else if (width === 7 && height === 7) {
-    } else if (width === 8 && height === 6) {
-    } else if (width === 9 && height === 7) {
-    } else {
+  constructor(width = 7, height = 6) {
+    const validSizes = ["6x5", "6x6", "7x6", "7x7", "8x6", "9x7"];
+    if (!validSizes.includes(`${width}x${height}`)) {
       throw new Error(
         `Board size ${width}x${height} is not supported by the generated WASM bundle. Supported sizes are 6x5, 6x6, 7x6, 7x7, 8x6, 9x7.`,
       );
@@ -91,7 +87,7 @@ export class Connect4Solver {
     this.initialized = true;
   }
 
-  private get mod(): SolverModule {
+  protected get mod(): SolverModule {
     if (!this.initialized) {
       throw new Error("Solver not initialized. Call init() first.");
     }
@@ -129,7 +125,7 @@ export class Connect4Solver {
   }
 
   private rawAnalyze(positionStr: string): Int32Array {
-    const mod = this.mod as any;
+    const mod = this.mod;
     const allocatedMemory = this.allocateString(positionStr);
 
     let outputPointer = 0;
@@ -198,13 +194,13 @@ export class Connect4Solver {
     const resArr = this.rawAnalyze(positionStr);
 
     const originalPosition = positionStr;
-    const status = resArr[0] as number;
-    const nbMoves = resArr[1] as number;
+    const status = resArr[0];
+    const nbMoves = resArr[1];
 
     let currentPosition = positionStr;
     const currentPlayer = this.getPlayerAt(nbMoves);
     let evaluation: Evaluation | null = null;
-    let moveOptions: (Evaluation | null)[] = [];
+    const moveOptions: (Evaluation | null)[] = [];
 
     if (status === STATUS_INVALID) {
       currentPosition = positionStr.slice(0, nbMoves);
@@ -219,10 +215,8 @@ export class Connect4Solver {
         score: Math.floor((this.width * this.height + 1 - nbMoves) / 2),
       };
     } else {
-      evaluation = null;
-
       for (let i = 0; i < this.width; i++) {
-        const n = resArr[2 + i] as number;
+        const n = resArr[2 + i];
         if (n === UNPLAYABLE_COLUMN_SCORE) {
           moveOptions.push(null);
         } else {
@@ -241,7 +235,9 @@ export class Connect4Solver {
         if (ev.outcome === Outcome.Win) {
           if (
             bestEval.outcome !== Outcome.Win ||
-            ev.movesToEnd! < bestEval.movesToEnd!
+            (ev.movesToEnd !== null &&
+              bestEval.movesToEnd !== null &&
+              ev.movesToEnd < bestEval.movesToEnd)
           ) {
             bestEval = ev;
           }
@@ -252,7 +248,9 @@ export class Connect4Solver {
         } else if (ev.outcome === Outcome.Loss) {
           if (
             bestEval.outcome === Outcome.Loss &&
-            ev.movesToEnd! > bestEval.movesToEnd!
+            ev.movesToEnd !== null &&
+            bestEval.movesToEnd !== null &&
+            ev.movesToEnd > bestEval.movesToEnd
           ) {
             bestEval = ev;
           }
@@ -268,5 +266,36 @@ export class Connect4Solver {
       evaluation,
       moveOptions,
     };
+  }
+}
+
+let ThreadedModule: SolverModule | null = null;
+let _threadedModuleInitPromise: Promise<void> | null = null;
+function initThreadedModule(): Promise<void> {
+  if (!_threadedModuleInitPromise) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const createThreadedModule =
+      require("../build/analyze_threaded.js") as unknown as () => Promise<SolverModule>;
+    _threadedModuleInitPromise = createThreadedModule().then(
+      (mod: SolverModule) => {
+        ThreadedModule = mod;
+      },
+    );
+  }
+  return _threadedModuleInitPromise;
+}
+
+export class ThreadedConnect4Solver extends Connect4Solver {
+  async init(): Promise<void> {
+    if (this.initialized) return;
+    await initThreadedModule();
+    this.initialized = true;
+  }
+
+  protected get mod(): SolverModule {
+    if (!this.initialized) {
+      throw new Error("Threaded Solver not initialized. Call init() first.");
+    }
+    return ThreadedModule as unknown as SolverModule;
   }
 }

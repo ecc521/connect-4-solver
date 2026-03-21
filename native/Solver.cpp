@@ -16,9 +16,12 @@
  * along with Connect4 Game Solver. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <cassert>
 #include "Solver.hpp"
 #include "MoveSorter.hpp"
+#ifdef USE_PTHREADS
+#include <thread>
+#include <algorithm>
+#endif
 
 using namespace GameSolver::Connect4;
 
@@ -127,6 +130,41 @@ int Solver::solve(const Position &P, bool weak) {
 
 std::vector<int> Solver::analyze(const Position &P, bool weak) {
   std::vector<int> scores(Position::WIDTH, -1000);
+
+#ifdef USE_PTHREADS
+  std::atomic<int> next_col{0};
+
+  auto worker = [&]() {
+    while (true) {
+      int col = next_col.fetch_add(1);
+      if (col >= Position::WIDTH) break;
+
+      if (P.canPlay(col)) {
+        if(P.isWinningMove(col)) {
+          scores[col] = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
+        } else {
+          Position P2(P);
+          P2.playCol(col);
+          scores[col] = -solve(P2, weak);
+        }
+      }
+    }
+  };
+
+  unsigned int hardware_threads = std::thread::hardware_concurrency();
+  if (hardware_threads == 0) hardware_threads = 4;
+  unsigned int num_threads = std::min((unsigned int)Position::WIDTH, hardware_threads);
+  
+  std::vector<std::thread> threads;
+  for (unsigned int i = 0; i < num_threads - 1; i++) {
+    threads.emplace_back(worker);
+  }
+  worker(); // use the main thread too
+
+  for (auto& t : threads) {
+    if (t.joinable()) t.join();
+  }
+#else
   for (int col = 0; col < Position::WIDTH; col++)
     if (P.canPlay(col)) {
       if(P.isWinningMove(col)) scores[col] = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
@@ -136,6 +174,8 @@ std::vector<int> Solver::analyze(const Position &P, bool weak) {
         scores[col] = -solve(P2, weak);
       }
     }
+#endif
+
   return scores;
 }
 
