@@ -1,5 +1,4 @@
-echo "If emcc does not exist, but is installed, make sure to source emsdk/emsdk_env.sh"
 mkdir -p build
 emcc -O3 -o build/analyze.js native/analyze.cpp -s NO_EXIT_RUNTIME=1 -s EXPORTED_FUNCTIONS='["_free", "_malloc"]' -s EXPORTED_RUNTIME_METHODS='["FS", "UTF8ToString", "stringToNewUTF8", "getValue", "wasmMemory"]' -s INITIAL_MEMORY=200MB -s ALLOW_MEMORY_GROWTH -s WASM=1 -s SINGLE_FILE=1 -s MODULARIZE=1 -s EXPORT_NAME="createModule"
 
-emcc -O3 -DUSE_PTHREADS=1 -pthread -o build/analyze_threaded.js native/analyze.cpp -s NO_EXIT_RUNTIME=1 -s EXPORTED_FUNCTIONS='["_free", "_malloc"]' -s EXPORTED_RUNTIME_METHODS='["FS", "UTF8ToString", "stringToNewUTF8", "getValue", "wasmMemory"]' -s INITIAL_MEMORY=200MB -s MAXIMUM_MEMORY=1GB -s ALLOW_MEMORY_GROWTH -s WASM=1 -s MODULARIZE=1 -s EXPORT_NAME="createThreadedModule"
+emcc -O3 -DUSE_PTHREADS=1 -pthread -o build/analyze_threaded.js native/analyze.cpp -s NO_EXIT_RUNTIME=1 -s EXPORTED_FUNCTIONS='["_free", "_malloc"]' -s EXPORTED_RUNTIME_METHODS='["FS", "UTF8ToString", "stringToNewUTF8", "getValue", "wasmMemory"]' -s INITIAL_MEMORY=200MB -s MAXIMUM_MEMORY=1GB -s ALLOW_MEMORY_GROWTH -s WASM=1 -s SINGLE_FILE=1 -s MODULARIZE=1 -s EXPORT_NAME="createThreadedModule"
