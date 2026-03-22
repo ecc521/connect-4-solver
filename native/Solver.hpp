@@ -56,9 +56,14 @@ class Solver {
   // Returns the score of a position
   int solve(const Position &P, bool weak = false);
 
-  // Returns the score off all possible moves of a position as an array.
-  // Returns INVALID_MOVE for unplayable columns
-  std::vector<int> analyze(const Position &P, bool weak = false);
+  /**
+   * Evaluate possible winning moves for current player
+   * @param P: position to evaluate
+   * @param weak: boolean indicating if the solver should only compute outcome (win, draw, loss)
+   * @param threads: num WebAssembly std::threads to spawn, defaults to 1 for no multithreading
+   * @return a vector of scores for each column
+   */
+  std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1);
 
   unsigned long long getNodeCount() const {
     return nodeCount;

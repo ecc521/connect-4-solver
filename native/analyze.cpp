@@ -12,7 +12,7 @@
 #include <algorithm>
 
 template <typename CoreSolver, typename CorePosition, int W>
-int32_t* runAnalysis(CoreSolver& solver, const char* positionCharArr) {
+int32_t* runAnalysis(CoreSolver& solver, const char* positionCharArr, int threads) {
   std::string positionString(positionCharArr);
   CorePosition P;
   
@@ -27,7 +27,7 @@ int32_t* runAnalysis(CoreSolver& solver, const char* positionCharArr) {
   else {
     result[0] = 0;
     result[1] = P.nbMoves();
-    std::vector<int> scores = solver.analyze(P, false);
+    std::vector<int> scores = solver.analyze(P, false, threads);
     for(int i = 0; i < W; i++) result[2 + i] = scores[i];
   }
   return result;
@@ -142,21 +142,21 @@ C4_8x6::GameSolver::Connect4::Solver solver8x6;
 C4_9x7::GameSolver::Connect4::Solver solver9x7;
 
 EMSCRIPTEN_KEEPALIVE void loadBook6x5(const char* path) { solver6x5.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x5(const char* pos) { return runAnalysis<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6>(solver6x5, pos); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x5(const char* pos, int threads) { return runAnalysis<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6>(solver6x5, pos, threads); }
 
 EMSCRIPTEN_KEEPALIVE void loadBook6x6(const char* path) { solver6x6.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x6(const char* pos) { return runAnalysis<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6>(solver6x6, pos); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x6(const char* pos, int threads) { return runAnalysis<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6>(solver6x6, pos, threads); }
 
 EMSCRIPTEN_KEEPALIVE void loadBook7x6(const char* path) { solver7x6.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x6(const char* pos) { return runAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7>(solver7x6, pos); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x6(const char* pos, int threads) { return runAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7>(solver7x6, pos, threads); }
 
 EMSCRIPTEN_KEEPALIVE void loadBook7x7(const char* path) { solver7x7.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x7(const char* pos) { return runAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7>(solver7x7, pos); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x7(const char* pos, int threads) { return runAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7>(solver7x7, pos, threads); }
 
 EMSCRIPTEN_KEEPALIVE void loadBook8x6(const char* path) { solver8x6.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition8x6(const char* pos) { return runAnalysis<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8>(solver8x6, pos); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition8x6(const char* pos, int threads) { return runAnalysis<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8>(solver8x6, pos, threads); }
 
 EMSCRIPTEN_KEEPALIVE void loadBook9x7(const char* path) { solver9x7.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition9x7(const char* pos) { return runAnalysis<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9>(solver9x7, pos); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition9x7(const char* pos, int threads) { return runAnalysis<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9>(solver9x7, pos, threads); }
 
 } // extern "C"
