@@ -20,6 +20,7 @@
 #define TRANSPOSITION_TABLE_HPP
 
 #include <cstring>
+#include <atomic>
 
 namespace GameSolver {
 namespace Connect4 {
@@ -94,11 +95,11 @@ template<class partial_key_t, class key_t, class value_t, int log_size>
 class TranspositionTable : public TableGetter<key_t, value_t> {
  private:
   static const size_t size = next_prime(1 << log_size); // size of the transition table. Have to be odd to be prime with 2^sizeof(key_t)
-  partial_key_t *K;     // Array to store truncated version of keys;
-  value_t *V;   // Array to store values;
+  std::atomic<partial_key_t> *K;     // Array to store truncated version of keys;
+  std::atomic<value_t> *V;   // Array to store values;
 
-  void* getKeys()    override {return K;}
-  void* getValues()  override {return V;}
+  void* getKeys()    override {return (void*)K;}
+  void* getValues()  override {return (void*)V;}
   size_t getSize()   override {return size;}
   int getKeySize()   override {return sizeof(partial_key_t);}
   int getValueSize() override {return sizeof(value_t);}
@@ -109,8 +110,8 @@ class TranspositionTable : public TableGetter<key_t, value_t> {
 
  public:
   TranspositionTable() {
-    K = new partial_key_t[size];
-    V = new value_t[size];
+    K = new std::atomic<partial_key_t>[size];
+    V = new std::atomic<value_t>[size];
     reset();
   }
 
@@ -122,9 +123,11 @@ class TranspositionTable : public TableGetter<key_t, value_t> {
   /**
    * Empty the Transition Table.
    */
-  void reset() { // fill everything with 0, because 0 value means missing data
-    memset(K, 0, size * sizeof(partial_key_t));
-    memset(V, 0, size * sizeof(value_t));
+  void reset() {
+    for (size_t i = 0; i < size; i++) {
+      K[i].store(0, std::memory_order_relaxed);
+      V[i].store(0, std::memory_order_relaxed);
+    }
   }
 
   /**
@@ -134,8 +137,9 @@ class TranspositionTable : public TableGetter<key_t, value_t> {
    */
   void put(key_t key, value_t value) {
     size_t pos = index(key);
-    K[pos] = key; // key is possibly trucated as key_t is possibly less than key_size bits.
-    V[pos] = value;
+    // Lock-free sequence lock: Write V first, then K with release semantics
+    V[pos].store(value, std::memory_order_relaxed);
+    K[pos].store((partial_key_t)key, std::memory_order_release);
   }
 
   /**
@@ -145,8 +149,15 @@ class TranspositionTable : public TableGetter<key_t, value_t> {
    */
   value_t get(key_t key) const override {
     size_t pos = index(key);
-    if(K[pos] == (partial_key_t)key) return V[pos]; // need to cast to key_t because key may be truncated due to size of key_t
-    else return 0;
+    // Lock-free sequence lock: Read V, then K with acquire semantics, then V again
+    value_t v1 = V[pos].load(std::memory_order_relaxed);
+    partial_key_t k = K[pos].load(std::memory_order_acquire);
+    value_t v2 = V[pos].load(std::memory_order_relaxed);
+
+    if (k == (partial_key_t)key && v1 == v2) {
+      return v1;
+    }
+    return 0;
   }
 };
 
