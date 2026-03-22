@@ -2,15 +2,23 @@
 export const BOARD_WIDTH = 7;
 
 export * from "./core";
-import { Player, Outcome, Evaluation, PositionAnalysis, SolverModule } from "./core";
+import {
+  Player,
+  Outcome,
+  Evaluation,
+  PositionAnalysis,
+  SolverModule,
+} from "./core";
 
 const STATUS_WIN = 1;
 const STATUS_INVALID = 2;
 const UNPLAYABLE_COLUMN_SCORE = -1000;
 const INT32_SIZE = 4;
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const createModule = require("../build/analyze.js") as unknown as () => Promise<SolverModule>;
+/* eslint-disable @typescript-eslint/no-require-imports */
+const createModule =
+  require("../build/analyze.js") as unknown as () => Promise<SolverModule>;
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 let Module: SolverModule | null = null;
 const _moduleInitPromise = createModule().then((mod: SolverModule) => {

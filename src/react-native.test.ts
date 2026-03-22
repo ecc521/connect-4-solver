@@ -11,7 +11,13 @@ jest.mock(
           // Return a mock output raw JNI/Obj-C IntArray matching what WASM usually returns
           // [status, nbmoves, scores...]
           analyze: jest.fn(
-            (pos: string, _threads: number, _w: number, _h: number, _weak: boolean) => {
+            (
+              pos: string,
+              _threads: number,
+              _w: number,
+              _h: number,
+              _weak: boolean,
+            ) => {
               return new Promise((resolve) => {
                 if (pos === "121212") {
                   // If it's a 7x6 board, output 2 (status) + 7 = 9 length array
@@ -66,7 +72,9 @@ describe("ReactNativeConnect4Solver Bridge Tests", () => {
 
   test("should correctly bypass the unneeded Opening Book loading payload securely natively", async () => {
     // Should warn, not throw
-    const consoleSpy = jest.spyOn(console, "warn").mockImplementation(() => { return; });
+    const consoleSpy = jest.spyOn(console, "warn").mockImplementation(() => {
+      return;
+    });
     await solver.loadBook(new Uint8Array([1, 2, 3]));
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining("natively bypassed"),
