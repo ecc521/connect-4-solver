@@ -22,7 +22,13 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "build/analyze.js",
+    "build/analyze_threaded.js",
+    "android",
+    "ios",
+    "native",
+    "connect-4-solver.podspec"
   ],
   "scripts": {
     "build": "npm run build:wasm && npm run build:ts",
