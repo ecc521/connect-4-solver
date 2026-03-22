@@ -1,4 +1,4 @@
-import { Connect4Solver, Outcome, Player, BOARD_WIDTH } from "../src/index";
+import { Connect4Solver, Player, Outcome, BOARD_WIDTH } from "./index";
 import * as fs from "fs";
 import * as path from "path";
 
