@@ -80,34 +80,33 @@ The threads dynamically share their evaluated tree hashes with each other across
 
 WebAssembly execution is fundamentally **synchronous and blocking**. Calling `solver.analyze()` directly on your main UI thread will instantly freeze your browser tab until the C++ algorithm formally completes its evaluation.
 
-To achieve non-blocking execution safely on Web/Node environments, you **must** instantiate the solver natively inside your own application's Web Worker. 
+To achieve non-blocking execution safely on Web/Node environments, you **must** instantiate the solver natively inside your own application's Web Worker.
 
 Here is a standard WebWorker architecture (`worker.ts`) you should securely deploy inside your app:
 
 ```typescript
 // worker.ts (Inside your application codebase)
-import { Connect4Solver } from 'connect-4-solver';
+import { Connect4Solver } from "connect-4-solver";
 
 let solver: Connect4Solver;
 
 self.onmessage = async (e) => {
   const { type, position } = e.data;
-  
-  if (type === 'INIT') {
+
+  if (type === "INIT") {
     solver = new Connect4Solver(7, 6);
     await solver.init();
     // await solver.loadBook(bookBuffer);
-    self.postMessage({ type: 'READY' });
-  } 
-  else if (type === 'ANALYZE') {
+    self.postMessage({ type: "READY" });
+  } else if (type === "ANALYZE") {
     // The intensive C++ call executes safely out of the Main Thread here!
     const result = solver.analyze(position);
-    self.postMessage({ type: 'RESULT', result });
+    self.postMessage({ type: "RESULT", result });
   }
 };
 ```
 
-*(Note: The React Native `"connect-4-solver/native"` plugins circumvent this entirely! They are exclusively engineered to run 100% asynchronously on true background CPU hooks natively!)*
+_(Note: The React Native `"connect-4-solver/native"` plugins circumvent this entirely! They are exclusively engineered to run 100% asynchronously on true background CPU hooks natively!)_
 
 ### Analysis Result Structure
 
@@ -154,14 +153,15 @@ npm run build
 ### Generating Opening Books Natively
 
 **What is "Depth"?**  
-Depth refers to the exact number of moves (ply) pre-calculated consecutively starting from a completely empty board. Connect 4 branching logic scales *exponentially* based on the remaining unplayed mathematical volume. By generating an opening book up to an explicit Depth (e.g. `14`), you are securely caching the perfect evaluations for every single valid board permutation that can possibly occur within the first 14 turns. The upstream user's device instantly fetches this cached scenario directly from the `.book` memory buffer without burning their processor cycle.
+Depth refers to the exact number of moves (ply) pre-calculated consecutively starting from a completely empty board. Connect 4 branching logic scales _exponentially_ based on the remaining unplayed mathematical volume. By generating an opening book up to an explicit Depth (e.g. `14`), you are securely caching the perfect evaluations for every single valid board permutation that can possibly occur within the first 14 turns. The upstream user's device instantly fetches this cached scenario directly from the `.book` memory buffer without burning their processor cycle.
 
 **Depth Recommendations (Targeting `<1s` UI Response Times):**
-*   **`6x5` & `6x6`:** Depth `0` *(No book required; WASM evaluates instantly)*
-*   **`7x6` (Standard):** Depth `12` or `14` *(Standard 14-depth book is ~4MB)*
-*   **`7x7`:** Depth `16` to `18`
-*   **`8x6`:** Depth `20` to `22` 
-*   **`9x7`:** Astronomical complexity. Effectively unsolvable seamlessly without colossal initial caching overheads (> Depth `26`).
+
+- **`6x5` & `6x6`:** Depth `0` _(No book required; WASM evaluates instantly)_
+- **`7x6` (Standard):** Depth `12` or `14` _(Standard 14-depth book is ~4MB)_
+- **`7x7`:** Depth `16` to `18`
+- **`8x6`:** Depth `20` to `22`
+- **`9x7`:** Astronomical complexity. Effectively unsolvable seamlessly without colossal initial caching overheads (> Depth `26`).
 
 Generating opening books for larger board sizes (like `8x6`) can take significant CPU time to compute locally. You can drastically speed this up by building the books natively in C++ across all your CPU cores using GNU Parallel:
 
