@@ -23,7 +23,7 @@ function runParityTest(
   for (const line of lines) {
     const parts = line.split(" ");
     const pos = parts[0];
-    const expectedRawScore = parseInt(parts[1]!, 10);
+    const expectedRawScore = parseInt(parts[1], 10);
 
     if (ignoreEarlyGame && pos.length <= 10) {
       continue;
@@ -68,7 +68,7 @@ function runParityTest(
   }
 }
 
-describe("Connect4Solver", (): void => {
+describe("Connect4Solver", () => {
   let solver: Connect4Solver;
   let bookLoaded = false;
 
@@ -123,18 +123,20 @@ describe("Connect4Solver", (): void => {
     runParityTest(solver, dataPath, 7, 6, !bookLoaded);
   });
 
-  describe("Generic Board Sizes Support", (): void => {
-    it("should correctly instantiate and evaluate an 8x6 board forced win", async (): Promise<void> => {
-      const testSolver = new Connect4Solver(8, 6);
-      await testSolver.init();
-      const result = testSolver.analyze("1828384");
+  describe("Generic Board Sizes Support", () => {
+    it("should correctly instantiate and evaluate an 8x6 board at depth 34", async () => {
+      const solver = new Connect4Solver(8, 6);
+      await solver.init();
+      // P1 plays 1, 2, 3, 4. P2 plays 8, 8, 8. P1 Wins on move 7!
+      const result = solver.analyze("1828384");
       expect(result.evaluation?.outcome).toBe(Outcome.Win);
     });
 
-    it("should correctly instantiate and evaluate a massive 9x7 board forced win", async (): Promise<void> => {
-      const testSolver = new Connect4Solver(9, 7);
-      await testSolver.init();
-      const result = testSolver.analyze("1929394");
+    it("should correctly instantiate and evaluate a massive 9x7 board using the 128-bit fallback math", async () => {
+      const solver = new Connect4Solver(9, 7);
+      await solver.init();
+      // P1 plays 1, 2, 3, 4. P2 plays 9, 9, 9. P1 Wins on move 7!
+      const result = solver.analyze("1929394");
       expect(result.evaluation?.outcome).toBe(Outcome.Win);
     });
 
