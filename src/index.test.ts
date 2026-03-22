@@ -1,4 +1,5 @@
 import { Connect4Solver, Player, Outcome, BOARD_WIDTH } from "./index";
+import { ThreadedConnect4Solver } from "./threaded";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -68,12 +69,15 @@ function runParityTest(
   }
 }
 
-describe("Connect4Solver", () => {
+describe.each([
+  { name: "Connect4Solver", SolverClass: Connect4Solver },
+  { name: "ThreadedConnect4Solver", SolverClass: ThreadedConnect4Solver },
+])("Testing %s parity structures", ({ SolverClass }) => {
   let solver: Connect4Solver;
   let bookLoaded = false;
 
   beforeAll(async (): Promise<void> => {
-    solver = new Connect4Solver();
+    solver = new SolverClass();
     await solver.init();
 
     // Check both legacy root and new data/ directory for the book
@@ -125,7 +129,7 @@ describe("Connect4Solver", () => {
 
   describe("Generic Board Sizes Support", () => {
     it("should correctly instantiate and evaluate an 8x6 board at depth 34", async () => {
-      const solver = new Connect4Solver(8, 6);
+      const solver = new SolverClass(8, 6);
       await solver.init();
       // P1 plays 1, 2, 3, 4. P2 plays 8, 8, 8. P1 Wins on move 7!
       const result = solver.analyze("1828384");
@@ -133,7 +137,7 @@ describe("Connect4Solver", () => {
     });
 
     it("should correctly instantiate and evaluate a massive 9x7 board using the 128-bit fallback math", async () => {
-      const solver = new Connect4Solver(9, 7);
+      const solver = new SolverClass(9, 7);
       await solver.init();
       // P1 plays 1, 2, 3, 4. P2 plays 9, 9, 9. P1 Wins on move 7!
       const result = solver.analyze("1929394");
@@ -156,7 +160,7 @@ describe("Connect4Solver", () => {
           "test-data",
           `positions_${w}x${h}.txt`,
         );
-        const testSolver = new Connect4Solver(w, h);
+        const testSolver = new SolverClass(w, h);
         await testSolver.init();
 
         runParityTest(testSolver, dataPath, w, h, false);
