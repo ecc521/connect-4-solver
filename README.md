@@ -18,21 +18,30 @@ npm install connect-4-solver
 ## Usage
 
 ```typescript
-import { Connect4Solver, Player, Outcome } from "connect-4-solver";
+import { Connect4Solver, ThreadedConnect4Solver, Player, Outcome } from "connect-4-solver";
 import * as fs from "fs";
 
-  // Initialize the solver for a specific board size (defaults to 7x6)
+  // Initialize the standard single-threaded solver
   // Supported sizes: 6x5, 6x6, 7x6, 7x7, 8x6, 9x7
   const solver = new Connect4Solver(7, 6);
   await solver.init();
+
+  // Or explicitly use the powerful Multithreaded WASM engine (Requires COOP/COEP strict HTTP headers!)
+  // The Emscripten memory isolation automatically bounds to SharedArrayBuffer mechanics natively.
+  const threadedSolver = new ThreadedConnect4Solver(7, 6);
+  await threadedSolver.init();
 
   // Load an opening book for instant performance (Required for evaluating positions with <= 6 moves in a reasonable amount of time)
   // Download book files from: https://github.com/ecc521/connect-4-solver/releases/tag/solutionbooks
   const bookBuffer = fs.readFileSync("path/to/downloaded/book_7x6.book");
   await solver.loadBook(new Uint8Array(bookBuffer));
+  // await threadedSolver.loadBook(new Uint8Array(bookBuffer)); // The APIs are completely identical
 
   // Analyze a position (column sequence: 1 to board width)
   const result = solver.analyze("4424");
+  
+  // The threaded backend optionally accepts a concurrency argument (Defaults natively to 1 thread)
+  // const threadedResult = threadedSolver.analyze("4424", { threads: 4 });
 
   if (result.evaluation) {
     if (result.evaluation.outcome === Outcome.Win) {
