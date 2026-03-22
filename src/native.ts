@@ -2,7 +2,13 @@ import { Connect4Solver } from "./index";
 import { Player, Outcome, Evaluation, PositionAnalysis } from "./core";
 
 interface NativeSolverType {
-  analyze(pos: string, threads: number, w: number, h: number, weak: boolean): Promise<number[]>;
+  analyze(
+    pos: string,
+    threads: number,
+    w: number,
+    h: number,
+    weak: boolean,
+  ): Promise<number[]>;
 }
 
 export class ReactNativeConnect4Solver extends Connect4Solver {
@@ -18,15 +24,22 @@ export class ReactNativeConnect4Solver extends Connect4Solver {
     return Promise.resolve();
   }
 
-  async analyzeAsync(positionStr: string, opts?: { threads?: number }): Promise<PositionAnalysis> {
+  async analyzeAsync(
+    positionStr: string,
+    opts?: { threads?: number },
+  ): Promise<PositionAnalysis> {
     let Connect4SolverNative: NativeSolverType;
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const rn = require("react-native") as { NativeModules: { Connect4Solver?: NativeSolverType } };
+      const rn = require("react-native") as {
+        NativeModules: { Connect4Solver?: NativeSolverType };
+      };
       if (!rn.NativeModules.Connect4Solver) throw new Error();
       Connect4SolverNative = rn.NativeModules.Connect4Solver;
     } catch {
-      throw new Error("NativeModules.Connect4Solver is completely missing from the bridge block. Ensure the native libraries were properly bundled.");
+      throw new Error(
+        "NativeModules.Connect4Solver is completely missing from the bridge block. Ensure the native libraries were properly bundled.",
+      );
     }
 
     // Call the Objective-C++ / JNI Layer passing the raw arguments strongly
@@ -35,18 +48,18 @@ export class ReactNativeConnect4Solver extends Connect4Solver {
       opts?.threads ?? 1,
       this.width,
       this.height,
-      false // weak=false
+      false, // weak=false
     );
 
     const status = nativeResArr[0];
     const nbMoves = nativeResArr[1];
-    
+
     let currentPosition = positionStr;
     const currentPlayer = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
     let evaluation: Evaluation | null = null;
     const moveOptions: (Evaluation | null)[] = [];
 
-    if (status === 2) { 
+    if (status === 2) {
       currentPosition = positionStr.slice(0, nbMoves);
     } else if (status === 1) {
       currentPosition = positionStr.slice(0, nbMoves + 1);
@@ -69,13 +82,28 @@ export class ReactNativeConnect4Solver extends Connect4Solver {
           const opp = isPlayer1Turn ? Player.P2 : Player.P1;
           const movesRemaining = this.width * this.height - nbMoves;
           const halfMovesRemaining = Math.ceil(movesRemaining / 2);
-          
+
           if (n === 0) {
-            moveOptions.push({ outcome: Outcome.Draw, winner: null, movesToEnd: null, score: 0 });
+            moveOptions.push({
+              outcome: Outcome.Draw,
+              winner: null,
+              movesToEnd: null,
+              score: 0,
+            });
           } else if (n > 0) {
-            moveOptions.push({ outcome: Outcome.Win, winner: owner, movesToEnd: halfMovesRemaining - n + 1, score: n });
+            moveOptions.push({
+              outcome: Outcome.Win,
+              winner: owner,
+              movesToEnd: halfMovesRemaining - n + 1,
+              score: n,
+            });
           } else {
-            moveOptions.push({ outcome: Outcome.Loss, winner: opp, movesToEnd: halfMovesRemaining + n + 1, score: n });
+            moveOptions.push({
+              outcome: Outcome.Loss,
+              winner: opp,
+              movesToEnd: halfMovesRemaining + n + 1,
+              score: n,
+            });
           }
         }
       }
