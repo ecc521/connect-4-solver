@@ -7,8 +7,8 @@ function runParityTest(
   dataPath: string,
   w: number,
   h: number,
-  ignoreEarlyGame: boolean = false,
-) {
+  ignoreEarlyGame = false,
+): void {
   if (!fs.existsSync(dataPath)) {
     console.warn(`Skipping parity test, ${dataPath} not found.`);
     return;
@@ -23,7 +23,7 @@ function runParityTest(
   for (const line of lines) {
     const parts = line.split(" ");
     const pos = parts[0];
-    const expectedRawScore = parseInt(parts[1]!, 10);
+    const expectedRawScore = parseInt(parts[1], 10);
 
     if (ignoreEarlyGame && pos.length <= 10) {
       continue;
@@ -54,8 +54,7 @@ function runParityTest(
     }
 
     if (
-      !result.evaluation ||
-      result.evaluation.outcome !== expectedOutcome ||
+      result.evaluation?.outcome !== expectedOutcome ||
       result.evaluation.winner !== expectedWinner ||
       result.evaluation.movesToEnd !== expectedMoves ||
       result.evaluation.score !== expectedRawScore
