@@ -153,7 +153,17 @@ npm run build
 
 ### Generating Opening Books Natively
 
-Generating opening books for larger board sizes (like `8x6`) can take significant CPU time. You can drastically speed this up by building the books natively in C++ across all your CPU cores using GNU Parallel:
+**What is "Depth"?**  
+Depth refers to the exact number of moves (ply) pre-calculated consecutively starting from a completely empty board. Connect 4 branching logic scales *exponentially* based on the remaining unplayed mathematical volume. By generating an opening book up to an explicit Depth (e.g. `14`), you are securely caching the perfect evaluations for every single valid board permutation that can possibly occur within the first 14 turns. The upstream user's device instantly fetches this cached scenario directly from the `.book` memory buffer without burning their processor cycle.
+
+**Depth Recommendations (Targeting `<1s` UI Response Times):**
+*   **`6x5` & `6x6`:** Depth `0` *(No book required; WASM evaluates instantly)*
+*   **`7x6` (Standard):** Depth `12` or `14` *(Standard 14-depth book is ~4MB)*
+*   **`7x7`:** Depth `16` to `18`
+*   **`8x6`:** Depth `20` to `22` 
+*   **`9x7`:** Astronomical complexity. Effectively unsolvable seamlessly without colossal initial caching overheads (> Depth `26`).
+
+Generating opening books for larger board sizes (like `8x6`) can take significant CPU time to compute locally. You can drastically speed this up by building the books natively in C++ across all your CPU cores using GNU Parallel:
 
 1. Compile the native solver and generator for your target board size (by updating `WIDTH` and `HEIGHT` in `native/Position.hpp`):
    ```bash
