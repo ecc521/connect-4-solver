@@ -1,4 +1,5 @@
-import { ReactNativeConnect4Solver, Outcome, Player } from "../src/index";
+import { Outcome, Player } from "./core";
+import { ReactNativeConnect4Solver } from "./native";
 
 // Mock React Native universally before tests run
 jest.mock(

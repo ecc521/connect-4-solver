@@ -3,10 +3,26 @@
   "version": "2.0.1",
   "description": "Solver for 7x6 Connect 4 Games",
   "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./threaded": {
+      "types": "./dist/threaded.d.ts",
+      "default": "./dist/threaded.js"
+    },
+    "./native": {
+      "types": "./dist/native.d.ts",
+      "default": "./dist/native.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "default": "./dist/core.js"
+    }
+  },
   "files": [
-    "dist",
-    "build/analyze.js",
-    "build/analyze_threaded.js"
+    "dist"
   ],
   "scripts": {
     "build": "npm run build:wasm && npm run build:ts",
