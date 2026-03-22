@@ -7,6 +7,9 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
+#include <atomic>
+#include <thread>
+#include <algorithm>
 
 template <typename CoreSolver, typename CorePosition, int W>
 int32_t* runAnalysis(CoreSolver& solver, const char* positionCharArr) {

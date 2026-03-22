@@ -65,7 +65,7 @@ const _moduleInitPromise = createModule().then((mod: SolverModule) => {
 });
 
 export class Connect4Solver {
-  private initialized = false;
+  protected initialized = false;
   private bookLoaded = false;
   public width: number;
   public height: number;
@@ -87,7 +87,7 @@ export class Connect4Solver {
     this.initialized = true;
   }
 
-  private get mod(): SolverModule {
+  protected get mod(): SolverModule {
     if (!this.initialized) {
       throw new Error("Solver not initialized. Call init() first.");
     }
@@ -266,5 +266,36 @@ export class Connect4Solver {
       evaluation,
       moveOptions,
     };
+  }
+}
+
+let ThreadedModule: SolverModule | null = null;
+let _threadedModuleInitPromise: Promise<void> | null = null;
+function initThreadedModule(): Promise<void> {
+  if (!_threadedModuleInitPromise) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const createThreadedModule =
+      require("../build/analyze_threaded.js") as unknown as () => Promise<SolverModule>;
+    _threadedModuleInitPromise = createThreadedModule().then(
+      (mod: SolverModule) => {
+        ThreadedModule = mod;
+      },
+    );
+  }
+  return _threadedModuleInitPromise;
+}
+
+export class ThreadedConnect4Solver extends Connect4Solver {
+  async init(): Promise<void> {
+    if (this.initialized) return;
+    await initThreadedModule();
+    this.initialized = true;
+  }
+
+  protected get mod(): SolverModule {
+    if (!this.initialized) {
+      throw new Error("Threaded Solver not initialized. Call init() first.");
+    }
+    return ThreadedModule as unknown as SolverModule;
   }
 }

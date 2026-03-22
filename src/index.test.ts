@@ -72,7 +72,7 @@ describe("Connect4Solver", () => {
   let solver: Connect4Solver;
   let bookLoaded = false;
 
-  beforeAll(async () => {
+  beforeAll(async (): Promise<void> => {
     solver = new Connect4Solver();
     await solver.init();
 
@@ -98,21 +98,21 @@ describe("Connect4Solver", () => {
     }
   }, 15000);
 
-  test("should analyze a deep position", () => {
+  test("should analyze a deep position", (): void => {
     const result = solver.analyze("121212333");
     expect(result.originalPosition).toBe("121212333");
     expect(result.evaluation).not.toBeNull();
     expect(result.moveOptions).toHaveLength(BOARD_WIDTH);
   });
 
-  test("should detect a winning position", () => {
+  test("should detect a winning position", (): void => {
     const result = solver.analyze("1212121");
     expect(result.evaluation?.outcome).toBe(Outcome.Win);
     expect(result.evaluation?.winner).toBe(Player.P1);
     expect(result.position).toBe("1212121");
   });
 
-  test("should handle invalid moves", () => {
+  test("should handle invalid moves", (): void => {
     const result = solver.analyze("1111111");
     expect(result.position).not.toBe(result.originalPosition);
     expect(result.evaluation).toBeNull();
