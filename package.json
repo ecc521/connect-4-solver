@@ -29,6 +29,9 @@
     "url": "https://github.com/ecc521/connect4/issues"
   },
   "homepage": "https://github.com/ecc521/connect4#readme",
+  "peerDependencies": {
+    "react-native": "*"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/jest": "^30.0.0",

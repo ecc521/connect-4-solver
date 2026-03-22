@@ -1,0 +1,47 @@
+buildscript {
+  ext.safeExtGet = {prop, fallback ->
+    rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+  }
+  repositories {
+      google()
+      mavenCentral()
+  }
+  dependencies {
+      classpath("com.android.tools.build:gradle:7.3.1")
+      classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.7.22")
+  }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+  compileSdkVersion safeExtGet('compileSdkVersion', 33)
+  defaultConfig {
+    minSdkVersion safeExtGet('minSdkVersion', 21)
+    targetSdkVersion safeExtGet('targetSdkVersion', 33)
+    versionCode 1
+    versionName "1.0"
+    externalNativeBuild {
+      cmake {
+        cppFlags "-O3 -frtti -fexceptions -Wall -std=c++14 -DUSE_PTHREADS=1"
+        abiFilters "armeabi-v7a", "x86", "x86_64", "arm64-v8a"
+      }
+    }
+  }
+  externalNativeBuild {
+    cmake {
+      path "CMakeLists.txt"
+    }
+  }
+}
+
+repositories {
+  google()
+  mavenCentral()
+}
+
+dependencies {
+  implementation "com.facebook.react:react-native:+"
+  implementation "org.jetbrains.kotlin:kotlin-stdlib:1.7.22"
+}
