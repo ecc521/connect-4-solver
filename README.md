@@ -76,6 +76,39 @@ The threaded solver uses a "Root Splitting" architecture alongside a global lock
 
 The threads dynamically share their evaluated tree hashes with each other across the WebWorker memory pool in real-time, allowing sister-threads to instantly prune millions of branches the fraction of a second a branch refutation is discovered.
 
+### ⚠️ Web Browsers & Node.js (Web Workers)
+
+WebAssembly execution is fundamentally **synchronous and blocking**. Calling `solver.analyze()` directly on your main UI thread will instantly freeze your browser tab until the C++ algorithm formally completes its evaluation.
+
+To achieve non-blocking execution safely on Web/Node environments, you **must** instantiate the solver natively inside your own application's Web Worker. 
+
+Here is a standard WebWorker architecture (`worker.ts`) you should securely deploy inside your app:
+
+```typescript
+// worker.ts (Inside your application codebase)
+import { Connect4Solver } from 'connect-4-solver';
+
+let solver: Connect4Solver;
+
+self.onmessage = async (e) => {
+  const { type, position } = e.data;
+  
+  if (type === 'INIT') {
+    solver = new Connect4Solver(7, 6);
+    await solver.init();
+    // await solver.loadBook(bookBuffer);
+    self.postMessage({ type: 'READY' });
+  } 
+  else if (type === 'ANALYZE') {
+    // The intensive C++ call executes safely out of the Main Thread here!
+    const result = solver.analyze(position);
+    self.postMessage({ type: 'RESULT', result });
+  }
+};
+```
+
+*(Note: The React Native `"connect-4-solver/native"` plugins circumvent this entirely! They are exclusively engineered to run 100% asynchronously on true background CPU hooks natively!)*
+
 ### Analysis Result Structure
 
 The `analyze` method returns a `PositionAnalysis` object:
@@ -158,4 +191,4 @@ If you don't want to install Emscripten locally, you can use the provided Docker
 
 - Core algorithm by [Pascal Pons](http://blog.gamesolver.org).
 - Original C++ source code is published under **AGPL v3** license.
-- Wrapper and distribution by Tucker Willenborg.
+- Wrapper and distribution by Tucker Willenborg (also AGPL v3).
