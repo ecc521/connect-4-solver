@@ -34,17 +34,17 @@ const INT32_SIZE = 4;
 
 export interface SolverModule {
   stringToNewUTF8(str: string): number;
-  _analyzePosition6x5(pointer: number): number;
+  _analyzePosition6x5(pointer: number, threads: number): number;
   _loadBook6x5(pointer: number): void;
-  _analyzePosition6x6(pointer: number): number;
+  _analyzePosition6x6(pointer: number, threads: number): number;
   _loadBook6x6(pointer: number): void;
-  _analyzePosition7x6(pointer: number): number;
+  _analyzePosition7x6(pointer: number, threads: number): number;
   _loadBook7x6(pointer: number): void;
-  _analyzePosition7x7(pointer: number): number;
+  _analyzePosition7x7(pointer: number, threads: number): number;
   _loadBook7x7(pointer: number): void;
-  _analyzePosition8x6(pointer: number): number;
+  _analyzePosition8x6(pointer: number, threads: number): number;
   _loadBook8x6(pointer: number): void;
-  _analyzePosition9x7(pointer: number): number;
+  _analyzePosition9x7(pointer: number, threads: number): number;
   _loadBook9x7(pointer: number): void;
   UTF8ToString(pointer: number): string;
   _free(pointer: number): void;
@@ -124,23 +124,23 @@ export class Connect4Solver {
     return this.mod.stringToNewUTF8(str);
   }
 
-  private rawAnalyze(positionStr: string): Int32Array {
+  private rawAnalyze(positionStr: string, threads = 1): Int32Array {
     const mod = this.mod;
     const allocatedMemory = this.allocateString(positionStr);
 
     let outputPointer = 0;
     if (this.width === 6 && this.height === 5)
-      outputPointer = mod._analyzePosition6x5(allocatedMemory);
+      outputPointer = mod._analyzePosition6x5(allocatedMemory, threads);
     else if (this.width === 6 && this.height === 6)
-      outputPointer = mod._analyzePosition6x6(allocatedMemory);
+      outputPointer = mod._analyzePosition6x6(allocatedMemory, threads);
     else if (this.width === 7 && this.height === 6)
-      outputPointer = mod._analyzePosition7x6(allocatedMemory);
+      outputPointer = mod._analyzePosition7x6(allocatedMemory, threads);
     else if (this.width === 7 && this.height === 7)
-      outputPointer = mod._analyzePosition7x7(allocatedMemory);
+      outputPointer = mod._analyzePosition7x7(allocatedMemory, threads);
     else if (this.width === 8 && this.height === 6)
-      outputPointer = mod._analyzePosition8x6(allocatedMemory);
+      outputPointer = mod._analyzePosition8x6(allocatedMemory, threads);
     else if (this.width === 9 && this.height === 7)
-      outputPointer = mod._analyzePosition9x7(allocatedMemory);
+      outputPointer = mod._analyzePosition9x7(allocatedMemory, threads);
 
     const dataLength = 2 + this.width;
     const finalData = new Int32Array(dataLength);
@@ -190,8 +190,8 @@ export class Connect4Solver {
     }
   }
 
-  analyze(positionStr: string): PositionAnalysis {
-    const resArr = this.rawAnalyze(positionStr);
+  analyze(positionStr: string, opts?: { threads?: number }): PositionAnalysis {
+    const resArr = this.rawAnalyze(positionStr, opts?.threads ?? 1);
 
     const originalPosition = positionStr;
     const status = resArr[0];

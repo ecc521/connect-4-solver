@@ -128,16 +128,33 @@ int Solver::solve(const Position &P, bool weak) {
   return min;
 }
 
-std::vector<int> Solver::analyze(const Position &P, bool weak) {
+std::vector<int> Solver::analyze(const Position &P, bool weak, int threads) {
   std::vector<int> scores(Position::WIDTH, -1000);
 
 #ifdef USE_PTHREADS
+  if (threads <= 1) {
+    for (int i = 0; i < Position::WIDTH; i++) {
+      int col = columnOrder[i];
+      if (P.canPlay(col)) {
+        if(P.isWinningMove(col)) {
+          scores[col] = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
+        } else {
+          Position P2(P);
+          P2.playCol(col);
+          scores[col] = -solve(P2, weak);
+        }
+      }
+    }
+    return scores;
+  }
+
   std::atomic<int> next_col{0};
 
   auto worker = [&]() {
     while (true) {
-      int col = next_col.fetch_add(1);
-      if (col >= Position::WIDTH) break;
+      int i = next_col.fetch_add(1);
+      if (i >= Position::WIDTH) break;
+      int col = columnOrder[i];
 
       if (P.canPlay(col)) {
         if(P.isWinningMove(col)) {
@@ -151,21 +168,20 @@ std::vector<int> Solver::analyze(const Position &P, bool weak) {
     }
   };
 
-  unsigned int hardware_threads = std::thread::hardware_concurrency();
-  if (hardware_threads == 0) hardware_threads = 4;
-  unsigned int num_threads = std::min((unsigned int)Position::WIDTH, hardware_threads);
+  unsigned int num_threads = std::min((unsigned int)Position::WIDTH, (unsigned int)threads);
   
-  std::vector<std::thread> threads;
+  std::vector<std::thread> thread_pool;
   for (unsigned int i = 0; i < num_threads - 1; i++) {
-    threads.emplace_back(worker);
+    thread_pool.emplace_back(worker);
   }
   worker(); // use the main thread too
 
-  for (auto& t : threads) {
+  for (auto& t : thread_pool) {
     if (t.joinable()) t.join();
   }
 #else
-  for (int col = 0; col < Position::WIDTH; col++)
+  for (int i = 0; i < Position::WIDTH; i++) {
+    int col = columnOrder[i];
     if (P.canPlay(col)) {
       if(P.isWinningMove(col)) scores[col] = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
       else {
@@ -174,6 +190,7 @@ std::vector<int> Solver::analyze(const Position &P, bool weak) {
         scores[col] = -solve(P2, weak);
       }
     }
+  }
 #endif
 
   return scores;
