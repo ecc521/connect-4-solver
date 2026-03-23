@@ -36,6 +36,17 @@ class OpeningBook {
   template<class partial_key_t>
   TableGetter<Position::position_t, uint8_t>* initTranspositionTable(int log_size) {
     switch(log_size) {
+    case 10: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 10>();
+    case 11: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 11>();
+    case 12: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 12>();
+    case 13: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 13>();
+    case 14: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 14>();
+    case 15: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 15>();
+    case 16: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 16>();
+    case 17: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 17>();
+    case 18: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 18>();
+    case 19: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 19>();
+    case 20: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 20>();
     case 21:
       return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 21>();
     case 22:
