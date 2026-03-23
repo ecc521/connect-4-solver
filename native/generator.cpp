@@ -81,7 +81,8 @@ void generate_opening_book() {
 int main(int argc, char** argv) {
   if(argc > 1) {
     int depth = atoi(argv[1]);
-    char pos_str[depth + 1] = {0};
+    char* pos_str = new char[depth + 1]();
     explore(Position(), pos_str, depth);
+    delete[] pos_str;
   } else generate_opening_book();
 }

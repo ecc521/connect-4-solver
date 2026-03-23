@@ -166,9 +166,10 @@ Depth refers to the exact number of moves (ply) pre-calculated consecutively sta
 
 Generating opening books for larger board sizes (like `8x6`) can take significant CPU time to compute locally. You can drastically speed this up by building the books natively in C++ across all your CPU cores using GNU Parallel:
 
-1. Compile the native solver and generator for your target board size (by updating `WIDTH` and `HEIGHT` in `native/Position.hpp`):
+1. Navigate to the native directory and compile the solver and generator for your target board size (by updating `WIDTH` and `HEIGHT` in `native/Position.hpp`):
    ```bash
-   make
+   cd native
+   make c4solver generator
    ```
 2. Generate all unique positional configurations up to your desired book depth (e.g. depth 14):
    ```bash
@@ -178,7 +179,7 @@ Generating opening books for larger board sizes (like `8x6`) can take significan
    ```bash
    cat positions.txt | parallel --jobs $(nproc) ./c4solver > scored.txt
    ```
-4. Compress the scored outcomes back into a compact `.book` file:
+4. Compress the scored outcomes back into a compact `.book` file (it will output as e.g. `7x6.book`):
    ```bash
    cat scored.txt | ./generator
    ```
