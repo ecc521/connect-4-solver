@@ -102,11 +102,20 @@ describe.each([
     }
   }, 15000);
 
-  test("should analyze a deep position", (): void => {
+  test("should analyze a deep position synchronously", (): void => {
     const result = solver.analyze("121212333");
     expect(result.originalPosition).toBe("121212333");
     expect(result.evaluation).not.toBeNull();
     expect(result.moveOptions).toHaveLength(BOARD_WIDTH);
+  });
+
+  test("should safely evaluate asynchronously mirroring synchronous hooks", async (): Promise<void> => {
+    const asyncResult = await solver.analyzeAsync("121212333");
+    const syncResult = solver.analyze("121212333");
+    // Ensure the asynchronous UI-deferment wrapper parses mathematical outcomes identically
+    expect(asyncResult.evaluation?.outcome).toBe(syncResult.evaluation?.outcome);
+    expect(asyncResult.evaluation?.score).toBe(syncResult.evaluation?.score);
+    expect(asyncResult.moveOptions.length).toBe(syncResult.moveOptions.length);
   });
 
   test("should detect a winning position", (): void => {

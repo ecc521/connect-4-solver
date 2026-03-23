@@ -18,7 +18,8 @@ npm install connect-4-solver
 ## Usage
 
 ```typescript
-import { Connect4Solver, ThreadedConnect4Solver, Player, Outcome } from "connect-4-solver";
+import { Connect4Solver, Player, Outcome } from "connect-4-solver";
+import { ThreadedConnect4Solver } from "connect-4-solver/threaded";
 import * as fs from "fs";
 
   // Initialize the standard single-threaded solver
