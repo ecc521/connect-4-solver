@@ -113,7 +113,9 @@ describe.each([
     const asyncResult = await solver.analyzeAsync("121212333");
     const syncResult = solver.analyze("121212333");
     // Ensure the asynchronous UI-deferment wrapper parses mathematical outcomes identically
-    expect(asyncResult.evaluation?.outcome).toBe(syncResult.evaluation?.outcome);
+    expect(asyncResult.evaluation?.outcome).toBe(
+      syncResult.evaluation?.outcome,
+    );
     expect(asyncResult.evaluation?.score).toBe(syncResult.evaluation?.score);
     expect(asyncResult.moveOptions.length).toBe(syncResult.moveOptions.length);
   });
