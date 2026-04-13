@@ -30,8 +30,8 @@ namespace Connect4 {
  * Functions are relative to the current player to play.
  * Position containing alignment are not supported by this class.
  *
- * A binary bitboard representationis used.
- * Each column is encoded on HEIGH+1 bits.
+ * A binary bitboard representation is used.
+ * Each column is encoded on HEIGHT+1 bits.
  *
  * Example of bit order to encode for a 7x6 board
  * .  .  .  .  .  .  .
@@ -48,7 +48,7 @@ namespace Connect4 {
  *
  * "current_player" bitboard can be transformed into a compact and non ambiguous key
  * by adding an extra bit on top of the last non empty cell of each column.
- * This allow to identify all the empty cells whithout needing "mask" bitboard
+ * This allow to identify all the empty cells without needing "mask" bitboard
  *
  * current_player "x" = 1, opponent "o" = 0
  * board     position  mask      key       bottom
@@ -76,7 +76,7 @@ namespace Connect4 {
  */
   
 /**
- * Generate a bitmask containing one for the bottom slot of each colum
+ * Generate a bitmask containing one for the bottom slot of each column
  * must be defined outside of the class definition to be available at compile time for bottom_mask
  */
 
@@ -118,12 +118,12 @@ class Position {
   }
 
   /*
-   * Plays a sequence of successive played columns, mainly used to initilize a board.
+   * Plays a sequence of successive played columns, mainly used to initialize a board.
    * @param seq: a sequence of digits corresponding to the 1-based index of the column played.
    *
    * @return number of played moves. Processing will stop at first invalid move that can be:
    *           - invalid character (non digit, or digit >= WIDTH)
-   *           - playing a colum the is already full
+   *           - playing a column that is already full
    *           - playing a column that makes an alignment (we only solve non).
    *         Caller can check if the move sequence was valid by comparing the number of
    *         processed moves to the length of the sequence.
@@ -160,18 +160,18 @@ class Position {
   }
 
   /**
-  * Build a symetric base 3 key. Two symetric positions will have the same key.
+  * Build a symmetric base 3 key. Two symmetric positions will have the same key.
   *
   * This key is a base 3 representation of the sequence of played moves column per column,
-  * from bottom to top. The 3 digits are top_of_colum(0), current_player(1), opponent(2).
+  * from bottom to top. The 3 digits are top_of_column(0), current_player(1), opponent(2).
   *
-  * example: game "45" where player one played colum 4, then player two played column 5
+  * example: game "45" where player one played column 4, then player two played column 5
   * has a representation in base 3 digits : 0 0 0 1 0 2 0 0 0 or : 3*3^3 + 1*3^5
   *
-  * The symetric key is the mimimum key of the two keys built iterating columns from left to righ or right to left.
+  * The symmetric key is the minimum key of the two keys built iterating columns from left to right or right to left.
   *
   * as the last digit is always 0, we omit it and a base 3 key
-  * uses N = (nbMoves + nbColums - 1) base 3 digits or N*log2(3) bits.
+  * uses N = (nbMoves + nbColumns - 1) base 3 digits or N*log2(3) bits.
   */
   uint64_t key3() const {
     uint64_t key_forward = 0;
@@ -252,8 +252,8 @@ class Position {
 
  private:
   position_t current_position; // bitmap of the current_player stones
-  position_t mask;             // bitmap of all the already palyed spots
-  unsigned int moves;        // number of moves played since the beinning of the game.
+  position_t mask;             // bitmap of all the already played spots
+  unsigned int moves;        // number of moves played since the beginning of the game.
 
   /**
     * Compute a partial base 3 key for a given column
@@ -299,7 +299,7 @@ class Position {
   }
 
   /**
-   * @parmam position, a bitmap of the player to evaluate the winning pos
+   * @param position, a bitmap of the player to evaluate the winning pos
    * @param mask, a mask of the already played spots
    *
    * @return a bitmap of all the winning free spots making an alignment
@@ -342,12 +342,12 @@ class Position {
   static constexpr position_t bottom_mask = bottom<WIDTH, HEIGHT>::mask;
   static constexpr position_t board_mask = bottom_mask * ((1LL << HEIGHT) - 1);
 
-  // return a bitmask containg a single 1 corresponding to the top cel of a given column
+  // return a bitmask containing a single 1 corresponding to the top cell of a given column
   static constexpr position_t top_mask_col(int col) {
     return UINT64_C(1) << ((HEIGHT - 1) + col * (HEIGHT + 1));
   }
 
-  // return a bitmask containg a single 1 corresponding to the bottom cell of a given column
+  // return a bitmask containing a single 1 corresponding to the bottom cell of a given column
   static constexpr position_t bottom_mask_col(int col) {
     return UINT64_C(1) << col * (HEIGHT + 1);
   }
