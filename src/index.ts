@@ -15,15 +15,20 @@ const STATUS_INVALID = 2;
 const UNPLAYABLE_COLUMN_SCORE = -1000;
 const INT32_SIZE = 4;
 
-/* eslint-disable @typescript-eslint/no-require-imports */
-const createModule =
-  require("../build/analyze.js") as unknown as () => Promise<SolverModule>;
-/* eslint-enable @typescript-eslint/no-require-imports */
-
 let Module: SolverModule | null = null;
-const _moduleInitPromise = createModule().then((mod: SolverModule) => {
-  Module = mod;
-});
+let _moduleInitPromise: Promise<void> | null = null;
+
+function getModuleInitPromise() {
+  if (!_moduleInitPromise) {
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    const createModule = require("../build/analyze.js") as unknown as () => Promise<SolverModule>;
+    /* eslint-enable @typescript-eslint/no-require-imports */
+    _moduleInitPromise = createModule().then((mod: SolverModule) => {
+      Module = mod;
+    });
+  }
+  return _moduleInitPromise;
+}
 
 export class Connect4Solver {
   protected initialized = false;
@@ -44,7 +49,7 @@ export class Connect4Solver {
 
   async init(): Promise<void> {
     if (this.initialized) return;
-    await _moduleInitPromise;
+    await getModuleInitPromise();
     this.initialized = true;
   }
 

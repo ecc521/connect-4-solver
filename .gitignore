@@ -12,6 +12,10 @@ native/c4solver
 native/generator
 native/.depend
 
+# Library Native Android Builds
+android/.cxx/
+android/build/
+
 # Example App (React Native)
 example/node_modules/
 example/ios/Pods/
@@ -20,4 +24,5 @@ example/android/.gradle/
 example/android/build/
 example/android/local.properties
 example/android/app/build/
+example/android/.cxx/
 example/.metro-health-check*
