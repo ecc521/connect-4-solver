@@ -23,6 +23,7 @@ namespace C4_6x5 {
 #undef POSITION_HPP
 #undef SOLVER_HPP
 #undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
 #undef OPENING_BOOK_HPP
 #undef MOVE_SORTER_HPP
 
@@ -36,6 +37,7 @@ namespace C4_6x6 {
 #undef POSITION_HPP
 #undef SOLVER_HPP
 #undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
 #undef OPENING_BOOK_HPP
 #undef MOVE_SORTER_HPP
 
@@ -49,6 +51,7 @@ namespace C4_7x6 {
 #undef POSITION_HPP
 #undef SOLVER_HPP
 #undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
 #undef OPENING_BOOK_HPP
 #undef MOVE_SORTER_HPP
 
@@ -62,6 +65,7 @@ namespace C4_7x7 {
 #undef POSITION_HPP
 #undef SOLVER_HPP
 #undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
 #undef OPENING_BOOK_HPP
 #undef MOVE_SORTER_HPP
 
@@ -75,6 +79,7 @@ namespace C4_8x6 {
 #undef POSITION_HPP
 #undef SOLVER_HPP
 #undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
 #undef OPENING_BOOK_HPP
 #undef MOVE_SORTER_HPP
 
@@ -88,6 +93,7 @@ namespace C4_9x7 {
 #undef POSITION_HPP
 #undef SOLVER_HPP
 #undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
 #undef OPENING_BOOK_HPP
 #undef MOVE_SORTER_HPP
 
