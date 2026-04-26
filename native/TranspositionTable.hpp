@@ -28,22 +28,18 @@ namespace Connect4 {
 /**
  * util functions to compute next prime at compile time
  */
-constexpr uint64_t med(uint64_t min, uint64_t max) {
-  return (min + max) / 2;
-}
-/**
- * tells if an integer n has a a divisor between min (inclusive) and max (exclusive)
- */
-constexpr bool has_factor(uint64_t n, uint64_t min, uint64_t max) {
-  return min * min > n ? false : // do not search for factor above sqrt(n)
-         min + 1 >= max ? n % min == 0 :
-         has_factor(n, min, med(min, max)) || has_factor(n, med(min, max), max);
+constexpr bool is_prime(uint64_t n) {
+  if (n % 2 == 0) return n == 2;
+  for (uint64_t i = 3; i * i <= n; i += 2) {
+    if (n % i == 0) return false;
+  }
+  return true;
 }
 
-// return next prime number greater or equal to n.
-// n must be >= 2
 constexpr uint64_t next_prime(uint64_t n) {
-  return has_factor(n, 2, n) ? next_prime(n + 1) : n;
+  if (n <= 2) return 2;
+  while (!is_prime(n)) n++;
+  return n;
 }
 
 // log2(1) = 0; log2(2) = 1; log2(3) = 1; log2(4) = 2; log2(8) = 3
