@@ -30,8 +30,8 @@ namespace Connect4 {
  * Functions are relative to the current player to play.
  * Position containing alignment are not supported by this class.
  *
- * A binary bitboard representation is used.
- * Each column is encoded on HEIGHT+1 bits.
+ * A binary bitboard representationis used.
+ * Each column is encoded on HEIGH+1 bits.
  *
  * Example of bit order to encode for a 7x6 board
  * .  .  .  .  .  .  .
@@ -48,7 +48,7 @@ namespace Connect4 {
  *
  * "current_player" bitboard can be transformed into a compact and non ambiguous key
  * by adding an extra bit on top of the last non empty cell of each column.
- * This allow to identify all the empty cells without needing "mask" bitboard
+ * This allow to identify all the empty cells whithout needing "mask" bitboard
  *
  * current_player "x" = 1, opponent "o" = 0
  * board     position  mask      key       bottom
@@ -76,33 +76,28 @@ namespace Connect4 {
  */
   
 /**
- * Generate a bitmask containing one for the bottom slot of each column
+ * Generate a bitmask containing one for the bottom slot of each colum
  * must be defined outside of the class definition to be available at compile time for bottom_mask
  */
 
 
-#ifndef BOARD_WIDTH_MACRO
-#define BOARD_WIDTH_MACRO 7
-#endif
-#ifndef BOARD_HEIGHT_MACRO
-#define BOARD_HEIGHT_MACRO 6
-#endif
-
-class Position {
+template <int W, int H>
+class GenericPosition {
  public:
-  static constexpr int WIDTH = BOARD_WIDTH_MACRO;  // width of the board
-  static constexpr int HEIGHT = BOARD_HEIGHT_MACRO; // height of the board
 
-  // Board size is 64bits or 128 bits depending on WIDTH and HEIGHT
-  using position_t = typename std::conditional < WIDTH * (HEIGHT + 1) <= 64, uint64_t, __int128>::type;
+  // Board size is 64bits or 128 bits depending on W and H
+  using position_t = typename std::conditional < W * (H + 1) <= 64, uint64_t, unsigned __int128>::type;
   // __int128 is a g++ non portable type. Use the following line limited to 64bits board for C++ compatibility
   // using position_t = uint64_t;
 
-  static constexpr int MIN_SCORE = -(WIDTH*HEIGHT) / 2 + 3;
-  static constexpr int MAX_SCORE = (WIDTH * HEIGHT + 1) / 2 - 3;
+  static constexpr int WIDTH = W;
+  static constexpr int HEIGHT = H;
 
-  static_assert(WIDTH < 10, "Board's width must be less than 10");
-  static_assert(WIDTH * (HEIGHT + 1) <= sizeof(position_t)*8, "Board does not fit into position_t bitmask");
+  static constexpr int MIN_SCORE = -(W*H) / 2 + 3;
+  static constexpr int MAX_SCORE = (W * H + 1) / 2 - 3;
+
+  static_assert(W <= 16, "Board's width must be <= 16 due to alphanumeric parsing limits");
+  static_assert(W * (H + 1) <= sizeof(position_t)*8, "Board does not fit into position_t bitmask");
 
   /**
    * Plays a possible move given by its bitmap representation
@@ -118,12 +113,12 @@ class Position {
   }
 
   /*
-   * Plays a sequence of successive played columns, mainly used to initialize a board.
+   * Plays a sequence of successive played columns, mainly used to initilize a board.
    * @param seq: a sequence of digits corresponding to the 1-based index of the column played.
    *
    * @return number of played moves. Processing will stop at first invalid move that can be:
    *           - invalid character (non digit, or digit >= WIDTH)
-   *           - playing a column that is already full
+   *           - playing a colum the is already full
    *           - playing a column that makes an alignment (we only solve non).
    *         Caller can check if the move sequence was valid by comparing the number of
    *         processed moves to the length of the sequence.
@@ -131,7 +126,9 @@ class Position {
   unsigned int play(const std::string &seq) {
     for(unsigned int i = 0; i < seq.size(); i++) {
       int col = seq[i] - '1';
-      if(col < 0 || col >= Position::WIDTH || !canPlay(col) || isWinningMove(col)) return i; // invalid move
+      if (seq[i] >= 'a' && seq[i] <= 'z') col = seq[i] - 'a' + 9;
+      else if (seq[i] >= 'A' && seq[i] <= 'Z') col = seq[i] - 'A' + 9;
+      if(col < 0 || col >= WIDTH || !canPlay(col) || isWinningMove(col)) return i; // invalid move
       playCol(col);
     }
     return seq.size();
@@ -160,25 +157,25 @@ class Position {
   }
 
   /**
-  * Build a symmetric base 3 key. Two symmetric positions will have the same key.
+  * Build a symetric base 3 key. Two symetric positions will have the same key.
   *
   * This key is a base 3 representation of the sequence of played moves column per column,
-  * from bottom to top. The 3 digits are top_of_column(0), current_player(1), opponent(2).
+  * from bottom to top. The 3 digits are top_of_colum(0), current_player(1), opponent(2).
   *
-  * example: game "45" where player one played column 4, then player two played column 5
+  * example: game "45" where player one played colum 4, then player two played column 5
   * has a representation in base 3 digits : 0 0 0 1 0 2 0 0 0 or : 3*3^3 + 1*3^5
   *
-  * The symmetric key is the minimum key of the two keys built iterating columns from left to right or right to left.
+  * The symetric key is the mimimum key of the two keys built iterating columns from left to righ or right to left.
   *
   * as the last digit is always 0, we omit it and a base 3 key
-  * uses N = (nbMoves + nbColumns - 1) base 3 digits or N*log2(3) bits.
+  * uses N = (nbMoves + nbColums - 1) base 3 digits or N*log2(3) bits.
   */
   uint64_t key3() const {
     uint64_t key_forward = 0;
-    for(int i = 0; i < Position::WIDTH; i++) partialKey3(key_forward, i);  // compute key in increasing order of columns
+    for(int i = 0; i < WIDTH; i++) partialKey3(key_forward, i);  // compute key in increasing order of columns
 
     uint64_t key_reverse = 0;
-    for(int i = Position::WIDTH; i--;) partialKey3(key_reverse, i);  // compute key in decreasing order of columns
+    for(int i = WIDTH; i--;) partialKey3(key_reverse, i);  // compute key in decreasing order of columns
 
     return key_forward < key_reverse ? key_forward / 3 : key_reverse / 3; // take the smallest key and divide per 3 as the last base3 digit is always 0
   }
@@ -217,9 +214,34 @@ class Position {
   }
 
   /**
+   * Heuristic score of the position using center-weights and threat counts.
+   * Non-terminal fallback evaluated when depth_limit is reached.
+   */
+  int heuristic_evaluate() const {
+    int score = 0;
+    
+    position_t opp_position = current_position ^ mask;
+
+    position_t my_threats = compute_winning_position(current_position, mask);
+    position_t opp_threats = compute_winning_position(opp_position, mask);
+    score += (popcount(my_threats) - popcount(opp_threats)) * 10;
+    
+    for(int i = 0; i < WIDTH; i++) {
+      int dist = i - WIDTH / 2;
+      if (dist < 0) dist = -dist;
+      int weight = WIDTH - dist; 
+      position_t col_mask = column_mask(i);
+      
+      score += (popcount(current_position & col_mask) - popcount(opp_position & col_mask)) * weight;
+    }
+    
+    return score;
+  }
+
+  /**
    * Default constructor, build an empty position.
    */
-  Position() : current_position{0}, mask{0}, moves{0} {}
+  GenericPosition() : current_position{0}, mask{0}, moves{0} {}
 
   /**
    * Indicates whether a column is playable.
@@ -252,14 +274,14 @@ class Position {
 
  private:
   position_t current_position; // bitmap of the current_player stones
-  position_t mask;             // bitmap of all the already played spots
-  unsigned int moves;        // number of moves played since the beginning of the game.
+  position_t mask;             // bitmap of all the already palyed spots
+  unsigned int moves;        // number of moves played since the beinning of the game.
 
   /**
     * Compute a partial base 3 key for a given column
     */
   void partialKey3(uint64_t &key, int col) const {
-    for(position_t pos = UINT64_C(1) << (col * (Position::HEIGHT + 1)); pos & mask; pos <<= 1) {
+    for(position_t pos = position_t(1) << (col * (HEIGHT + 1)); pos & mask; pos <<= 1) {
       key *= 3;
       if(pos & current_position) key += 1;
       else key += 2;
@@ -290,16 +312,26 @@ class Position {
   }
 
   /**
-   * counts number of bit set to one in a 64bits integer
+   * counts number of bit set to one in a 64bits or 128bits integer safely
    */
+  template <typename T>
+  static typename std::enable_if<sizeof(T) <= 8, unsigned int>::type popcount_impl(T m) {
+    return __builtin_popcountll((uint64_t)m);
+  }
+
+  template <typename T>
+  static typename std::enable_if<(sizeof(T) > 8), unsigned int>::type popcount_impl(T m) {
+    uint64_t low = (uint64_t)m;
+    uint64_t high = (uint64_t)(m >> 64);
+    return __builtin_popcountll(low) + __builtin_popcountll(high);
+  }
+
   static unsigned int popcount(position_t m) {
-    unsigned int c = 0;
-    for(c = 0; m; c++) m &= m - 1;
-    return c;
+    return popcount_impl<position_t>(m);
   }
 
   /**
-   * @param position, a bitmap of the player to evaluate the winning pos
+   * @parmam position, a bitmap of the player to evaluate the winning pos
    * @param mask, a mask of the already played spots
    *
    * @return a bitmap of all the winning free spots making an alignment
@@ -342,22 +374,26 @@ class Position {
   static constexpr position_t bottom_mask = bottom<WIDTH, HEIGHT>::mask;
   static constexpr position_t board_mask = bottom_mask * ((1LL << HEIGHT) - 1);
 
-  // return a bitmask containing a single 1 corresponding to the top cell of a given column
+  // return a bitmask containg a single 1 corresponding to the top cel of a given column
   static constexpr position_t top_mask_col(int col) {
-    return UINT64_C(1) << ((HEIGHT - 1) + col * (HEIGHT + 1));
+    return position_t(1) << ((HEIGHT - 1) + col * (HEIGHT + 1));
   }
 
-  // return a bitmask containing a single 1 corresponding to the bottom cell of a given column
+  // return a bitmask containg a single 1 corresponding to the bottom cell of a given column
   static constexpr position_t bottom_mask_col(int col) {
-    return UINT64_C(1) << col * (HEIGHT + 1);
+    return position_t(1) << (col * (HEIGHT + 1));
   }
 
  public:
   // return a bitmask 1 on all the cells of a given column
   static constexpr position_t column_mask(int col) {
-    return ((UINT64_C(1) << HEIGHT) - 1) << col * (HEIGHT + 1);
+    return (position_t((1ULL << HEIGHT) - 1)) << (col * (HEIGHT + 1));
   }
 };
+
+#ifdef BOARD_WIDTH_MACRO
+using Position = GenericPosition<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>;
+#endif
 
 } // namespace Connect4
 } // namespace GameSolver

@@ -1,0 +1,216 @@
+/*
+ * This file is part of Connect4 Game Solver <http://connect4.gamesolver.org>
+ * Copyright (C) 2017-2019 Pascal Pons <contact@gamesolver.org>
+ */
+
+#include "HeuristicSolver.hpp"
+#include "MoveSorter.hpp"
+#ifdef USE_PTHREADS
+#include <thread>
+#include <algorithm>
+#endif
+
+using namespace GameSolver::Connect4;
+
+namespace GameSolver {
+namespace Connect4 {
+
+template <int WIDTH, int HEIGHT>
+int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth) {
+  assert(alpha < beta);
+  assert(!P.canWinNext());
+
+  nodeCount++; 
+  typename GenericPosition<WIDTH, HEIGHT>::position_t possible = P.possibleNonLosingMoves();
+  if(possible == 0) // opponent wins next move
+    return -(WIDTH * HEIGHT - P.nbMoves()) / 2 * 1000;
+
+  if(P.nbMoves() >= WIDTH * HEIGHT - 2) // draw game
+    return 0;
+
+  if (depth <= 0) {
+    return P.heuristic_evaluate();
+  }
+
+  int min = -(WIDTH * HEIGHT - 2 - P.nbMoves()) / 2 * 1000;
+  if(alpha < min) {
+    alpha = min;                     
+    if(alpha >= beta) return alpha;  
+  }
+
+  int max = (WIDTH * HEIGHT - 1 - P.nbMoves()) / 2 * 1000;
+  if(beta > max) {
+    beta = max;                     
+    if(alpha >= beta) return beta;  
+  }
+
+  const typename GenericPosition<WIDTH, HEIGHT>::position_t key = P.key();
+  uint32_t tt_val = transTable.get(key);
+  int val = tt_val ? ((int)(tt_val & 0xFFFFFF) - 1000000) : 0;
+  int tt_flags = (tt_val >> 24) & 0x03; // 1 = exact, 2 = lower bound, 3 = upper bound
+  int best_move_col = tt_val ? (tt_val >> 26) - 1 : -1;
+
+  if(tt_val) {
+    if(tt_flags == 2) { // lower bound
+      if(alpha < val) {
+        alpha = val;                     
+        if(alpha >= beta) return alpha;  
+      }
+    } else if (tt_flags == 3) { // upper bound
+      if(beta > val) {
+        beta = val;                     
+        if(alpha >= beta) return beta;  
+      }
+    } else if (tt_flags == 1) { // exact
+      return val;
+    }
+  }
+
+  GenericMoveSorter<WIDTH, HEIGHT> moves;
+  for(int i = WIDTH; i--;) {
+    int col = columnOrder[i];
+    if(typename GenericPosition<WIDTH, HEIGHT>::position_t move = possible & GenericPosition<WIDTH, HEIGHT>::column_mask(col)) {
+      int base_score = P.moveScore(move);
+      if(col == best_move_col) base_score += 10000;
+      moves.add(move, base_score);
+    }
+  }
+
+  int best_seen_col = -1;
+  int orig_alpha = alpha;
+  int best_score = -1000000;
+
+  while(typename GenericPosition<WIDTH, HEIGHT>::position_t next = moves.getNext()) {
+    GenericPosition<WIDTH, HEIGHT> P2(P);
+    P2.play(next);  
+    int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1); 
+    
+    int next_col = 0;
+    for(int c = 0; c < WIDTH; c++) {
+      if(next & GenericPosition<WIDTH, HEIGHT>::column_mask(c)) {
+        next_col = c;
+        break;
+      }
+    }
+
+    if(score > best_score) {
+      best_score = score;
+      best_seen_col = next_col;
+    }
+
+    if(score >= beta) {
+      transTable.put(key, ((uint32_t)(next_col + 1) << 26) | (2 << 24) | (score + 1000000)); 
+      return score;  
+    }
+    if(score > alpha) {
+      alpha = score; 
+    }
+  }
+
+  int flags = (best_score <= orig_alpha) ? 3 : 1; 
+  transTable.put(key, ((uint32_t)(best_seen_col == -1 ? 0 : best_seen_col + 1) << 26) | (flags << 24) | (best_score + 1000000)); 
+  return best_score;
+}
+
+template <int WIDTH, int HEIGHT>
+int HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms) {
+  if(P.canWinNext()) 
+    return (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+  
+  int best_score = 0;
+  for (int d = 1; d <= max_depth; d++) {
+    int current_score = negamax_heuristic(P, -1000000, 1000000, d);
+#ifdef __EMSCRIPTEN__
+    if (end_time_ms > 0.0 && emscripten_get_now() >= end_time_ms) {
+      if (d == 1) best_score = current_score;
+      break;
+    }
+#endif
+    best_score = current_score;
+    if (best_score > 10000 || best_score < -10000) {
+      break;
+    }
+  }
+  return best_score;
+}
+
+template <int WIDTH, int HEIGHT>
+std::vector<int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads, double timeout_ms) {
+  std::vector<int> scores(WIDTH, -1000000);
+#ifdef __EMSCRIPTEN__
+  double end_time_ms = timeout_ms > 0.0 ? emscripten_get_now() + timeout_ms : 0.0;
+#else
+  double end_time_ms = 0.0;
+#endif
+
+#ifdef USE_PTHREADS
+  if (threads <= 1) {
+    for (int i = 0; i < WIDTH; i++) {
+      int col = columnOrder[i];
+      if (P.canPlay(col)) {
+        if(P.isWinningMove(col)) {
+          scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+        } else {
+          GenericPosition<WIDTH, HEIGHT> P2(P);
+          P2.playCol(col);
+          scores[col] = -solve_heuristic(P2, max_depth - 1, end_time_ms);
+        }
+      }
+    }
+    return scores;
+  }
+
+  std::atomic<int> next_col{0};
+  auto worker = [&]() {
+    while (true) {
+      int i = next_col.fetch_add(1);
+      if (i >= WIDTH) break;
+      int col = columnOrder[i];
+
+      if (P.canPlay(col)) {
+        if(P.isWinningMove(col)) {
+          scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+        } else {
+          GenericPosition<WIDTH, HEIGHT> P2(P);
+          P2.playCol(col);
+          scores[col] = -solve_heuristic(P2, max_depth - 1, end_time_ms);
+        }
+      }
+    }
+  };
+
+  unsigned int num_threads = std::min((unsigned int)WIDTH, (unsigned int)threads);
+  std::vector<std::thread> thread_pool;
+  for (unsigned int i = 0; i < num_threads - 1; i++) {
+    thread_pool.emplace_back(worker);
+  }
+  worker();
+
+  for (auto& t : thread_pool) {
+    if (t.joinable()) t.join();
+  }
+#else
+  for (int i = 0; i < WIDTH; i++) {
+    int col = columnOrder[i];
+    if (P.canPlay(col)) {
+      if(P.isWinningMove(col)) scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+      else {
+        GenericPosition<WIDTH, HEIGHT> P2(P);
+        P2.playCol(col);
+        scores[col] = -solve_heuristic(P2, max_depth - 1, end_time_ms);
+      }
+    }
+  }
+#endif
+  return scores;
+}
+
+// Constructor
+template <int WIDTH, int HEIGHT>
+HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver() : nodeCount{0} {
+  for(int i = 0; i < WIDTH; i++) // initialize the column exploration order, starting with center columns
+    columnOrder[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; // example for WIDTH=7: columnOrder = {3, 4, 2, 5, 1, 6, 0}
+}
+
+} // namespace Connect4
+} // namespace GameSolver

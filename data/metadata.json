@@ -1,0 +1,34 @@
+{
+  "7x7_dense8.cbook": {
+    "width": 7,
+    "height": 7,
+    "depth": 8,
+    "size_bytes": 273022,
+    "num_buckets": 34127,
+    "cuckoo": true
+  },
+  "7x7_dense12.cbook": {
+    "width": 7,
+    "height": 7,
+    "depth": 12,
+    "size_bytes": 20821102,
+    "num_buckets": 2602637,
+    "cuckoo": true
+  },
+  "7x6_dense12.cbook": {
+    "width": 7,
+    "height": 6,
+    "depth": 12,
+    "size_bytes": 20821102,
+    "num_buckets": 2602637,
+    "cuckoo": true
+  },
+  "7x6_dense4.cbook": {
+    "width": 7,
+    "height": 6,
+    "depth": 4,
+    "size_bytes": 1790,
+    "num_buckets": 223,
+    "cuckoo": true
+  }
+}

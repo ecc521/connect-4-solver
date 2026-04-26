@@ -47,27 +47,7 @@ constexpr unsigned int log2(unsigned int n) {
   return n <= 1 ? 0 : log2(n / 2) + 1;
 }
 
-/**
- * Abstrac interface for the Transposition Table get function
- */
-template<class key_t, class value_t>
-class TableGetter {
- private:
-  virtual void* getKeys() = 0;
-  virtual void* getValues() = 0;
-  virtual size_t getSize() = 0;
-  virtual int getKeySize() = 0;
-  virtual int getValueSize() = 0;
 
- public:
-  virtual value_t get(key_t key) const = 0;
-  virtual ~TableGetter() {};
-
- friend class OpeningBook;
-};
-
-// uint_t<S> is a template type providing an unsigned int able to fit interger of S bits.
-// uint_t<8> = uint8_t and uint_t<9> = uint_16t
 template<int S> using uint_t =
   typename std::conditional < S <= 8, uint_least8_t,
   typename std::conditional < S <= 16, uint_least16_t,
@@ -86,16 +66,10 @@ template<int S> using uint_t =
  *             The table will contain 2^log_size elements
  */
 template<class partial_key_t, class key_t, class value_t, int log_size>
-class TranspositionTable : public TableGetter<key_t, value_t> {
+class TranspositionTable {
  private:
   static const size_t size = next_prime(1 << log_size);
   std::atomic<uint16_t> *Data;
-
-  void* getKeys()    override {return (void*)Data;}
-  void* getValues()  override {return nullptr;}
-  size_t getSize()   override {return size;}
-  int getKeySize()   override {return sizeof(uint16_t);}
-  int getValueSize() override {return 0;}
 
   size_t index(key_t key) const {
     return key % size;
@@ -142,7 +116,7 @@ class TranspositionTable : public TableGetter<key_t, value_t> {
     }
   }
 
-  value_t get(key_t key) const override {
+  value_t get(key_t key) const {
     size_t pos = index(key);
     uint16_t partial = key & 0xFF;
     size_t start_pos = pos;

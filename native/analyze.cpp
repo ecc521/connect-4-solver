@@ -11,6 +11,8 @@
 #include <thread>
 #include <algorithm>
 
+#include "HeuristicSolver.hpp"
+
 template <typename CoreSolver, typename CorePosition, int W>
 int32_t* runAnalysis(CoreSolver& solver, const char* positionCharArr, int threads) {
   std::string positionString(positionCharArr);
@@ -33,130 +35,66 @@ int32_t* runAnalysis(CoreSolver& solver, const char* positionCharArr, int thread
   return result;
 }
 
-// ==========================================
-// 6x5 Instantiation
-// ==========================================
-#define BOARD_WIDTH_MACRO 6
-#define BOARD_HEIGHT_MACRO 5
-namespace C4_6x5 {
-#include "Solver.cpp"
+template <typename CoreSolver, typename CorePosition, int W>
+int32_t* runHeuristicAnalysis(CoreSolver& solver, const char* positionCharArr, int max_depth, int threads, double timeout_ms) {
+  std::string positionString(positionCharArr);
+  CorePosition P;
+  
+  int32_t* result = (int32_t*)malloc((2 + W) * sizeof(int32_t));
+  
+  if(P.play(positionString) != positionString.size()) {
+    int lastColPlayed = positionString[P.nbMoves()] - '1';
+    result[0] = P.isWinningMove(lastColPlayed) ? 1 : 2;
+    result[1] = P.nbMoves();
+    for(int i = 0; i < W; i++) result[2 + i] = 0;
+  } 
+  else {
+    result[0] = 0;
+    result[1] = P.nbMoves();
+    std::vector<int> scores = solver.analyze_heuristic(P, max_depth, threads, timeout_ms);
+    for(int i = 0; i < W; i++) result[2 + i] = scores[i];
+  }
+  return result;
 }
-#undef BOARD_WIDTH_MACRO
-#undef BOARD_HEIGHT_MACRO
-#undef POSITION_HPP
-#undef SOLVER_HPP
-#undef TRANSPOSITION_TABLE_HPP
-#undef OPENING_BOOK_HPP
-#undef MOVE_SORTER_HPP
 
-// ==========================================
-// 6x6 Instantiation
-// ==========================================
-#define BOARD_WIDTH_MACRO 6
-#define BOARD_HEIGHT_MACRO 6
-namespace C4_6x6 {
-#include "Solver.cpp"
-}
-#undef BOARD_WIDTH_MACRO
-#undef BOARD_HEIGHT_MACRO
-#undef POSITION_HPP
-#undef SOLVER_HPP
-#undef TRANSPOSITION_TABLE_HPP
-#undef OPENING_BOOK_HPP
-#undef MOVE_SORTER_HPP
-
-// ==========================================
-// 7x6 Instantiation
-// ==========================================
-#define BOARD_WIDTH_MACRO 7
-#define BOARD_HEIGHT_MACRO 6
-namespace C4_7x6 {
-#include "Solver.cpp"
-}
-#undef BOARD_WIDTH_MACRO
-#undef BOARD_HEIGHT_MACRO
-#undef POSITION_HPP
-#undef SOLVER_HPP
-#undef TRANSPOSITION_TABLE_HPP
-#undef OPENING_BOOK_HPP
-#undef MOVE_SORTER_HPP
-
-// ==========================================
-// 7x7 Instantiation
-// ==========================================
-#define BOARD_WIDTH_MACRO 7
-#define BOARD_HEIGHT_MACRO 7
-namespace C4_7x7 {
-#include "Solver.cpp"
-}
-#undef BOARD_WIDTH_MACRO
-#undef BOARD_HEIGHT_MACRO
-#undef POSITION_HPP
-#undef SOLVER_HPP
-#undef TRANSPOSITION_TABLE_HPP
-#undef OPENING_BOOK_HPP
-#undef MOVE_SORTER_HPP
-
-// ==========================================
-// 8x6 Instantiation
-// ==========================================
-#define BOARD_WIDTH_MACRO 8
-#define BOARD_HEIGHT_MACRO 6
-namespace C4_8x6 {
-#include "Solver.cpp"
-}
-#undef BOARD_WIDTH_MACRO
-#undef BOARD_HEIGHT_MACRO
-#undef POSITION_HPP
-#undef SOLVER_HPP
-#undef TRANSPOSITION_TABLE_HPP
-#undef OPENING_BOOK_HPP
-#undef MOVE_SORTER_HPP
-
-// ==========================================
-// 9x7 Instantiation
-// ==========================================
-#define BOARD_WIDTH_MACRO 9
-#define BOARD_HEIGHT_MACRO 7
-namespace C4_9x7 {
-#include "Solver.cpp"
-}
-#undef BOARD_WIDTH_MACRO
-#undef BOARD_HEIGHT_MACRO
-#undef POSITION_HPP
-#undef SOLVER_HPP
-#undef TRANSPOSITION_TABLE_HPP
-#undef OPENING_BOOK_HPP
-#undef MOVE_SORTER_HPP
+// Include the shared template instantiations
+#include "bindings_core.hpp"
 
 // ==========================================
 // Exposed WebAssembly Bridge
 // ==========================================
 extern "C" {
 
-C4_6x5::GameSolver::Connect4::Solver solver6x5;
-C4_6x6::GameSolver::Connect4::Solver solver6x6;
-C4_7x6::GameSolver::Connect4::Solver solver7x6;
-C4_7x7::GameSolver::Connect4::Solver solver7x7;
-C4_8x6::GameSolver::Connect4::Solver solver8x6;
-C4_9x7::GameSolver::Connect4::Solver solver9x7;
+EMSCRIPTEN_KEEPALIVE void loadBook6x5(const char* path) { SharedInstances::solver6x5.loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x5(const char* pos, int threads) { return runAnalysis<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6>(SharedInstances::solver6x5, pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition6x5(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<6, 5>, GameSolver::Connect4::GenericPosition<6, 5>, 6>(SharedInstances::heuristicSolver6x5, pos, max_depth, threads, timeout_ms); }
 
-EMSCRIPTEN_KEEPALIVE void loadBook6x5(const char* path) { solver6x5.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x5(const char* pos, int threads) { return runAnalysis<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6>(solver6x5, pos, threads); }
+EMSCRIPTEN_KEEPALIVE void loadBook6x6(const char* path) { SharedInstances::solver6x6.loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x6(const char* pos, int threads) { return runAnalysis<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6>(SharedInstances::solver6x6, pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition6x6(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<6, 6>, GameSolver::Connect4::GenericPosition<6, 6>, 6>(SharedInstances::heuristicSolver6x6, pos, max_depth, threads, timeout_ms); }
 
-EMSCRIPTEN_KEEPALIVE void loadBook6x6(const char* path) { solver6x6.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x6(const char* pos, int threads) { return runAnalysis<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6>(solver6x6, pos, threads); }
+EMSCRIPTEN_KEEPALIVE void loadBook7x6(const char* path) { SharedInstances::solver7x6.loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x6(const char* pos, int threads) { return runAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7>(SharedInstances::solver7x6, pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition7x6(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 6>, GameSolver::Connect4::GenericPosition<7, 6>, 7>(SharedInstances::heuristicSolver7x6, pos, max_depth, threads, timeout_ms); }
 
-EMSCRIPTEN_KEEPALIVE void loadBook7x6(const char* path) { solver7x6.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x6(const char* pos, int threads) { return runAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7>(solver7x6, pos, threads); }
+EMSCRIPTEN_KEEPALIVE void loadBook7x7(const char* path) { SharedInstances::solver7x7.loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x7(const char* pos, int threads) { return runAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7>(SharedInstances::solver7x7, pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition7x7(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7>(SharedInstances::heuristicSolver7x7, pos, max_depth, threads, timeout_ms); }
 
-EMSCRIPTEN_KEEPALIVE void loadBook7x7(const char* path) { solver7x7.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x7(const char* pos, int threads) { return runAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7>(solver7x7, pos, threads); }
+EMSCRIPTEN_KEEPALIVE void loadBook8x6(const char* path) { SharedInstances::solver8x6.loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition8x6(const char* pos, int threads) { return runAnalysis<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8>(SharedInstances::solver8x6, pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition8x6(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<8, 6>, GameSolver::Connect4::GenericPosition<8, 6>, 8>(SharedInstances::heuristicSolver8x6, pos, max_depth, threads, timeout_ms); }
 
-EMSCRIPTEN_KEEPALIVE void loadBook8x6(const char* path) { solver8x6.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition8x6(const char* pos, int threads) { return runAnalysis<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8>(solver8x6, pos, threads); }
+EMSCRIPTEN_KEEPALIVE void loadBook9x7(const char* path) { SharedInstances::solver9x7.loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition9x7(const char* pos, int threads) { return runAnalysis<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9>(SharedInstances::solver9x7, pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition9x7(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 7>, GameSolver::Connect4::GenericPosition<9, 7>, 9>(SharedInstances::heuristicSolver9x7, pos, max_depth, threads, timeout_ms); }
 
-EMSCRIPTEN_KEEPALIVE void loadBook9x7(const char* path) { solver9x7.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition9x7(const char* pos, int threads) { return runAnalysis<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9>(solver9x7, pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition8x8(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<8, 8>, GameSolver::Connect4::GenericPosition<8, 8>, 8>(SharedInstances::heuristicSolver8x8, pos, max_depth, threads, timeout_ms); }
+
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition10x7(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<10, 7>, GameSolver::Connect4::GenericPosition<10, 7>, 10>(SharedInstances::heuristicSolver10x7, pos, max_depth, threads, timeout_ms); }
+
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition9x9(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 9>, GameSolver::Connect4::GenericPosition<9, 9>, 9>(SharedInstances::heuristicSolver9x9, pos, max_depth, threads, timeout_ms); }
+
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition10x10(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<10, 10>, GameSolver::Connect4::GenericPosition<10, 10>, 10>(SharedInstances::heuristicSolver10x10, pos, max_depth, threads, timeout_ms); }
 
 } // extern "C"

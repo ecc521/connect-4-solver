@@ -11,13 +11,13 @@
 #include <iostream>
 #include <unordered_map>
 #include <cstdlib>
-#include "TranspositionTable.hpp" 
+ 
 
 namespace GameSolver {
 namespace Connect4 {
 
 template<class key_t, class value_t>
-class CuckooTable : public TableGetter<key_t, value_t> {
+class CuckooTable {
  private:
   struct Bucket {
     std::atomic<uint16_t> slots[4];
@@ -28,11 +28,10 @@ class CuckooTable : public TableGetter<key_t, value_t> {
   std::vector<std::pair<key_t, value_t>> TempItems;
   bool is_built = false;
 
-  void* getKeys()    override {return (void*)Data;}
-  void* getValues()  override {return nullptr;}
-  size_t getSize()   override {return num_buckets * 4;}
-  int getKeySize()   override {return sizeof(uint16_t);}
-  int getValueSize() override {return 0;}
+  friend class OpeningBook;
+  void* getKeys()    {return (void*)Data;}
+  size_t getSize()   {return num_buckets * 4;}
+  int getKeySize()   {return sizeof(uint16_t);}
 
   size_t h1(key_t key) const {
     return (key * 0x517cc1b727220a95ULL) % num_buckets;
@@ -127,7 +126,7 @@ class CuckooTable : public TableGetter<key_t, value_t> {
     return fail_count;
   }
 
-  value_t get(key_t key) const override {
+  value_t get(key_t key) const {
     uint16_t partial = key & 0xFF;
     
     size_t b1 = h1(key);

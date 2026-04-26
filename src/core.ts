@@ -38,6 +38,14 @@ export interface SolverModule {
   _loadBook8x6(pointer: number): void;
   _analyzePosition9x7(pointer: number, threads: number): number;
   _loadBook9x7(pointer: number): void;
+  _analyzePosition8x8(pointer: number, threads: number): number;
+  _loadBook8x8(pointer: number): void;
+  _analyzePosition10x7(pointer: number, threads: number): number;
+  _loadBook10x7(pointer: number): void;
+  _analyzePosition9x9(pointer: number, threads: number): number;
+  _loadBook9x9(pointer: number): void;
+  _analyzePosition10x10(pointer: number, threads: number): number;
+  _loadBook10x10(pointer: number): void;
   UTF8ToString(pointer: number): string;
   _malloc(size: number): number;
   _free(pointer: number): void;

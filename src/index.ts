@@ -2,6 +2,7 @@
 export const BOARD_WIDTH = 7;
 
 export * from "./core";
+
 import {
   Player,
   Outcome,
@@ -86,11 +87,11 @@ export class Connect4Solver {
     this.bookLoaded = true;
   }
 
-  private allocateString(str: string): number {
+  protected allocateString(str: string): number {
     return this.mod.stringToNewUTF8(str);
   }
 
-  private rawAnalyze(positionStr: string, threads = 1): Int32Array {
+  protected rawAnalyze(positionStr: string, threads = 1): Int32Array {
     const mod = this.mod;
     const allocatedMemory = this.allocateString(positionStr);
 
@@ -120,11 +121,11 @@ export class Connect4Solver {
     return finalData;
   }
 
-  private getPlayerAt(nbMoves: number): Player {
+  protected getPlayerAt(nbMoves: number): Player {
     return nbMoves % 2 === 0 ? Player.P1 : Player.P2;
   }
 
-  private createEvaluation(score: number, nbMoves: number): Evaluation {
+  protected createEvaluation(score: number, nbMoves: number): Evaluation {
     const isPlayer1Turn = nbMoves % 2 === 0;
     const currentPlayer = isPlayer1Turn ? Player.P1 : Player.P2;
     const opponent = isPlayer1Turn ? Player.P2 : Player.P1;
@@ -247,3 +248,6 @@ export class Connect4Solver {
     });
   }
 }
+
+export * from "./threaded";
+export * from "./heuristic";

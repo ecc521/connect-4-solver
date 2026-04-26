@@ -34,7 +34,7 @@ import * as fs from "fs";
 
   // Load an opening book for instant performance (Required for evaluating positions with <= 6 moves in a reasonable amount of time)
   // Download book files from: https://github.com/ecc521/connect-4-solver/releases/tag/solutionbooks
-  const bookBuffer = fs.readFileSync("path/to/downloaded/7x6_dense10.book");
+  const bookBuffer = fs.readFileSync("path/to/downloaded/7x6_dense12.cbook");
   await solver.loadBook(new Uint8Array(bookBuffer));
   // await threadedSolver.loadBook(new Uint8Array(bookBuffer)); // The APIs are completely identical
 
@@ -193,7 +193,7 @@ Depth refers to the exact number of moves (ply) pre-calculated consecutively sta
 
 - **`6x5`:** Depth `0` _(No book required; WASM evaluates instantly)_
 - **`6x6`:** Depth `4` _(WASM takes ~8s from scratch, but a `6x6_dense4.book` evaluates instantly)_
-- **`7x6` (Standard):** Depth `10` or `14` _(The `7x6_dense10.book` is 4MB, `7x6_sparse0-10.book` is 1MB; `7x6_sparse14-16.book` is 33MB)_
+- **`7x6` (Standard):** Depth `12` _(The `7x6_dense12.cbook` is 20MB, providing perfect caching without collisions)_
 - **`7x7`:** Depth `16` to `18`
 - **`8x6`:** Depth `20` to `22`
 - **`9x7`:** Astronomical complexity. Effectively unsolvable seamlessly without colossal initial caching overheads (> Depth `26`).

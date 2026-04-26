@@ -6,22 +6,25 @@ This repository provides an extremely fast, high-performance, and "perfect" Conn
 ## Key Directories and Files
 
 * **`native/`**
-  Contains the core C++ algorithm (`Solver.cpp`, `TranspositionTable.hpp`, `MoveSorter.hpp`) alongside Emscripten binding hooks (`analyze.cpp`) and native JSI-compatible bridging logic. This is where the actual mathematical evaluation takes place.
-
+  Contains the core C++ algorithm (`Solver.cpp`, `TranspositionTable.hpp`, `MoveSorter.hpp`, `HeuristicSolver.hpp`) alongside Emscripten binding hooks (`analyze.cpp`) and native JSI-compatible bridging logic. This is where the actual mathematical evaluation takes place.
+  
 * **`src/`**
-  Contains the TypeScript library source code (e.g. `index.ts`, `core.ts`, `threaded.ts`). It wraps the WebAssembly and Native module hooks to expose a clean, object-oriented, and strongly-typed API to the end-user.
+  Contains the TypeScript library source code (e.g. `index.ts`, `core.ts`, `threaded.ts`, `heuristic.ts`). It wraps the WebAssembly and Native module hooks to expose a clean, object-oriented, and strongly-typed API to the end-user.
 
-* **`ios/`**, **`android/`**, and **`connect-4-solver.podspec`**
-  Provide the platform-specific boilerplate for React Native. They map the C++ solver directly to Obj-C/Swift (iOS) and JNI/Java (Android), allowing mobile developers to use this library natively without WebAssembly overhead.
+* **`ios/`** & **`android/`**
+  Provide the platform-specific boilerplate for React Native mapping the C++ solver directly to Obj-C/Swift (iOS) and JNI/Java (Android). This allows mobile developers to use this library natively without WebAssembly overhead, including the newly added `HeuristicSolver` endpoints.
 
 * **`test-data/`**
-  Stores large `.txt` files containing tens of thousands of pre-evaluated Connect 4 positions across various board sizes. These are used extensively by Jest to run continuous parity tests to ensure the TS wrapper outputs match the pure C++ expectations.
+  Stores `.txt` files containing tens of thousands of pre-evaluated Connect 4 positions across various board sizes. These are used extensively by Jest to run continuous parity tests to ensure the TS wrapper outputs match the pure C++ expectations.
+
+* **`data/`**
+  Houses the highly-optimized `.cbook` (Cuckoo Table) opening books. These files are securely read and loaded by the solver to instantiate zero-latency early-game positional caches.
 
 * **`build.sh`**
   The script responsible for running `emcc` (Emscripten) against the `native/` C++ files. It generates the `build/analyze.js` and `build/analyze_threaded.js` WASM bundles.
 
 * **`Dockerfile`**
-  Provides an isolated environment for compiling the WebAssembly code. Useful for developers (or agents) who do not have Emscripten installed natively on their machine.
+  Provides an isolated environment for compiling the WebAssembly code. Useful for compiling the C++ to WASM without having Emscripten installed natively on the host machine.
 
 * **`eslint.config.mjs`** & **`tsconfig.json`**
   Establish rigorous code-quality constraints for the TypeScript portion of the repository. They utilize `recommendedTypeChecked`, prohibit `any` types, and enforce explicit function return types.

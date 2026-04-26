@@ -35,14 +35,16 @@ namespace Connect4 {
  * and also efficient if the move are pushed in approximately increasing
  * order which can be achieved by using a simpler column ordering heuristic.
  */
-class MoveSorter {
+template <int WIDTH, int HEIGHT>
+class GenericMoveSorter {
+  using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
  public:
 
   /**
    * Add a move in the container with its score.
-   * You cannot add more than Position::WIDTH moves
+   * You cannot add more than WIDTH moves
    */
-  void add(const Position::position_t move, const int score) {
+  void add(const position_t move, const int score) {
     int pos = size++;
     for(; pos && entries[pos - 1].score > score; --pos) entries[pos] = entries[pos - 1];
     entries[pos].move = move;
@@ -54,7 +56,7 @@ class MoveSorter {
    * @return next remaining move with max score and remove it from the container.
    * If no more move is available return 0
    */
-  Position::position_t getNext() {
+  position_t getNext() {
     if(size)
       return entries[--size].move;
     else
@@ -71,7 +73,7 @@ class MoveSorter {
   /**
    * Build an empty container
    */
-  MoveSorter(): size{0} {
+  GenericMoveSorter(): size{0} {
   }
 
  private:
@@ -80,10 +82,14 @@ class MoveSorter {
 
   // Contains size moves with their score ordered by score
   struct {
-    Position::position_t move;
+    position_t move;
     int score;
-  } entries[Position::WIDTH];
+  } entries[WIDTH];
 };
+
+#ifdef BOARD_WIDTH_MACRO
+using MoveSorter = GenericMoveSorter<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>;
+#endif
 
 } // namespace Connect4
 } // namespace GameSolver

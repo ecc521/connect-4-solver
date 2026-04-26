@@ -17,12 +17,33 @@ class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContext
     }
 
     external fun nativeAnalyze(position: String, threads: Int, width: Int, height: Int): IntArray?
+    external fun nativeAnalyzeHeuristic(position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int): IntArray?
 
     @ReactMethod
     fun analyze(position: String, threads: Int, width: Int, height: Int, weak: Boolean, promise: Promise) {
         executor.execute {
             try {
                 val result = nativeAnalyze(position, threads, width, height)
+                if (result != null) {
+                    val writableArray = Arguments.createArray()
+                    for (i in result) {
+                        writableArray.pushInt(i)
+                    }
+                    promise.resolve(writableArray)
+                } else {
+                    promise.reject("UNSUPPORTED_SIZE", "Unsupported board size")
+                }
+            } catch (e: Exception) {
+                promise.reject("ERROR", e.message)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun analyzeHeuristic(position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, promise: Promise) {
+        executor.execute {
+            try {
+                val result = nativeAnalyzeHeuristic(position, maxDepth, threads, timeoutMs, width, height)
                 if (result != null) {
                     val writableArray = Arguments.createArray()
                     for (i in result) {
