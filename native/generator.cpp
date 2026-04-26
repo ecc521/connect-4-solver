@@ -12,7 +12,7 @@ std::unordered_set<uint64_t> visited;
 
 /**
  * Explore and print all possible position under a given depth.
- * symetric positions are printed only once.
+ * symmetric positions are printed only once.
  */
 void explore(const Position &P, char* pos_str, const int depth) {
   uint64_t key = P.key3();
@@ -75,8 +75,8 @@ void generate_opening_book() {
 }
 
 /**
- * If used with a max depth parameter: generate all uniquepsoition upto max depth
- * If no parameter: read scoredposition from standard input to store in an opening book
+ * If used with a max depth parameter: generate all unique position up to max depth
+ * If no parameter: read scored position from standard input to store in an opening book
  */
 int main(int argc, char** argv) {
   if(argc > 1) {

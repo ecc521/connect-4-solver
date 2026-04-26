@@ -32,8 +32,8 @@ namespace Connect4 {
  *
  * This class implement an insertion sort that is in practice very
  * efficient for small number of move to sort (max is Position::WIDTH)
- * and also efficient if the move are pushed in approximatively increasing
- * order which can be acheived by using a simpler column ordering heuristic.
+ * and also efficient if the move are pushed in approximately increasing
+ * order which can be achieved by using a simpler column ordering heuristic.
  */
 class MoveSorter {
  public:
