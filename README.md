@@ -109,6 +109,39 @@ self.onmessage = async (e) => {
 
 _(Note: The React Native `"connect-4-solver/native"` plugins circumvent this entirely! They are exclusively engineered to run 100% asynchronously on true background CPU hooks natively!)_
 
+### 📱 React Native (iOS & Android)
+
+For mobile development, `connect-4-solver` includes true native C++ bindings for React Native via JSI/JNI. This entirely bypasses the WebAssembly engine and executes the solver directly on the device's native CPU architecture for maximum performance.
+
+```typescript
+import { ReactNativeConnect4Solver } from "connect-4-solver/native";
+
+const runMobile = async () => {
+  const solver = new ReactNativeConnect4Solver(7, 6);
+  await solver.init();
+
+  // The React Native bindings execute fully asynchronously off the main JS thread automatically
+  const result = await solver.analyzeAsync("121212");
+  
+  if (result.evaluation?.outcome === "Win") {
+    console.log("Win detected via Native C++ execution!");
+  }
+};
+```
+
+#### Testing with the Example App
+
+This repository includes a bare-bones React Native `example` application configured to build and test the local `connect-4-solver` library natively.
+
+To test the native bindings on your machine:
+1. Ensure you have the Android SDK (for Android) or Xcode/CocoaPods (for iOS) installed.
+2. From the root directory, run:
+   ```bash
+   npm run example:ios
+   # or
+   npm run example:android
+   ```
+
 ### Analysis Result Structure
 
 The `analyze` method returns a `PositionAnalysis` object:

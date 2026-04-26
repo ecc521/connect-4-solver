@@ -39,7 +39,9 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepublishOnly": "npm run lint && npm run build:ts && npm run format:check && npm test"
+    "prepublishOnly": "npm run lint && npm run build:ts && npm run format:check && npm test",
+    "example:ios": "cd example && npx react-native run-ios --simulator=\"iPhone 15\"",
+    "example:android": "cd example && npx react-native run-android"
   },
   "repository": {
     "type": "git",
