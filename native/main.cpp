@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
   bool weak = false;
   bool analyze = false;
 
-  std::string opening_book = "7x6.book";
+  std::string opening_book = "7x6_sparse14-16.book";
   for(int i = 1; i < argc; i++) {
     if(argv[i][0] == '-') {
       if(argv[i][1] == 'w') weak = true; // parameter -w: use weak solver

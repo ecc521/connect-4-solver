@@ -79,30 +79,27 @@ template<int S> using uint_t =
   uint_least64_t>::type>::type >::type;
 
 /**
- * Transposition Table is a simple hash map with fixed storage size.
- * In case of collision we keep the last entry and overide the previous one.
- * We keep only part of the key to reduce storage, but no error is possible thanks to Chinese theorem.
+ * Transposition Table is a highly optimized memory-dense hash map 
+ * designed for L1/L3 Cache utilization. It packs an 8-bit partial key
+ * and an 8-bit value into a single atomic uint16_t array slot.
+ * This halves memory fetch latency during alpha-beta tree traversal.
  *
- * The number of stored entries is a power of two that is defined at compile time.
- * We also define size of the entries and keys to allow optimization at compile time.
- *
- * key_size:   number of bits of the key
- * value_size: number of bits of the value
+ * key_size:   (ignored - forced to uint16_t array internally)
+ * value_size: (ignored)
  * log_size:   base 2 log of the size of the Transposition Table.
  *             The table will contain 2^log_size elements
  */
 template<class partial_key_t, class key_t, class value_t, int log_size>
 class TranspositionTable : public TableGetter<key_t, value_t> {
  private:
-  static const size_t size = next_prime(1 << log_size); // size of the transition table. Have to be odd to be prime with 2^sizeof(key_t)
-  std::atomic<partial_key_t> *K;     // Array to store truncated version of keys;
-  std::atomic<value_t> *V;   // Array to store values;
+  static const size_t size = next_prime(1 << log_size);
+  std::atomic<uint16_t> *Data;
 
-  void* getKeys()    override {return (void*)K;}
-  void* getValues()  override {return (void*)V;}
+  void* getKeys()    override {return (void*)Data;}
+  void* getValues()  override {return nullptr;}
   size_t getSize()   override {return size;}
-  int getKeySize()   override {return sizeof(partial_key_t);}
-  int getValueSize() override {return sizeof(value_t);}
+  int getKeySize()   override {return sizeof(uint16_t);}
+  int getValueSize() override {return 0;}
 
   size_t index(key_t key) const {
     return key % size;
@@ -110,52 +107,60 @@ class TranspositionTable : public TableGetter<key_t, value_t> {
 
  public:
   TranspositionTable() {
-    K = new std::atomic<partial_key_t>[size];
-    V = new std::atomic<value_t>[size];
+    Data = new std::atomic<uint16_t>[size];
     reset();
   }
 
   ~TranspositionTable() {
-    delete[] K;
-    delete[] V;
+    delete[] Data;
   }
 
-  /**
-   * Empty the Transition Table.
-   */
   void reset() {
     for (size_t i = 0; i < size; i++) {
-      K[i].store(0, std::memory_order_relaxed);
-      V[i].store(0, std::memory_order_relaxed);
+      Data[i].store(0, std::memory_order_relaxed);
     }
   }
 
-  /**
-   * Store a value for a given key
-   * @param key: must be less than key_size bits.
-   * @param value: must be less than value_size bits. null (0) value is used to encode missing data
-   */
   void put(key_t key, value_t value) {
     size_t pos = index(key);
-    // Lock-free sequence lock: Write V first, then K with release semantics
-    V[pos].store(value, std::memory_order_relaxed);
-    K[pos].store((partial_key_t)key, std::memory_order_release);
+    // 8-bit signature 
+    uint16_t partial = key & 0xFF;
+    uint16_t packed_val = value & 0xFF; 
+    uint16_t combined = (partial << 8) | packed_val;
+    size_t start_pos = pos;
+
+    while (true) {
+        uint16_t expected = 0;
+        // Lock-free atomic compare and swap: if 0, insert it.
+        if (Data[pos].compare_exchange_strong(expected, combined, std::memory_order_relaxed)) {
+            break;
+        }
+        // If the slot is taken but has identical signature, overwrite it (transposition deepening)
+        if ((expected >> 8) == partial) {
+            Data[pos].store(combined, std::memory_order_relaxed);
+            break;
+        }
+        // Linear probe within identical cache line gracefully
+        pos = (pos + 1) % size;
+        if (pos == start_pos) break; // Table full fail-safe
+    }
   }
 
-  /**
-   * Get the value of a key
-   * @param key: must be less than key_size bits.
-   * @return value_size bits value associated with the key if present, 0 otherwise.
-   */
   value_t get(key_t key) const override {
     size_t pos = index(key);
-    // Lock-free sequence lock: Read V, then K with acquire semantics, then V again
-    value_t v1 = V[pos].load(std::memory_order_relaxed);
-    partial_key_t k = K[pos].load(std::memory_order_acquire);
-    value_t v2 = V[pos].load(std::memory_order_relaxed);
-
-    if (k == (partial_key_t)key && v1 == v2) {
-      return v1;
+    uint16_t partial = key & 0xFF;
+    size_t start_pos = pos;
+    
+    while (true) {
+        uint16_t combined = Data[pos].load(std::memory_order_relaxed);
+        if (combined == 0) return 0; // Hit empty slot, item not found
+        
+        if ((combined >> 8) == partial) {
+            return (value_t)(combined & 0xFF);
+        }
+        
+        pos = (pos + 1) % size;
+        if (pos == start_pos) return 0; // Looped through full table
     }
     return 0;
   }

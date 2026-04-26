@@ -23,6 +23,7 @@
 #include <fstream>
 #include "Position.hpp"
 #include "TranspositionTable.hpp"
+#include "CuckooTable.hpp"
 
 namespace GameSolver {
 namespace Connect4 {
@@ -33,53 +34,33 @@ class OpeningBook {
   const int height;
   int depth;
 
-  template<class partial_key_t>
   TableGetter<Position::position_t, uint8_t>* initTranspositionTable(int log_size) {
     switch(log_size) {
-    case 10: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 10>();
-    case 11: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 11>();
-    case 12: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 12>();
-    case 13: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 13>();
-    case 14: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 14>();
-    case 15: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 15>();
-    case 16: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 16>();
-    case 17: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 17>();
-    case 18: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 18>();
-    case 19: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 19>();
-    case 20: return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 20>();
-    case 21:
-      return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 21>();
-    case 22:
-      return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 22>();
-    case 23:
-      return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 23>();
-    case 24:
-      return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 24>();
-    case 25:
-      return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 25>();
-    case 26:
-      return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 26>();
-    case 27:
-      return new TranspositionTable<partial_key_t, Position::position_t, uint8_t, 27>();
+    case 10: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 10>();
+    case 11: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 11>();
+    case 12: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 12>();
+    case 13: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 13>();
+    case 14: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 14>();
+    case 15: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 15>();
+    case 16: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 16>();
+    case 17: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 17>();
+    case 18: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 18>();
+    case 19: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 19>();
+    case 20: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 20>();
+    case 21: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 21>();
+    case 22: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 22>();
+    case 23: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 23>();
+    case 24: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 24>();
+    case 25: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 25>();
+    case 26: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 26>();
+    case 27: return new TranspositionTable<uint16_t, Position::position_t, uint8_t, 27>();
     default:
       std::cerr << "Unimplemented OpeningBook size: " << log_size << std::endl;
       return 0;
     }
   }
 
-  TableGetter<Position::position_t, uint8_t>* initTranspositionTable(int partial_key_bytes, int log_size) {
-    switch(partial_key_bytes) {
-    case 1:
-      return initTranspositionTable<uint8_t>(log_size);
-    case 2:
-      return initTranspositionTable<uint16_t>(log_size);
-    case 4:
-      return initTranspositionTable<uint32_t>(log_size);
-    default:
-      std::cerr << "Invalid internal key size: " << partial_key_bytes << " bytes" << std::endl;
-      return 0;
-    }
-  }
+  // initCuckooTable removed as it dynamically allocates from file size now
 
  public:
   OpeningBook(int width, int height) : T{0}, width{width}, height{height}, depth{ -1} {} // Empty opening book
@@ -128,7 +109,8 @@ class OpeningBook {
     }
 
     ifs.read(&value_bytes, 1);
-    if(ifs.fail() || value_bytes != 1) {
+    if(ifs.fail() || (value_bytes != 0 && value_bytes != 2)) {
+      std::cerr << "Incompatible legacy book format. Please convert your .book using pack_book.\n";
       return;
     }
 
@@ -137,9 +119,20 @@ class OpeningBook {
       return;
     }
 
-    if((T = initTranspositionTable(partial_key_bytes, log_size))) {
-      ifs.read(reinterpret_cast<char *>(T->getKeys()), T->getSize() * partial_key_bytes);
-      ifs.read(reinterpret_cast<char *>(T->getValues()), T->getSize() * value_bytes);
+    ifs.seekg(0, ifs.end);
+    size_t file_size = ifs.tellg();
+    ifs.seekg(6, ifs.beg);
+
+    if (value_bytes == 2) {
+      size_t num_buckets = (file_size - 6) / 8;
+      T = new CuckooTable<Position::position_t, uint8_t>(num_buckets);
+    } else {
+      T = initTranspositionTable(log_size);
+    }
+
+    if(T) {
+      // Packed format relies strictly on the Keys array
+      ifs.read(reinterpret_cast<char *>(T->getKeys()), T->getSize() * T->getKeySize());
       if(ifs.fail()) {
         return;
       }
@@ -159,13 +152,12 @@ class OpeningBook {
     ofs.write(&tmp, 1);
     tmp = T->getKeySize();
     ofs.write(&tmp, 1);
-    tmp = T->getValueSize();
+    tmp = 0; // Value_size forced to 0
     ofs.write(&tmp, 1);
     tmp = log2(T->getSize());
     ofs.write(&tmp, 1);
 
     ofs.write(reinterpret_cast<const char *>(T->getKeys()), T->getSize() * T->getKeySize());
-    ofs.write(reinterpret_cast<const char *>(T->getValues()), T->getSize() * T->getValueSize());
     ofs.close();
   }
 

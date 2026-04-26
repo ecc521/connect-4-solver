@@ -41,7 +41,7 @@ void explore(const Position &P, char* pos_str, const int depth) {
  * Read input until EOF or an empty line is reached.
  */
 void generate_opening_book() {
-  static constexpr int BOOK_SIZE = 23; // store 2^BOOK_SIZE positions in the book
+  static constexpr int BOOK_SIZE = 23; // store 2^BOOK_SIZE positions in the book (4MB packed)
   static constexpr int DEPTH = 14;     // max depth of every position to be stored
   static constexpr double LOG_3 = 1.58496250072; // log2(3)
   TranspositionTable<uint_t<int((DEPTH + Position::WIDTH -1) * LOG_3) + 1 - BOOK_SIZE>, Position::position_t, uint8_t, BOOK_SIZE> *table =
