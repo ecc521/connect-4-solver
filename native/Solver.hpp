@@ -31,10 +31,22 @@
 namespace GameSolver {
 namespace Connect4 {
 
+template <int W, int H>
+constexpr int getRequiredValueBits() {
+    // Pascal Pons mapping requires ~1.5 * (W * H) values.
+    // Score range: [-W*H/2, W*H/2]
+    // Mapping: S + (W*H/2) + (W*H) + 2 
+    constexpr int max_val = (W * H + 1) / 2 + (W * H / 2) + (W * H) + 2;
+    if (max_val <= 63) return 6;
+    if (max_val <= 127) return 7;
+    return 8;
+}
+
 template <typename SlotType>
 constexpr size_t getMinimumTableBytes() {
     constexpr int board_bits = Position::WIDTH * (Position::HEIGHT + 1);
-    constexpr int partial_key_bits = (sizeof(SlotType) * 8) - 8;
+    constexpr int value_bits = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
+    constexpr int partial_key_bits = (sizeof(SlotType) * 8) - value_bits;
     
     if (board_bits <= partial_key_bits) return 0; // Exact match fits completely
     
@@ -61,7 +73,8 @@ class Solver {
 template <typename SlotType>
 class SolverImpl : public Solver {
  private:
-  TranspositionTable<SlotType, uint8_t, 7> transTable;
+  static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
+  TranspositionTable<SlotType, uint8_t, VALUE_BITS> transTable;
   std::unique_ptr<OpeningBookBase> book;
   std::atomic<unsigned long long> nodeCount;
   int columnOrder[Position::WIDTH];

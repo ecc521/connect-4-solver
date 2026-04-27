@@ -129,7 +129,7 @@ describe.each([
 
   test("should correctly analyze 200 positions against expected C++ raw solver output", () => {
     const dataPath = path.join(__dirname, "..", "test-data", "positions.txt");
-    runParityTest(solver, dataPath, 7, 6, true);
+    runParityTest(solver, dataPath, 7, 6, !bookLoaded);
   });
 
   describe("Generic Board Sizes Support", () => {
@@ -168,7 +168,15 @@ describe.each([
         const testSolver = new SolverClass(w, h);
         await testSolver.init();
 
-        runParityTest(testSolver, dataPath, w, h, false);
+        // For generic sizes, we check for a book in the data directory
+        let hasBook = false;
+        const bookPath = path.join(__dirname, "..", "data", `${w}x${h}.book`);
+        if (fs.existsSync(bookPath)) {
+          await testSolver.loadBook(new Uint8Array(fs.readFileSync(bookPath)));
+          hasBook = true;
+        }
+
+        runParityTest(testSolver, dataPath, w, h, !hasBook);
       });
     }
   });

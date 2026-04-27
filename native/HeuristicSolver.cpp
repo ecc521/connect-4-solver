@@ -56,6 +56,23 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     if(alpha >= beta) return beta;  
   }
 
+  if constexpr (HEIGHT % 2 == 0) {
+    if (P.nbMoves() % 2 == 0) {
+      int evens = P.computeEvensStrategy();
+      if (evens == 1) { // Forced Loss
+        if (beta > -1000) {
+          beta = -1000;
+          if (alpha >= beta) return beta;
+        }
+      } else if (evens == 0) { // Forced Draw
+        if (beta > 0) {
+          beta = 0;
+          if (alpha >= beta) return beta;
+        }
+      }
+    }
+  }
+
   const typename GenericPosition<WIDTH, HEIGHT>::position_t key = P.key();
   uint32_t tt_val = transTable->get(key);
   

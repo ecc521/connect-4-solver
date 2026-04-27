@@ -433,6 +433,57 @@ class GenericPosition {
 
   static constexpr position_t bottom_mask = bottom<WIDTH, HEIGHT>::mask;
   static constexpr position_t board_mask = bottom_mask * ((1LL << HEIGHT) - 1);
+  static constexpr position_t TOP = bottom_mask << HEIGHT;
+  static constexpr position_t TOP_PLUS_1 = TOP + 1;
+
+  static constexpr position_t get_alt_col() {
+      position_t res = 0;
+      for (int i = 0; i < HEIGHT; i += 2) {
+          res |= (position_t(1) << i);
+      }
+      return res;
+  }
+  static constexpr position_t ALTO = bottom_mask * get_alt_col();
+  static constexpr position_t ALTX = ALTO << 1;
+
+  static position_t haswond(position_t x1, int dir) {
+    position_t x2 = x1 & (x1 >> dir);
+    return x2 & (x2 >> (2 * dir));
+  }
+
+  /**
+   * Computes whether the second player can mathematically force a Draw or Win 
+   * using the Evens Strategy (pairing odd/even rows).
+   * 
+   * @return 1 if 2nd player forces a Win, 0 if 2nd player forces a Draw, -1 otherwise.
+   */
+  int computeEvensStrategy() const {
+    if constexpr (HEIGHT % 2 != 0) return -1;
+    if (moves % 2 != 0) return -1; // Strategy evaluates the second player's forced bounds, so only evaluate when P1 is to move
+
+    position_t color0 = current_position;
+    position_t color1 = current_position ^ mask;
+
+    position_t xe = color1 | (ALTX & ~(2 * color0 + color1 + bottom_mask));
+    position_t oe = board_mask - xe;
+
+    if (haswond(oe, 1)) return -1;
+
+    position_t xeh = haswond(xe, HEIGHT + 1);
+    position_t xed1 = haswond(xe, HEIGHT);
+    position_t xed2 = haswond(xe, HEIGHT + 2);
+    position_t xeany = xeh | xed1 | xed2;
+
+    position_t oeh = haswond(oe, HEIGHT + 1);
+    position_t oed1 = haswond(oe, HEIGHT);
+    position_t oed2 = haswond(oe, HEIGHT + 2);
+
+    if (oeh & (xeany - TOP_PLUS_1)) return -1;
+    if (oed1 && ((oeh | oed1) & ((xeh | xed1) - TOP_PLUS_1))) return -1;
+    if (oed2 && ((oeh | oed2) & ((xeh | xed2) - TOP_PLUS_1))) return -1;
+
+    return xeany ? 1 : 0;
+  }
 
   // return a bitmask containg a single 1 corresponding to the top cel of a given column
   static constexpr position_t top_mask_col(int col) {

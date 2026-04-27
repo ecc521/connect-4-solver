@@ -65,6 +65,23 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
     if(alpha >= beta) return beta;  // prune the exploration if the [alpha;beta] window is empty.
   }
 
+  if constexpr (Position::HEIGHT % 2 == 0) {
+    if (P.nbMoves() % 2 == 0) {
+      int evens = P.computeEvensStrategy();
+      if (evens == 1) { // Forced Loss
+        if (beta > -1) {
+          beta = -1;
+          if (alpha >= beta) return beta;
+        }
+      } else if (evens == 0) { // Forced Draw
+        if (beta > 0) {
+          beta = 0;
+          if (alpha >= beta) return beta;
+        }
+      }
+    }
+  }
+
   const Position::position_t key = P.key();
   if(int val = transTable.get(key)) {
     if(val > Position::MAX_SCORE - Position::MIN_SCORE + 1) { // we have an lower bound
