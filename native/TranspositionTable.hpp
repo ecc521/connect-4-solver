@@ -99,28 +99,16 @@ class TranspositionTable {
     uint16_t combined = (partial << 8) | packed_val;
     size_t start_pos = pos;
 
-    int probes = 0;
-    while (probes < 32) {
-        uint16_t expected = 0;
-        // Lock-free atomic compare and swap: if 0, insert it.
-        if (Data[pos].compare_exchange_strong(expected, combined, std::memory_order_relaxed)) {
-            break;
-        }
-        // If the slot is taken but has identical signature, overwrite it (transposition deepening)
-        if ((expected >> 8) == partial) {
-            Data[pos].store(combined, std::memory_order_relaxed);
-            break;
-        }
-        // Linear probe within identical cache line gracefully
-        pos = (pos + 1) % size;
-        probes++;
+    uint16_t expected = 0;
+    // Lock-free atomic compare and swap: if 0, insert it.
+    if (!Data[pos].compare_exchange_strong(expected, combined, std::memory_order_relaxed)) {
+        // If slot is taken, ALWAYS replace it unconditionally. 
+        // We cannot use linear probing because moving a partial key to a different 
+        // index destroys the Chinese Remainder Theorem guarantee!
+        Data[pos].store(combined, std::memory_order_relaxed);
     }
     
-    // Eviction Policy: If the local cache line is completely saturated, 
-    // aggressively overwrite the original hash index. This guarantees that 
-    // new board positions (e.g., a user starting a new game) always take 
-    // priority over old, stale cache data, preventing 0% cache-hit starvation!
-    Data[start_pos].store(combined, std::memory_order_relaxed);
+
   }
 
   value_t get(key_t key) const {
@@ -128,18 +116,15 @@ class TranspositionTable {
     uint16_t partial = key & 0xFF;
     size_t start_pos = pos;
     
-    int probes = 0;
-    while (probes < 32) {
-        uint16_t combined = Data[pos].load(std::memory_order_relaxed);
-        if (combined == 0) return 0; // Hit empty slot, item not found
-        
-        if ((combined >> 8) == partial) {
-            return (value_t)(combined & 0xFF);
-        }
-        
-        pos = (pos + 1) % size;
-        probes++;
+    uint16_t combined = Data[pos].load(std::memory_order_relaxed);
+    if (combined == 0) return 0; // Hit empty slot, item not found
+    
+    // Thanks to Chinese Remainder Theorem, matching index AND partial key 
+    // mathematically guarantees (with 2^43 bounds) that it is the same state!
+    if ((combined >> 8) == partial) {
+        return (value_t)(combined & 0xFF);
     }
+    
     return 0;
   }
 };
