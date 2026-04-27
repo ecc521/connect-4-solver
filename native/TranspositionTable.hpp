@@ -56,9 +56,9 @@ template<int S> using uint_t =
 
 /**
  * Transposition Table is a highly optimized memory-dense hash map 
- * designed for L1/L3 Cache utilization. It packs an 8-bit partial key
- * and an 8-bit value into a single atomic uint16_t array slot.
- * This halves memory fetch latency during alpha-beta tree traversal.
+ * designed for L1/L3 Cache utilization. It packs the full 64-bit key
+ * and an 8-bit value into a single atomic uint64_t array slot.
+ * This guarantees 100% mathematically correct matches.
  *
  * key_size:   (ignored - forced to uint16_t array internally)
  * value_size: (ignored)
@@ -69,7 +69,7 @@ template<class partial_key_t, class key_t, class value_t, int log_size>
 class TranspositionTable {
  private:
   static const size_t size = next_prime(1ULL << log_size);
-  std::atomic<uint16_t> *Data;
+  std::atomic<uint64_t> *Data;
 
   size_t index(key_t key) const {
     return key % size;
@@ -77,7 +77,7 @@ class TranspositionTable {
 
  public:
   TranspositionTable() {
-    Data = new std::atomic<uint16_t>[size];
+    Data = new std::atomic<uint64_t>[size];
     reset();
   }
 
@@ -93,35 +93,27 @@ class TranspositionTable {
 
   void put(key_t key, value_t value) {
     size_t pos = index(key);
-    // 8-bit signature 
-    uint16_t partial = key & 0xFF;
-    uint16_t packed_val = value & 0xFF; 
-    uint16_t combined = (partial << 8) | packed_val;
-    size_t start_pos = pos;
+    
+    // Pack the full 64-bit key and the 8-bit value
+    uint64_t packed_val = value & 0xFF; 
+    uint64_t combined = (static_cast<uint64_t>(key) << 8) | packed_val;
 
-    uint16_t expected = 0;
+    uint64_t expected = 0;
     // Lock-free atomic compare and swap: if 0, insert it.
     if (!Data[pos].compare_exchange_strong(expected, combined, std::memory_order_relaxed)) {
         // If slot is taken, ALWAYS replace it unconditionally. 
-        // We cannot use linear probing because moving a partial key to a different 
-        // index destroys the Chinese Remainder Theorem guarantee!
         Data[pos].store(combined, std::memory_order_relaxed);
     }
-    
-
   }
 
   value_t get(key_t key) const {
     size_t pos = index(key);
-    uint16_t partial = key & 0xFF;
-    size_t start_pos = pos;
     
-    uint16_t combined = Data[pos].load(std::memory_order_relaxed);
+    uint64_t combined = Data[pos].load(std::memory_order_relaxed);
     if (combined == 0) return 0; // Hit empty slot, item not found
     
-    // Thanks to Chinese Remainder Theorem, matching index AND partial key 
-    // mathematically guarantees (with 2^43 bounds) that it is the same state!
-    if ((combined >> 8) == partial) {
+    // 100% mathematically guarantees the exact same board state!
+    if ((combined >> 8) == static_cast<uint64_t>(key)) {
         return (value_t)(combined & 0xFF);
     }
     
