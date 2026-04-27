@@ -112,8 +112,10 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
     }
   }
 
+#if BOARD_WIDTH_MACRO >= 8
   int searched[Position::WIDTH];
   int searched_cnt = 0;
+#endif
 
   while(Position::position_t next = moves.getNext()) {
     Position P2(P);
@@ -124,10 +126,12 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
 
     if(score >= beta) {
       if constexpr (Position::WIDTH >= 8) {
+#if BOARD_WIDTH_MACRO >= 8
         if (searched_cnt > 0) {
           for (int i = 0; i < searched_cnt; i++) {
             if (history[searched[i]] > -500000) history[searched[i]]--;
           }
+          int bit_idx = Position::ctz_impl(next);
           history[bit_idx] += searched_cnt;
           if (history[bit_idx] > 500000) {
             for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
@@ -135,11 +139,16 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
             }
           }
         }
+#endif
       }
       transTable.put(key, score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2); // save the lower bound of the position
       return score;  // prune the exploration if we find a possible move better than what we were looking for.
     }
-    searched[searched_cnt++] = bit_idx;
+#if BOARD_WIDTH_MACRO >= 8
+    if constexpr (Position::WIDTH >= 8) {
+      searched[searched_cnt++] = Position::ctz_impl(next);
+    }
+#endif
     if(score > alpha) alpha = score; 
   }
 
