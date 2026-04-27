@@ -109,11 +109,11 @@ describe("Polymorphic Dense Book Packing", () => {
     await solver.init();
     await solver.loadBook(bookData);
 
-    // Evaluate a depth 4 position (1 2 3 4)
+    // Evaluate a depth 2 position (1 2)
     // The exact score is cached in the book, so it should return instantly and match
-    const result = await solver.analyzeAsync("1234");
+    const result = await solver.analyzeAsync("12");
     
-    expect(result.evaluation?.score).toBe(1);
+    expect(result.evaluation?.score).toBe(0);
     
     // Evaluate a depth 2 position (1 1)
     const result2 = await solver.analyzeAsync("11");

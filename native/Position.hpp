@@ -260,7 +260,7 @@ class GenericPosition {
    * Heuristic score of the position using center-weights and threat counts.
    * Non-terminal fallback evaluated when depth_limit is reached.
    */
-  int heuristic_evaluate() const {
+  int heuristic_evaluate(int double_threat_weight = 0, int uncontested_parity_weight = 50, int tempo_weight = 0, int center_multiplier = 1, int base_threat_weight = 35) const {
     int score = 0;
     
     position_t opp_position = current_position ^ mask;
@@ -274,8 +274,8 @@ class GenericPosition {
     // Having a threat here is actively GOOD, because it mathematically prevents the 
     // opponent from playing in that column, effectively locking them out.
     // We award +50 points for locking the opponent out, and subtract 50 if we are locked out.
-    score += popcount(my_threats & double_edged) * 50;
-    score -= popcount(opp_threats & double_edged) * 50;
+    score += popcount(my_threats & double_edged) * double_threat_weight;
+    score -= popcount(opp_threats & double_edged) * double_threat_weight;
 
     // 2. Strict Parity Control (Victor Allis's Uncontested Threats)
     // Smear threats upward to identify cells that are vertically "blocked" by an opponent's threat
@@ -311,17 +311,40 @@ class GenericPosition {
     position_t opp_uncontested_parity = (lowest_opp_threats & opp_parity) & ~opp_useless_threats;
 
     // Uncontested parity threats are highly prized (but kept below +1000 forced win threshold)
-    score += popcount(my_uncontested_parity) * 200;
-    score -= popcount(opp_uncontested_parity) * 200;
+    score += popcount(my_uncontested_parity) * uncontested_parity_weight;
+    score -= popcount(opp_uncontested_parity) * uncontested_parity_weight;
     
-    // 3. Base threat weight (ignore useless threats)
-    score += (popcount(lowest_my_threats & ~my_useless_threats) - popcount(lowest_opp_threats & ~opp_useless_threats)) * 10;
+    // 3. Zugzwang Timer (Safe Squares Parity)
+    position_t all_threats = my_threats | opp_threats;
+    position_t empty_squares = board_mask ^ (current_position | opp_position);
+    score += (popcount(lowest_my_threats & ~my_useless_threats) - popcount(lowest_opp_threats & ~opp_useless_threats)) * base_threat_weight;
+
+    int safe_squares = 0;
     
-    // 4. Center-control weighting
-    for(int i = 0; i < WIDTH; i++) {
-      score += (popcount(current_position & CENTER_MASKS[i]) - popcount(opp_position & CENTER_MASKS[i])) * CENTER_WEIGHTS[i];
+    for (int i = 0; i < WIDTH; i++) {
+        position_t col_mask = column_mask(i);
+        position_t col_threats = all_threats & col_mask;
+        if (col_threats) {
+            position_t lowest_threat = col_threats & ~(col_threats - 1);
+            safe_squares += popcount((lowest_threat - 1) & empty_squares & col_mask);
+        } else {
+            safe_squares += popcount(empty_squares & col_mask);
+        }
     }
     
+    if ((safe_squares % 2) != (moves % 2)) {
+        score += tempo_weight; // We control the tempo
+    } else {
+        score -= tempo_weight; // Opponent controls the tempo
+    }
+    
+    // 4. Center-control weighting (fallback)
+    for(int i = 0; i < WIDTH; i++) {
+      score += (popcount(current_position & CENTER_MASKS[i]) - popcount(opp_position & CENTER_MASKS[i])) * CENTER_WEIGHTS[i] * center_multiplier;
+    }
+    
+    if (moves == 2) std::cout << "score=" << score << " cm=" << center_multiplier << "\n";
+
     return score;
   }
 

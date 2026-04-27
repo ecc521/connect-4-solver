@@ -249,12 +249,12 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
 }
 
 std::unique_ptr<Solver> Solver::create(size_t table_bytes) {
-  size_t min_32 = getMinimumTableBytes<uint32_t>();
-  size_t min_64 = getMinimumTableBytes<uint64_t>();
+  uint64_t min_32 = getMinimumTableBytes<uint32_t>();
+  uint64_t min_64 = getMinimumTableBytes<uint64_t>();
 
-  if (table_bytes >= min_32 && min_32 != SIZE_MAX) {
+  if (table_bytes >= min_32 && min_32 != UINT64_MAX) {
       return std::make_unique<SolverImpl<uint32_t>>(table_bytes);
-  } else if (table_bytes >= min_64 && min_64 != SIZE_MAX) {
+  } else if (table_bytes >= min_64 && min_64 != UINT64_MAX) {
       return std::make_unique<SolverImpl<uint64_t>>(table_bytes);
   } else {
       // Clang __int128 fallback for massive boards with tiny memory constraints

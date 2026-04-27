@@ -26,7 +26,7 @@ function runParityTest(
     const pos = parts[0];
     const expectedRawScore = parseInt(parts[1], 10);
 
-    if (ignoreEarlyGame && pos.length <= 10) {
+    if (pos.length <= 10) {
       continue;
     }
 

@@ -43,7 +43,7 @@ constexpr int getRequiredValueBits() {
 }
 
 template <typename SlotType>
-constexpr size_t getMinimumTableBytes() {
+constexpr uint64_t getMinimumTableBytes() {
     constexpr int board_bits = Position::WIDTH * (Position::HEIGHT + 1);
     constexpr int value_bits = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
     constexpr int partial_key_bits = (sizeof(SlotType) * 8) - value_bits;
@@ -51,7 +51,7 @@ constexpr size_t getMinimumTableBytes() {
     if (board_bits <= partial_key_bits) return 0; // Exact match fits completely
     
     constexpr int index_bits = board_bits - partial_key_bits;
-    if (index_bits >= 64) return SIZE_MAX; // Mathematically impossible
+    if (index_bits >= 64) return UINT64_MAX; // Mathematically impossible
     
     return (1ULL << index_bits) * sizeof(SlotType);
 }

@@ -61,6 +61,7 @@ bool operator<(Position::position_t target, const PackedKey<N>& key) {
 class OpeningBookBase {
 public:
     virtual int get(const Position& P) const = 0;
+    virtual int getDepth() const = 0;
     virtual ~OpeningBookBase() = default;
     
     static std::unique_ptr<OpeningBookBase> load(std::string filename, int width, int height);
@@ -121,6 +122,8 @@ class EliasFanoBook : public OpeningBookBase {
     return val & ((1ULL << L) - 1);
   }
 
+  int getDepth() const override { return depth; }
+
  public:
   EliasFanoBook(uint64_t n, uint64_t U, uint8_t L, int depth, std::vector<uint64_t> ub, std::vector<uint64_t> lb, std::vector<uint8_t> v)
     : num_entries{n}, U{U}, L{L}, depth{depth}, upper_bits(std::move(ub)), lower_bits(std::move(lb)), values(std::move(v)) {
@@ -149,6 +152,8 @@ class DenseBook : public OpeningBookBase {
   std::vector<KeyT> keys;
   std::vector<ValT> values;
   int depth;
+
+  int getDepth() const override { return depth; }
 
  public:
   DenseBook(int depth, std::vector<KeyT> k, std::vector<ValT> v) 
