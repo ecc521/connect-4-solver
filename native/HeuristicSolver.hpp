@@ -23,9 +23,8 @@ template <int WIDTH, int HEIGHT>
 class HeuristicSolver {
  private:
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
-  // Dynamically reduce table size for massive boards (e.g. 9x7, 10x10) to offset the uint64_t memory overhead
-  static constexpr int TABLE_SIZE = (WIDTH * HEIGHT >= 56) ? (HEURISTIC_TABLE_SIZE - 1) : HEURISTIC_TABLE_SIZE;
-  TranspositionTable < uint_t < WIDTH*(HEIGHT + 1) - TABLE_SIZE >, position_t, uint32_t, TABLE_SIZE > transTable;
+  
+  std::unique_ptr<TranspositionTable<uint32_t>> transTable;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
   int columnOrder[WIDTH]; // column exploration order
 
@@ -52,7 +51,7 @@ class HeuristicSolver {
 
   void reset() {
     nodeCount = 0;
-    transTable.reset();
+    transTable->reset();
   }
 
   HeuristicSolver(); // Constructor

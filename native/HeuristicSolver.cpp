@@ -49,7 +49,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   }
 
   const typename GenericPosition<WIDTH, HEIGHT>::position_t key = P.key();
-  uint32_t tt_val = transTable.get(key);
+  uint32_t tt_val = transTable->get(key);
   int val = tt_val ? ((int)(tt_val & 0xFFFFFF) - 1000000) : 0;
   int tt_flags = (tt_val >> 24) & 0x03; // 1 = exact, 2 = lower bound, 3 = upper bound
   int best_move_col = tt_val ? (tt_val >> 26) - 1 : -1;
@@ -103,7 +103,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     }
 
     if(score >= beta) {
-      transTable.put(key, ((uint32_t)(next_col + 1) << 26) | (2 << 24) | (score + 1000000)); 
+      transTable->put(key, ((uint32_t)(next_col + 1) << 26) | (2 << 24) | (score + 1000000)); 
       return score;  
     }
     if(score > alpha) {
@@ -112,7 +112,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   }
 
   int flags = (best_score <= orig_alpha) ? 3 : 1; 
-  transTable.put(key, ((uint32_t)(best_seen_col == -1 ? 0 : best_seen_col + 1) << 26) | (flags << 24) | (best_score + 1000000)); 
+  transTable->put(key, ((uint32_t)(best_seen_col == -1 ? 0 : best_seen_col + 1) << 26) | (flags << 24) | (best_score + 1000000)); 
   return best_score;
 }
 
@@ -212,6 +212,8 @@ std::vector<int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const Generic
 // Constructor
 template <int WIDTH, int HEIGHT>
 HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver() : nodeCount{0} {
+  size_t table_bytes = (WIDTH * HEIGHT >= 56) ? 16777216 : 33554432; // Default heuristic table size 16MB or 32MB
+  transTable = std::make_unique<TranspositionTable<uint32_t>>(table_bytes);
   for(int i = 0; i < WIDTH; i++) // initialize the column exploration order, starting with center columns
     columnOrder[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; // example for WIDTH=7: columnOrder = {3, 4, 2, 5, 1, 6, 0}
 }

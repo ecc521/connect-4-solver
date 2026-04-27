@@ -232,7 +232,23 @@ class GenericPosition {
     score -= popcount(my_threats & double_edged) * 50;
     score += popcount(opp_threats & double_edged) * 50;
 
-    // 2. Parity Control
+    // 2. Strict Parity Control (Victor Allis's Uncontested Threats)
+    // Smear threats upward to identify cells that are vertically "blocked" by an opponent's threat
+    position_t opp_threats_above = (opp_threats << 1) & board_mask;
+    opp_threats_above |= (opp_threats_above << 1) & board_mask;
+    opp_threats_above |= (opp_threats_above << 2) & board_mask;
+    opp_threats_above |= (opp_threats_above << 4) & board_mask;
+    if constexpr (HEIGHT >= 8) opp_threats_above |= (opp_threats_above << 8) & board_mask;
+
+    position_t my_threats_above = (my_threats << 1) & board_mask;
+    my_threats_above |= (my_threats_above << 1) & board_mask;
+    my_threats_above |= (my_threats_above << 2) & board_mask;
+    my_threats_above |= (my_threats_above << 4) & board_mask;
+    if constexpr (HEIGHT >= 8) my_threats_above |= (my_threats_above << 8) & board_mask;
+
+    position_t my_useless_threats = my_threats & opp_threats_above;
+    position_t opp_useless_threats = opp_threats & my_threats_above;
+
     position_t even_rows = 0;
     for (int r = 0; r < HEIGHT; r += 2) {
         even_rows |= (bottom_mask << r);
@@ -242,11 +258,15 @@ class GenericPosition {
     position_t my_parity = (moves % 2 == 0) ? even_rows : odd_rows;
     position_t opp_parity = (moves % 2 == 0) ? odd_rows : even_rows;
 
-    score += popcount(my_threats & my_parity) * 20;
-    score -= popcount(opp_threats & opp_parity) * 20;
+    position_t my_uncontested_parity = (my_threats & my_parity) & ~my_useless_threats;
+    position_t opp_uncontested_parity = (opp_threats & opp_parity) & ~opp_useless_threats;
+
+    // Uncontested parity threats are highly prized (but kept below +1000 forced win threshold)
+    score += popcount(my_uncontested_parity) * 200;
+    score -= popcount(opp_uncontested_parity) * 200;
     
-    // 3. Base threat weight
-    score += (popcount(my_threats) - popcount(opp_threats)) * 10;
+    // 3. Base threat weight (ignore useless threats)
+    score += (popcount(my_threats & ~my_useless_threats) - popcount(opp_threats & ~opp_useless_threats)) * 10;
     
     // 4. Center-control weighting
     for(int i = 0; i < WIDTH; i++) {
