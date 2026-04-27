@@ -38,7 +38,7 @@ export class Connect4Solver {
   public height: number;
 
   constructor(width = 7, height = 6) {
-    const validSizes = ["6x5", "6x6", "7x6", "7x7", "8x6", "9x7"];
+    const validSizes = ["6x5", "6x6", "7x6", "7x7", "8x6", "9x7", "8x8", "9x6", "11x4"];
     if (!validSizes.includes(`${width}x${height}`)) {
       throw new Error(
         `Board size ${width}x${height} is not supported by the generated WASM bundle. Supported sizes are 6x5, 6x6, 7x6, 7x7, 8x6, 9x7.`,

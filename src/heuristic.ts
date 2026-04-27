@@ -17,6 +17,8 @@ interface HeuristicSolverModule extends SolverModule {
   _analyzeHeuristicPosition9x7(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
   _analyzeHeuristicPosition8x8(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
   _analyzeHeuristicPosition10x7(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
+  _analyzeHeuristicPosition9x6(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
+  _analyzeHeuristicPosition11x4(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
   _analyzeHeuristicPosition9x9(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
   _analyzeHeuristicPosition10x10(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
 }
@@ -91,6 +93,10 @@ export class HeuristicConnect4Solver extends Connect4Solver {
       outputPointer = mod._analyzeHeuristicPosition10x7(allocatedMemory, maxDepth, threads, timeoutMs);
     else if (this.width === 9 && this.height === 9)
       outputPointer = mod._analyzeHeuristicPosition9x9(allocatedMemory, maxDepth, threads, timeoutMs);
+    else if (this.width === 9 && this.height === 6)
+      outputPointer = mod._analyzeHeuristicPosition9x6(allocatedMemory, maxDepth, threads, timeoutMs);
+    else if (this.width === 11 && this.height === 4)
+      outputPointer = mod._analyzeHeuristicPosition11x4(allocatedMemory, maxDepth, threads, timeoutMs);
     else if (this.width === 10 && this.height === 10)
       outputPointer = mod._analyzeHeuristicPosition10x10(allocatedMemory, maxDepth, threads, timeoutMs);
 

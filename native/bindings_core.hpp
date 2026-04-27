@@ -103,6 +103,34 @@ namespace C4_9x7 {
 #undef OPENING_BOOK_HPP
 #undef MOVE_SORTER_HPP
 
+#define BOARD_WIDTH_MACRO 9
+#define BOARD_HEIGHT_MACRO 6
+namespace C4_9x6 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 11
+#define BOARD_HEIGHT_MACRO 4
+namespace C4_11x4 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
 #include <memory>
 
 // Expose singletons gracefully to whoever includes this header
@@ -228,4 +256,34 @@ namespace SharedInstances {
         return solver;
     }
     inline void releaseHeuristicSolver10x10() { getHeuristicSolver10x10().reset(); }
+
+    // 9x6
+    inline std::unique_ptr<C4_9x6::GameSolver::Connect4::Solver>& getSolver9x6(size_t table_bytes = 134217728) {
+        static std::unique_ptr<C4_9x6::GameSolver::Connect4::Solver> solver = nullptr;
+        if (!solver) solver = C4_9x6::GameSolver::Connect4::Solver::create(table_bytes);
+        return solver;
+    }
+    inline void releaseSolver9x6() { getSolver9x6().reset(); }
+
+    inline std::unique_ptr<GameSolver::Connect4::HeuristicSolver<9, 6>>& getHeuristicSolver9x6() {
+        static std::unique_ptr<GameSolver::Connect4::HeuristicSolver<9, 6>> solver = nullptr;
+        if (!solver) solver = std::make_unique<GameSolver::Connect4::HeuristicSolver<9, 6>>();
+        return solver;
+    }
+    inline void releaseHeuristicSolver9x6() { getHeuristicSolver9x6().reset(); }
+
+    // 11x4
+    inline std::unique_ptr<C4_11x4::GameSolver::Connect4::Solver>& getSolver11x4(size_t table_bytes = 134217728) {
+        static std::unique_ptr<C4_11x4::GameSolver::Connect4::Solver> solver = nullptr;
+        if (!solver) solver = C4_11x4::GameSolver::Connect4::Solver::create(table_bytes);
+        return solver;
+    }
+    inline void releaseSolver11x4() { getSolver11x4().reset(); }
+
+    inline std::unique_ptr<GameSolver::Connect4::HeuristicSolver<11, 4>>& getHeuristicSolver11x4() {
+        static std::unique_ptr<GameSolver::Connect4::HeuristicSolver<11, 4>> solver = nullptr;
+        if (!solver) solver = std::make_unique<GameSolver::Connect4::HeuristicSolver<11, 4>>();
+        return solver;
+    }
+    inline void releaseHeuristicSolver11x4() { getHeuristicSolver11x4().reset(); }
 }
