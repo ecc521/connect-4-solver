@@ -9,15 +9,7 @@
 #include <thread>
 #include <algorithm>
 #endif
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#else
 #include <chrono>
-inline double get_now_ms() {
-    auto now = std::chrono::steady_clock::now();
-    return std::chrono::duration<double, std::milli>(now.time_since_epoch()).count();
-}
-#endif
 
 using namespace GameSolver::Connect4;
 
@@ -37,7 +29,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
       stopSearch = true;
     }
 #else
-    if (get_now_ms() >= end_time_ms) {
+    auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()).time_since_epoch().count();
+    if (now >= end_time_ms) {
       stopSearch = true;
     }
 #endif
@@ -89,20 +82,13 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   const typename GenericPosition<WIDTH, HEIGHT>::position_t key = P.key();
   uint32_t tt_val = transTable->get(key);
   
-  // Layout: Score(16) | Depth(6) | Flags(2) | Move(4) | Key(4)
+  // Layout: Score(16) | Depth(6) | Flags(2) | Move(4)
   int val = tt_val ? ((int)(tt_val & 0xFFFF) - 32768) : 0;
   int tt_depth = (tt_val >> 16) & 0x3F;
   int tt_flags = (tt_val >> 22) & 0x03; 
   int best_move_col = tt_val ? (tt_val >> 24) - 1 : -1;
-  uint32_t tt_extra_key = (tt_val >> 28) & 0xF;
 
-  // We have 32 bits of partial_key in TT + 22 bits in index = 54 bits.
-  // The key is 64 bits, so 10 bits remain. We store 4 of them here.
-  // Size is ~4M (22 bits). partial_key = key / size. 
-  // TT stores partial_key % 2^32. So we want (partial_key >> 32) & 0xF.
-  uint32_t current_extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
-
-  if(tt_val && tt_depth >= depth && tt_extra_key == current_extra_key) {
+  if(tt_val && tt_depth >= depth) {
     if(tt_flags == 2) { // lower bound
       if(alpha < val) {
         alpha = val;                     
@@ -144,7 +130,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     
     int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms);
     
-    int next_col = GenericPosition<WIDTH, HEIGHT>::getCol(next);
+    int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<position_t>(next);
+    int next_col = bit_idx / (HEIGHT + 1);
 
     if(score > best_score) {
       best_score = score;
@@ -152,7 +139,6 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     }
 
     if(score > alpha) alpha = score;
-    int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<position_t>(next);
 
     if(alpha >= beta) {
       if constexpr (WIDTH >= 8) {
@@ -168,8 +154,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
           }
         }
       }
-      uint32_t extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
-      transTable->put(key, (extra_key << 28) | ((uint32_t)(next_col + 1) << 24) | (2 << 22) | ((uint32_t)depth << 16) | (uint32_t)(score + 32768)); 
+      transTable->put(key, ((uint32_t)(next_col + 1) << 24) | (2 << 22) | ((uint32_t)depth << 16) | (uint32_t)(score + 32768)); 
       return score;  
     }
     searched[searched_cnt++] = bit_idx;
@@ -179,8 +164,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   }
 
   int flags = (best_score <= orig_alpha) ? 3 : 1; 
-  uint32_t extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
-  transTable->put(key, (extra_key << 28) | ((uint32_t)(best_seen_col == -1 ? 0 : best_seen_col + 1) << 24) | ((uint32_t)flags << 22) | ((uint32_t)depth << 16) | (uint32_t)(best_score + 32768)); 
+  transTable->put(key, ((uint32_t)(best_seen_col == -1 ? 0 : best_seen_col + 1) << 24) | ((uint32_t)flags << 22) | ((uint32_t)depth << 16) | (uint32_t)(best_score + 32768)); 
   return best_score;
 }
 
@@ -216,7 +200,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 #ifdef __EMSCRIPTEN__
   double end_time_ms = timeout_ms > 0.0 ? emscripten_get_now() + timeout_ms : 0.0;
 #else
-  double end_time_ms = timeout_ms > 0.0 ? get_now_ms() + timeout_ms : 0.0;
+  double end_time_ms = timeout_ms > 0.0 ? std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()).time_since_epoch().count() + timeout_ms : 0.0;
 #endif
 
   reset();
