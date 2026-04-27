@@ -121,9 +121,6 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
     Position P2(P);
     P2.play(next);  // It's opponent turn in P2 position after current player plays x column.
     int score = -negamax(P2, -beta, -alpha); // explore opponent's score within [-beta;-alpha] windows:
-
-    int bit_idx = Position::ctz_impl(next);
-
     if(score >= beta) {
       if constexpr (Position::WIDTH >= 8) {
 #if BOARD_WIDTH_MACRO >= 8

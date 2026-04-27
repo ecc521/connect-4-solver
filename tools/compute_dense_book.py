@@ -7,7 +7,7 @@ import sys
 
 def set_generator_bounds(width, height, depth, book_size):
     print(f"\n[+] Re-Compiling natively for {width}x{height} Depth {depth} (Book Size: 2^{book_size})...")
-    os.system(f'make clean && make CXXFLAGS="--std=c++14 -W -Wall -O3 -march=native -DNDEBUG -pthread -I../native -DBOARD_WIDTH_MACRO={width} -DBOARD_HEIGHT_MACRO={height} -DBOOK_SIZE={book_size} -DBOOK_DEPTH={depth} -DEXACT_TABLE_SIZE={book_size}" generator c4solver pack_dense_book')
+    os.system(f'make clean && make CXXFLAGS="--std=c++17 -W -Wall -O3 -march=native -DNDEBUG -pthread -I../native -DBOARD_WIDTH_MACRO={width} -DBOARD_HEIGHT_MACRO={height} -DBOOK_SIZE={book_size} -DBOOK_DEPTH={depth} -DEXACT_TABLE_SIZE={book_size}" generator c4solver pack_dense_book')
 
 def process_stage(width, height, depth, book_size, cores, bootstrap_book=None):
     temp_book = f"../data/{width}x{height}_dense{depth}.book"
@@ -34,7 +34,8 @@ def process_stage(width, height, depth, book_size, cores, bootstrap_book=None):
         if skip_lines > 0:
             print(f"    - Engine is seamlessly resuming from line {skip_lines:,} natively...")
             
-    cmd = f"tail -n +{skip_lines + 1} {pos_file} | nice -n 20 ./c4solver --cores {cores}"
+    memory_bytes = (1 << book_size) * 8
+    cmd = f"tail -n +{skip_lines + 1} {pos_file} | nice -n 20 ./c4solver --cores {cores} --memory {memory_bytes}"
     if bootstrap_book:
         cmd += f" -b {bootstrap_book}"
     cmd += f" >> {scored_file}" 

@@ -9,6 +9,15 @@
 #include <thread>
 #include <algorithm>
 #endif
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#else
+#include <chrono>
+inline double get_now_ms() {
+    auto now = std::chrono::steady_clock::now();
+    return std::chrono::duration<double, std::milli>(now.time_since_epoch()).count();
+}
+#endif
 
 using namespace GameSolver::Connect4;
 
@@ -25,6 +34,10 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   if ((nodes & 16383) == 0 && end_time_ms > 0) {
 #ifdef __EMSCRIPTEN__
     if (emscripten_get_now() >= end_time_ms) {
+      stopSearch = true;
+    }
+#else
+    if (get_now_ms() >= end_time_ms) {
       stopSearch = true;
     }
 #endif
@@ -203,7 +216,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 #ifdef __EMSCRIPTEN__
   double end_time_ms = timeout_ms > 0.0 ? emscripten_get_now() + timeout_ms : 0.0;
 #else
-  double end_time_ms = 0.0;
+  double end_time_ms = timeout_ms > 0.0 ? get_now_ms() + timeout_ms : 0.0;
 #endif
 
   reset();

@@ -1,3 +1,9 @@
+extern thread_local int global_dt_weight;
+extern thread_local int global_up_weight;
+extern thread_local int global_tm_weight;
+extern thread_local int global_cm_weight;
+extern thread_local int global_bt_weight;
+
 /*
  * This file is part of Connect4 Game Solver <http://connect4.gamesolver.org>
  * Copyright (C) 2017-2019 Pascal Pons <contact@gamesolver.org>
@@ -260,7 +266,7 @@ class GenericPosition {
    * Heuristic score of the position using center-weights and threat counts.
    * Non-terminal fallback evaluated when depth_limit is reached.
    */
-  int heuristic_evaluate(int double_threat_weight = 0, int uncontested_parity_weight = 50, int tempo_weight = 0, int center_multiplier = 1, int base_threat_weight = 35) const {
+  int heuristic_evaluate() const {
     int score = 0;
     
     position_t opp_position = current_position ^ mask;
@@ -274,8 +280,8 @@ class GenericPosition {
     // Having a threat here is actively GOOD, because it mathematically prevents the 
     // opponent from playing in that column, effectively locking them out.
     // We award +50 points for locking the opponent out, and subtract 50 if we are locked out.
-    score += popcount(my_threats & double_edged) * double_threat_weight;
-    score -= popcount(opp_threats & double_edged) * double_threat_weight;
+    score += popcount(my_threats & double_edged) * global_dt_weight;
+    score -= popcount(opp_threats & double_edged) * global_dt_weight;
 
     // 2. Strict Parity Control (Victor Allis's Uncontested Threats)
     // Smear threats upward to identify cells that are vertically "blocked" by an opponent's threat
@@ -311,13 +317,13 @@ class GenericPosition {
     position_t opp_uncontested_parity = (lowest_opp_threats & opp_parity) & ~opp_useless_threats;
 
     // Uncontested parity threats are highly prized (but kept below +1000 forced win threshold)
-    score += popcount(my_uncontested_parity) * uncontested_parity_weight;
-    score -= popcount(opp_uncontested_parity) * uncontested_parity_weight;
+    score += popcount(my_uncontested_parity) * global_up_weight;
+    score -= popcount(opp_uncontested_parity) * global_up_weight;
     
     // 3. Zugzwang Timer (Safe Squares Parity)
     position_t all_threats = my_threats | opp_threats;
     position_t empty_squares = board_mask ^ (current_position | opp_position);
-    score += (popcount(lowest_my_threats & ~my_useless_threats) - popcount(lowest_opp_threats & ~opp_useless_threats)) * base_threat_weight;
+    score += (popcount(lowest_my_threats & ~my_useless_threats) - popcount(lowest_opp_threats & ~opp_useless_threats)) * global_bt_weight;
 
     int safe_squares = 0;
     
@@ -333,17 +339,16 @@ class GenericPosition {
     }
     
     if ((safe_squares % 2) != (moves % 2)) {
-        score += tempo_weight; // We control the tempo
+        score += global_tm_weight; // We control the tempo
     } else {
-        score -= tempo_weight; // Opponent controls the tempo
+        score -= global_tm_weight; // Opponent controls the tempo
     }
     
     // 4. Center-control weighting (fallback)
     for(int i = 0; i < WIDTH; i++) {
-      score += (popcount(current_position & CENTER_MASKS[i]) - popcount(opp_position & CENTER_MASKS[i])) * CENTER_WEIGHTS[i] * center_multiplier;
+      score += (popcount(current_position & CENTER_MASKS[i]) - popcount(opp_position & CENTER_MASKS[i])) * CENTER_WEIGHTS[i] * global_cm_weight;
     }
     
-    if (moves == 2) std::cout << "score=" << score << " cm=" << center_multiplier << "\n";
 
     return score;
   }

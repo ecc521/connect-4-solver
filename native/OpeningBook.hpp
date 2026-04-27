@@ -69,7 +69,6 @@ public:
 
 class EliasFanoBook : public OpeningBookBase {
   uint64_t num_entries;
-  uint64_t U;
   uint8_t L;
   int depth;
   std::vector<uint64_t> upper_bits;
@@ -126,7 +125,7 @@ class EliasFanoBook : public OpeningBookBase {
 
  public:
   EliasFanoBook(uint64_t n, uint64_t U, uint8_t L, int depth, std::vector<uint64_t> ub, std::vector<uint64_t> lb, std::vector<uint8_t> v)
-    : num_entries{n}, U{U}, L{L}, depth{depth}, upper_bits(std::move(ub)), lower_bits(std::move(lb)), values(std::move(v)) {
+    : num_entries{n}, L{L}, depth{depth}, upper_bits(std::move(ub)), lower_bits(std::move(lb)), values(std::move(v)) {
       build_index();
     }
 

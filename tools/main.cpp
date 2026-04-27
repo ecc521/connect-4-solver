@@ -41,6 +41,7 @@ int main(int argc, char** argv) {
   bool weak = false;
   bool analyze = false;
   int cores = 1;
+  uint64_t memory_bytes = 67108864; // 64MB default
 
   std::string opening_book = "";
   for(int i = 1; i < argc; i++) {
@@ -55,9 +56,12 @@ int main(int argc, char** argv) {
       else if(std::string(argv[i]) == "--cores") {
         if(++i < argc) cores = std::stoi(argv[i]);
       }
+      else if(std::string(argv[i]) == "--memory") {
+        if(++i < argc) memory_bytes = std::stoull(argv[i]);
+      }
     }
   }
-  if (!solver) solver = Solver::create(67108864); // 64MB default
+  if (!solver) solver = Solver::create(memory_bytes);
   if (!opening_book.empty()) solver->loadBook(opening_book);
 
   if (cores > 1) {
