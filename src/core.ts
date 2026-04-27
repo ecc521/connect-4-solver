@@ -22,6 +22,7 @@ export interface PositionAnalysis {
   currentPlayer: Player; // Whose turn it is at the analyzed position
   evaluation: Evaluation | null; // Overall evaluation of the position
   moveOptions: (Evaluation | null)[]; // Evaluation for playing in each column (1 to board width)
+  depthReached?: number; // Actual depth reached during search
 }
 
 export interface SolverModule {

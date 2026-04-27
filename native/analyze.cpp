@@ -40,19 +40,22 @@ int32_t* runHeuristicAnalysis(CoreSolver& solver, const char* positionCharArr, i
   std::string positionString(positionCharArr);
   CorePosition P;
   
-  int32_t* result = (int32_t*)malloc((2 + W) * sizeof(int32_t));
+  int32_t* result = (int32_t*)malloc((3 + W) * sizeof(int32_t));
   
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
     result[0] = P.isWinningMove(lastColPlayed) ? 1 : 2;
     result[1] = P.nbMoves();
     for(int i = 0; i < W; i++) result[2 + i] = 0;
+    result[2 + W] = 0;
   } 
   else {
     result[0] = 0;
     result[1] = P.nbMoves();
-    std::vector<int> scores = solver.analyze_heuristic(P, max_depth, threads, timeout_ms);
+    auto res = solver.analyze_heuristic(P, max_depth, threads, timeout_ms);
+    std::vector<int> scores = res.first;
     for(int i = 0; i < W; i++) result[2 + i] = scores[i];
+    result[2 + W] = res.second; // Depth reached
   }
   return result;
 }
@@ -78,6 +81,8 @@ EMSCRIPTEN_KEEPALIVE void releaseSolver6x6() { SharedInstances::releaseSolver6x6
 EMSCRIPTEN_KEEPALIVE void loadBook7x6(const char* path) { SharedInstances::getSolver7x6()->loadBook(std::string(path)); }
 EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x6(const char* pos, int threads) { return runAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7>(*SharedInstances::getSolver7x6(), pos, threads); }
 EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition7x6(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 6>, GameSolver::Connect4::GenericPosition<7, 6>, 7>(*SharedInstances::getHeuristicSolver7x6(), pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE uint64_t getNodeCount7x6() { return SharedInstances::getSolver7x6()->getNodeCount(); }
+EMSCRIPTEN_KEEPALIVE uint64_t getNodeCountHeuristic7x6() { return SharedInstances::getHeuristicSolver7x6()->getNodeCount(); }
 EMSCRIPTEN_KEEPALIVE void releaseSolver7x6() { SharedInstances::releaseSolver7x6(); SharedInstances::releaseHeuristicSolver7x6(); }
 
 EMSCRIPTEN_KEEPALIVE void loadBook7x7(const char* path) { SharedInstances::getSolver7x7()->loadBook(std::string(path)); }

@@ -189,13 +189,14 @@ npm run build
 **What is "Depth"?**  
 Depth refers to the exact number of moves (ply) pre-calculated consecutively starting from a completely empty board. Connect 4 branching logic scales _exponentially_ based on the remaining unplayed mathematical volume. By generating an opening book up to an explicit Depth (e.g. `14`), you are securely caching the perfect evaluations for every single valid board permutation that can possibly occur within the first 14 turns. The upstream user's device instantly fetches this cached scenario directly from the `.book` memory buffer without burning their processor cycle.
 
-**Depth Recommendations (Targeting `<0.1s` UI Response Times):**
+**Depth Recommendations (Targeting `<1s` UI Response Times):**
 
 - **`6x5`:** Depth `0` _(No book required; executes instantly)_
-- **`6x6`:** Depth `0` _(No book required; executes instantly)_
-- **`7x6` (Standard):** Depth `4` _(Highly recommended for perfect `<0.1s` responses. Usable without a book for ~1-2s response times)_
-- **`7x7`:** Depth `11` _(Highly recommended for `<0.5s` responses. Requires ~6.5MB dense book)_
-- **`8x6`, `8x8`, `9x7`, `10x10`:** _(We do not offer pre-computed mathematical opening books for these sizes due to astronomical branching complexity. Use the `HeuristicSolver` for these sizes instead!)_
+- **`6x6`:** Depth `6` or `8`
+- **`7x6` (Standard):** Depth `12` or `14` _(Standard 14-depth book is ~4MB)_
+- **`7x7`:** Depth `16` to `18` _(Requires ~6.5MB dense book)_
+- **`8x6`:** Depth `20` to `22`
+- **`8x8`, `9x7`, `10x10`:** _(We do not offer pre-computed mathematical opening books for these sizes due to astronomical branching complexity. Use the `HeuristicSolver` for these sizes instead!)_
 
 Generating opening books for larger board sizes (like `8x6`) can take significant CPU time to compute locally. You can drastically speed this up by building the books natively in C++ across all your CPU cores using GNU Parallel:
 

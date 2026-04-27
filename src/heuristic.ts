@@ -94,7 +94,7 @@ export class HeuristicConnect4Solver extends Connect4Solver {
     else if (this.width === 10 && this.height === 10)
       outputPointer = mod._analyzeHeuristicPosition10x10(allocatedMemory, maxDepth, threads, timeoutMs);
 
-    const dataLength = 2 + this.width;
+    const dataLength = 3 + this.width;
     const finalData = new Int32Array(dataLength);
     for (let i = 0; i < dataLength; i++) {
       finalData[i] = mod.getValue(outputPointer + i * INT32_SIZE, "i32");
@@ -110,9 +110,9 @@ export class HeuristicConnect4Solver extends Connect4Solver {
     positionStr: string,
     opts?: { threads?: number; maxDepth?: number; timeoutMs?: number },
   ): PositionAnalysis {
-    const depth = opts?.maxDepth ?? 18;
+    const depth = opts?.maxDepth ?? 20;
     const threads = opts?.threads ?? 1;
-    const timeoutMs = opts?.timeoutMs ?? 100;
+    const timeoutMs = opts?.timeoutMs ?? 25;
     const resArr = this.rawAnalyzeHeuristic(positionStr, depth, threads, timeoutMs);
 
     const originalPosition = positionStr;
@@ -184,12 +184,15 @@ export class HeuristicConnect4Solver extends Connect4Solver {
       evaluation = bestEval;
     }
 
+    const depthReached = resArr[2 + this.width];
+
     return {
       position: currentPosition,
       originalPosition,
       currentPlayer,
       evaluation,
       moveOptions,
+      depthReached,
     };
   }
 

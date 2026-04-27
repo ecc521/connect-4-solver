@@ -16,11 +16,19 @@ namespace GameSolver {
 namespace Connect4 {
 
 template <int WIDTH, int HEIGHT>
-int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth) {
+int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms) {
   assert(alpha < beta);
   assert(!P.canWinNext());
 
-  nodeCount++; 
+  if (stopSearch.load()) return 0;
+  unsigned long long nodes = ++nodeCount;
+  if ((nodes & 16383) == 0 && end_time_ms > 0) {
+#ifdef __EMSCRIPTEN__
+    if (emscripten_get_now() >= end_time_ms) {
+      stopSearch = true;
+    }
+#endif
+  }
   typename GenericPosition<WIDTH, HEIGHT>::position_t possible = P.possibleNonLosingMoves();
   if(possible == 0) // opponent wins next move
     return -(WIDTH * HEIGHT - P.nbMoves()) / 2 * 1000;
@@ -93,11 +101,14 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   int best_seen_col = -1;
   int orig_alpha = alpha;
   int best_score = -1000000;
+  bool first_move = true;
 
   while(typename GenericPosition<WIDTH, HEIGHT>::position_t next = moves.getNext()) {
+    if (stopSearch.load()) break;
     GenericPosition<WIDTH, HEIGHT> P2(P);
     P2.play(next);  
-    int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1); 
+    
+    int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms);
     
     int next_col = GenericPosition<WIDTH, HEIGHT>::getCol(next);
 
@@ -106,7 +117,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
       best_seen_col = next_col;
     }
 
-    if(score >= beta) {
+    if(score > alpha) alpha = score;
+    if(alpha >= beta) {
       uint32_t extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
       transTable->put(key, (extra_key << 28) | ((uint32_t)(next_col + 1) << 24) | (2 << 22) | ((uint32_t)depth << 16) | (uint32_t)(score + 32768)); 
       return score;  
@@ -123,35 +135,41 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
 }
 
 template <int WIDTH, int HEIGHT>
-int HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms) {
+std::pair<int, int> HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool reset_tt) {
+  if (reset_tt) {
+    reset();
+    stopSearch = false;
+  } else {
+    nodeCount = 0;
+  }
+
   if(P.canWinNext()) 
-    return (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+    return {(WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000, 0};
   
   int best_score = 0;
+  int depth_reached = 0;
   for (int d = 1; d <= max_depth; d++) {
-    int current_score = negamax_heuristic(P, -1000000, 1000000, d);
-#ifdef __EMSCRIPTEN__
-    if (end_time_ms > 0.0 && emscripten_get_now() >= end_time_ms) {
-      if (d == 1) best_score = current_score;
-      break;
-    }
-#endif
-    best_score = current_score;
+    best_score = negamax_heuristic(P, -1000000, 1000000, d, end_time_ms);
+    if (stopSearch.load()) break;
+    depth_reached = d;
     if (best_score > 10000 || best_score < -10000) {
       break;
     }
   }
-  return best_score;
+  return {best_score, depth_reached};
 }
 
 template <int WIDTH, int HEIGHT>
-std::vector<int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads, double timeout_ms) {
+std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads, double timeout_ms) {
   std::vector<int> scores(WIDTH, -1000000);
+  std::atomic<int> max_depth_reached{0};
 #ifdef __EMSCRIPTEN__
   double end_time_ms = timeout_ms > 0.0 ? emscripten_get_now() + timeout_ms : 0.0;
 #else
   double end_time_ms = 0.0;
 #endif
+
+  reset();
 
 #ifdef USE_PTHREADS
   if (threads <= 1) {
@@ -160,14 +178,17 @@ std::vector<int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const Generic
       if (P.canPlay(col)) {
         if(P.isWinningMove(col)) {
           scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+          if (max_depth_reached < 1) max_depth_reached = 1;
         } else {
           GenericPosition<WIDTH, HEIGHT> P2(P);
           P2.playCol(col);
-          scores[col] = -solve_heuristic(P2, max_depth - 1, end_time_ms);
+          auto res = solve_heuristic(P2, max_depth - 1, end_time_ms, false);
+          scores[col] = -res.first;
+          if (res.second + 1 > max_depth_reached) max_depth_reached = res.second + 1;
         }
       }
     }
-    return scores;
+    return {scores, max_depth_reached};
   }
 
   std::atomic<int> next_col{0};
@@ -180,10 +201,16 @@ std::vector<int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const Generic
       if (P.canPlay(col)) {
         if(P.isWinningMove(col)) {
           scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+          int current = max_depth_reached.load();
+          while (current < 1 && !max_depth_reached.compare_exchange_weak(current, 1));
         } else {
           GenericPosition<WIDTH, HEIGHT> P2(P);
           P2.playCol(col);
-          scores[col] = -solve_heuristic(P2, max_depth - 1, end_time_ms);
+          auto res = solve_heuristic(P2, max_depth - 1, end_time_ms, false);
+          scores[col] = -res.first;
+          int reached = res.second + 1;
+          int current = max_depth_reached.load();
+          while (reached > current && !max_depth_reached.compare_exchange_weak(current, reached));
         }
       }
     }
@@ -203,16 +230,20 @@ std::vector<int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const Generic
   for (int i = 0; i < WIDTH; i++) {
     int col = columnOrder[i];
     if (P.canPlay(col)) {
-      if(P.isWinningMove(col)) scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
-      else {
+      if(P.isWinningMove(col)) {
+        scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+        if (max_depth_reached < 1) max_depth_reached = 1;
+      } else {
         GenericPosition<WIDTH, HEIGHT> P2(P);
         P2.playCol(col);
-        scores[col] = -solve_heuristic(P2, max_depth - 1, end_time_ms);
+        auto res = solve_heuristic(P2, max_depth - 1, end_time_ms, false);
+        scores[col] = -res.first;
+        if (res.second + 1 > max_depth_reached) max_depth_reached = res.second + 1;
       }
     }
   }
 #endif
-  return scores;
+  return {scores, max_depth_reached};
 }
 
 // Constructor

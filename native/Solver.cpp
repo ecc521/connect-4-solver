@@ -95,15 +95,12 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
     Position P2(P);
     P2.play(next);  // It's opponent turn in P2 position after current player plays x column.
     int score = -negamax(P2, -beta, -alpha); // explore opponent's score within [-beta;-alpha] windows:
-    // no need to have good precision for score better than beta (opponent's score worse than -beta)
-    // no need to check for score worse than alpha (opponent's score worse better than -alpha)
 
     if(score >= beta) {
       transTable.put(key, score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2); // save the lower bound of the position
       return score;  // prune the exploration if we find a possible move better than what we were looking for.
     }
-    if(score > alpha) alpha = score; // reduce the [alpha;beta] window for next exploration, as we only
-    // need to search for a position that is better than the best so far.
+    if(score > alpha) alpha = score; 
   }
 
   transTable.put(key, alpha - Position::MIN_SCORE + 1); // save the upper bound of the position
