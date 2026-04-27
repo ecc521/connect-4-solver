@@ -36,21 +36,49 @@ export class Connect4Solver {
   private bookLoaded = false;
   public width: number;
   public height: number;
+  private _instancePtr: number = 0;
+  private _cache: import("./cache").SolverCache | null = null;
 
-  constructor(width = 7, height = 6) {
+  constructor(
+    widthOrOpts?: number | { width?: number; height?: number; cache?: import("./cache").SolverCache },
+    heightOpt?: number
+  ) {
+    let width = 7;
+    let height = 6;
+    let cache: import("./cache").SolverCache | undefined;
+
+    if (typeof widthOrOpts === 'object') {
+      width = widthOrOpts.width ?? 7;
+      height = widthOrOpts.height ?? 6;
+      cache = widthOrOpts.cache;
+    } else if (typeof widthOrOpts === 'number') {
+      width = widthOrOpts;
+      if (heightOpt !== undefined) height = heightOpt;
+    }
+
     const validSizes = ["6x5", "6x6", "7x6", "7x7", "8x6", "9x7", "8x8", "9x6", "11x4"];
     if (!validSizes.includes(`${width}x${height}`)) {
       throw new Error(
-        `Board size ${width}x${height} is not supported by the generated WASM bundle. Supported sizes are 6x5, 6x6, 7x6, 7x7, 8x6, 9x7.`,
+        `Board size ${width}x${height} is not supported by the generated WASM bundle.`,
       );
     }
     this.width = width;
     this.height = height;
+    
+    if (cache) {
+      if (width !== 7 || height !== 6) {
+        throw new Error("Shared caching is currently only supported via TypeScript for the 7x6 board size.");
+      }
+      this._cache = cache;
+    }
   }
 
   async init(): Promise<void> {
     if (this.initialized) return;
     await getModuleInitPromise();
+    if (this._cache && this._instancePtr === 0) {
+      this._instancePtr = this.mod._createSolverWithCache7x6(this._cache.ptr);
+    }
     this.initialized = true;
   }
 
@@ -96,7 +124,9 @@ export class Connect4Solver {
     const allocatedMemory = this.allocateString(positionStr);
 
     let outputPointer = 0;
-    if (this.width === 6 && this.height === 5)
+    if (this._instancePtr !== 0) {
+      outputPointer = mod._analyzePositionInstance7x6(this._instancePtr, allocatedMemory, threads);
+    } else if (this.width === 6 && this.height === 5)
       outputPointer = mod._analyzePosition6x5(allocatedMemory, threads);
     else if (this.width === 6 && this.height === 6)
       outputPointer = mod._analyzePosition6x6(allocatedMemory, threads);
@@ -255,6 +285,12 @@ export class Connect4Solver {
   unload(): void {
     if (!this.initialized) return;
     const mod = this.mod;
+    if (this._instancePtr !== 0) {
+      mod._destroySolver7x6(this._instancePtr);
+      this._instancePtr = 0;
+      return;
+    }
+    
     if (this.width === 6 && this.height === 5) mod._releaseSolver6x5();
     else if (this.width === 6 && this.height === 6) mod._releaseSolver6x6();
     else if (this.width === 7 && this.height === 6) mod._releaseSolver7x6();
@@ -268,5 +304,6 @@ export class Connect4Solver {
   }
 }
 
+export * from "./cache";
 export * from "./threaded";
 export * from "./heuristic";

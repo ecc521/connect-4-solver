@@ -56,6 +56,12 @@ constexpr uint64_t getMinimumTableBytes() {
     return (1ULL << index_bits) * sizeof(SlotType);
 }
 
+class Cache {
+ public:
+  virtual ~Cache() = default;
+  virtual void reset() = 0;
+};
+
 class Solver {
  public:
   static const int INVALID_MOVE = -1000;
@@ -68,13 +74,15 @@ class Solver {
   virtual ~Solver() {}
 
   static std::unique_ptr<Solver> create(size_t table_bytes);
+  static std::unique_ptr<Cache> createCache(size_t table_bytes);
+  static std::unique_ptr<Solver> createWithCache(Cache* cache);
 };
 
 template <typename SlotType>
 class SolverImpl : public Solver {
  private:
   static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
-  TranspositionTable<SlotType, uint8_t, VALUE_BITS> transTable;
+  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
   std::unique_ptr<OpeningBookBase> book;
   std::atomic<unsigned long long> nodeCount;
   int columnOrder[Position::WIDTH];
@@ -83,7 +91,18 @@ class SolverImpl : public Solver {
   int negamax(const Position &P, int alpha, int beta);
 
  public:
-  SolverImpl(size_t table_bytes) : transTable(table_bytes), nodeCount{0} {
+  SolverImpl(size_t table_bytes) 
+    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0} {
+    for(int i = 0; i < Position::WIDTH; i++) {
+      columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
+    }
+    for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
+      history[i] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[i];
+    }
+  }
+
+  SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> cache)
+    : transTable(cache), nodeCount{0} {
     for(int i = 0; i < Position::WIDTH; i++) {
       columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
     }
@@ -101,7 +120,7 @@ class SolverImpl : public Solver {
 
   void reset() override {
     nodeCount = 0;
-    transTable.reset();
+    transTable->reset();
     for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
       history[i] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[i];
     }

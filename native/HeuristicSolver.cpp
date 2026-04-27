@@ -82,13 +82,20 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   const typename GenericPosition<WIDTH, HEIGHT>::position_t key = P.key();
   uint32_t tt_val = transTable->get(key);
   
-  // Layout: Score(16) | Depth(6) | Flags(2) | Move(4)
+  // Layout: Score(16) | Depth(6) | Flags(2) | Move(4) | Key(4)
   int val = tt_val ? ((int)(tt_val & 0xFFFF) - 32768) : 0;
   int tt_depth = (tt_val >> 16) & 0x3F;
   int tt_flags = (tt_val >> 22) & 0x03; 
   int best_move_col = tt_val ? (tt_val >> 24) - 1 : -1;
+  uint32_t tt_extra_key = (tt_val >> 28) & 0xF;
 
-  if(tt_val && tt_depth >= depth) {
+  // We have 32 bits of partial_key in TT + 22 bits in index = 54 bits.
+  // The key is 64 bits, so 10 bits remain. We store 4 of them here.
+  // Size is ~4M (22 bits). partial_key = key / size. 
+  // TT stores partial_key % 2^32. So we want (partial_key >> 32) & 0xF.
+  uint32_t current_extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
+
+  if(tt_val && tt_depth >= depth && tt_extra_key == current_extra_key) {
     if(tt_flags == 2) { // lower bound
       if(alpha < val) {
         alpha = val;                     
@@ -154,7 +161,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
           }
         }
       }
-      transTable->put(key, ((uint32_t)(next_col + 1) << 24) | (2 << 22) | ((uint32_t)depth << 16) | (uint32_t)(score + 32768)); 
+      uint32_t extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
+      transTable->put(key, (extra_key << 28) | ((uint32_t)(next_col + 1) << 24) | (2 << 22) | ((uint32_t)depth << 16) | (uint32_t)(score + 32768)); 
       return score;  
     }
     searched[searched_cnt++] = bit_idx;
@@ -164,7 +172,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   }
 
   int flags = (best_score <= orig_alpha) ? 3 : 1; 
-  transTable->put(key, ((uint32_t)(best_seen_col == -1 ? 0 : best_seen_col + 1) << 24) | ((uint32_t)flags << 22) | ((uint32_t)depth << 16) | (uint32_t)(best_score + 32768)); 
+  uint32_t extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
+  transTable->put(key, (extra_key << 28) | ((uint32_t)(best_seen_col == -1 ? 0 : best_seen_col + 1) << 24) | ((uint32_t)flags << 22) | ((uint32_t)depth << 16) | (uint32_t)(best_score + 32768)); 
   return best_score;
 }
 

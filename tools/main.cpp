@@ -61,13 +61,17 @@ int main(int argc, char** argv) {
       }
     }
   }
-  if (!solver) solver = Solver::create(memory_bytes);
+  auto cache = Solver::createCache(memory_bytes);
+  if (!solver) solver = Solver::createWithCache(cache.get());
   if (!opening_book.empty()) solver->loadBook(opening_book);
 
   if (cores > 1) {
     std::mutex io_mutex;
     
     auto worker = [&]() {
+      auto local_solver = Solver::createWithCache(cache.get());
+      if (!opening_book.empty()) local_solver->loadBook(opening_book);
+
       while (true) {
         std::string current_line;
         {
@@ -84,10 +88,10 @@ int main(int argc, char** argv) {
         } else {
           std::string result = current_line;
           if(analyze) {
-            std::vector<int> scores = solver->analyze(P, weak);
+            std::vector<int> scores = local_solver->analyze(P, weak);
             for(int i = 0; i < Position::WIDTH; i++) result += " " + std::to_string(scores[i]);
           } else {
-            int score = solver->solve(P, weak);
+            int score = local_solver->solve(P, weak);
             result += " " + std::to_string(score);
           }
           std::lock_guard<std::mutex> lock(io_mutex);

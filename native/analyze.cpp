@@ -85,6 +85,13 @@ EMSCRIPTEN_KEEPALIVE uint64_t getNodeCount7x6() { return SharedInstances::getSol
 EMSCRIPTEN_KEEPALIVE uint64_t getNodeCountHeuristic7x6() { return SharedInstances::getHeuristicSolver7x6()->getNodeCount(); }
 EMSCRIPTEN_KEEPALIVE void releaseSolver7x6() { SharedInstances::releaseSolver7x6(); SharedInstances::releaseHeuristicSolver7x6(); }
 
+// Instance-based API for 7x6 Shared Cache
+EMSCRIPTEN_KEEPALIVE void* createCache7x6(size_t bytes) { return C4_7x6::GameSolver::Connect4::Solver::createCache(bytes).release(); }
+EMSCRIPTEN_KEEPALIVE void destroyCache7x6(void* cache) { delete static_cast<C4_7x6::GameSolver::Connect4::Cache*>(cache); }
+EMSCRIPTEN_KEEPALIVE void* createSolverWithCache7x6(void* cache) { return C4_7x6::GameSolver::Connect4::Solver::createWithCache(static_cast<C4_7x6::GameSolver::Connect4::Cache*>(cache)).release(); }
+EMSCRIPTEN_KEEPALIVE void destroySolver7x6(void* solver) { delete static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePositionInstance7x6(void* solver, const char* pos, int threads) { return runAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7>(*static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver), pos, threads); }
+
 EMSCRIPTEN_KEEPALIVE void loadBook7x7(const char* path) { SharedInstances::getSolver7x7()->loadBook(std::string(path)); }
 EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x7(const char* pos, int threads) { return runAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7>(*SharedInstances::getSolver7x7(), pos, threads); }
 EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition7x7(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7>(*SharedInstances::getHeuristicSolver7x7(), pos, max_depth, threads, timeout_ms); }

@@ -260,14 +260,25 @@ class GenericPosition {
    * Heuristic score of the position using center-weights and threat counts.
    * Non-terminal fallback evaluated when depth_limit is reached.
    */
-  int heuristic_evaluate() const {
+  int heuristic_evaluate(int double_threat_weight = 10, int uncontested_parity_weight = 57, int tempo_weight = 76, int center_multiplier = 5, int base_threat_weight = 23) const {
     int score = 0;
     
     position_t opp_position = current_position ^ mask;
 
     position_t my_threats = compute_winning_position(current_position, mask);
     position_t opp_threats = compute_winning_position(opp_position, mask);
-    
+    position_t playable = possible();
+    position_t double_edged = (playable << 1) & board_mask;
+
+    // 1. Double-edged threats: If we play under it, we allow the opponent to claim it.
+    // Having a threat here is actively GOOD, because it mathematically prevents the 
+    // opponent from playing in that column, effectively locking them out.
+    // We award +50 points for locking the opponent out, and subtract 50 if we are locked out.
+    score += popcount(my_threats & double_edged) * double_threat_weight;
+    score -= popcount(opp_threats & double_edged) * double_threat_weight;
+
+    // 2. Strict Parity Control (Victor Allis's Uncontested Threats)
+    // Smear threats upward to identify cells that are vertically "blocked" by an opponent's threat
     position_t opp_threats_above = (opp_threats << 1) & board_mask;
     opp_threats_above |= (opp_threats_above << 1) & board_mask;
     opp_threats_above |= (opp_threats_above << 2) & board_mask;
@@ -280,21 +291,56 @@ class GenericPosition {
     my_threats_above |= (my_threats_above << 4) & board_mask;
     if constexpr (HEIGHT >= 8) my_threats_above |= (my_threats_above << 8) & board_mask;
 
-    position_t my_useful_threats = my_threats & ~opp_threats_above;
-    position_t opp_useful_threats = opp_threats & ~my_threats_above;
+    position_t my_useless_threats = my_threats & opp_threats_above;
+    position_t opp_useless_threats = opp_threats & my_threats_above;
 
-    position_t my_double_threats = my_useful_threats & (my_useful_threats >> 1);
-    position_t opp_double_threats = opp_useful_threats & (opp_useful_threats >> 1);
-    
-    score += popcount(my_double_threats) * 2000;
-    score -= popcount(opp_double_threats) * 2000;
-
-    score += (popcount(my_useful_threats) - popcount(opp_useful_threats)) * 50;
-
-    // 5. Center-control weighting (fallback for early game)
-    for(int i = 0; i < WIDTH; i++) {
-      score += (popcount(current_position & CENTER_MASKS[i]) - popcount(opp_position & CENTER_MASKS[i])) * CENTER_WEIGHTS[i];
+    position_t even_rows = 0;
+    for (int r = 0; r < HEIGHT; r += 2) {
+        even_rows |= (bottom_mask << r);
     }
+    position_t odd_rows = (even_rows << 1) & board_mask;
+    
+    position_t my_parity = (moves % 2 == 0) ? even_rows : odd_rows;
+    position_t opp_parity = (moves % 2 == 0) ? odd_rows : even_rows;
+
+    // Isolate only the lowest threat per column (since higher ones are implicitly blocked by the lower one)
+    position_t lowest_my_threats = my_threats & ~my_threats_above;
+    position_t lowest_opp_threats = opp_threats & ~opp_threats_above;
+
+    position_t my_uncontested_parity = (lowest_my_threats & my_parity) & ~my_useless_threats;
+    position_t opp_uncontested_parity = (lowest_opp_threats & opp_parity) & ~opp_useless_threats;
+
+    // Uncontested parity threats are highly prized (but kept below +1000 forced win threshold)
+    score += popcount(my_uncontested_parity) * uncontested_parity_weight;
+    score -= popcount(opp_uncontested_parity) * uncontested_parity_weight;
+    
+    // 3. Zugzwang Timer (Safe Squares Parity)
+    position_t all_threats = my_threats | opp_threats;
+    position_t empty_squares = board_mask ^ (current_position | opp_position);
+
+    position_t all_threats_above = all_threats;
+    all_threats_above |= (all_threats_above << 1) & board_mask;
+    all_threats_above |= (all_threats_above << 2) & board_mask;
+    all_threats_above |= (all_threats_above << 4) & board_mask;
+    if constexpr (HEIGHT >= 8) all_threats_above |= (all_threats_above << 8) & board_mask;
+
+    int safe_squares = popcount(empty_squares & ~all_threats_above);
+    
+    if ((safe_squares % 2) != (moves % 2)) {
+        score += tempo_weight; // We control the tempo
+    } else {
+        score -= tempo_weight; // Opponent controls the tempo
+    }
+    
+    // 4. Base Threat Advantage
+    score += (popcount(lowest_my_threats & ~my_useless_threats) - popcount(lowest_opp_threats & ~opp_useless_threats)) * base_threat_weight;
+    
+    // 4. Center-control weighting (fallback)
+    for(int i = 0; i < WIDTH; i++) {
+      score += (popcount(current_position & CENTER_MASKS[i]) - popcount(opp_position & CENTER_MASKS[i])) * CENTER_WEIGHTS[i] * center_multiplier;
+    }
+    
+
 
     return score;
   }

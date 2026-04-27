@@ -33,11 +33,21 @@ export interface SolverModule {
   _analyzePosition6x6(pointer: number, threads: number): number;
   _loadBook6x6(pointer: number): void;
   _releaseSolver6x6(): void;
-  _analyzePosition7x6(pointer: number, threads: number): number;
-  _loadBook7x6(pointer: number): void;
-  _releaseSolver7x6(): void;
-  _analyzePosition7x7(pointer: number, threads: number): number;
-  _loadBook7x7(pointer: number): void;
+  _analyzePosition7x6: (pos: number, threads: number) => number;
+  _analyzeHeuristicPosition7x6: (pos: number, depth: number, threads: number, timeout: number) => number;
+  _getNodeCount7x6: () => number;
+  _getNodeCountHeuristic7x6: () => number;
+  _releaseSolver7x6: () => void;
+
+  _createCache7x6: (bytes: number) => number;
+  _destroyCache7x6: (ptr: number) => void;
+  _createSolverWithCache7x6: (cachePtr: number) => number;
+  _destroySolver7x6: (ptr: number) => void;
+  _analyzePositionInstance7x6: (solverPtr: number, pos: number, threads: number) => number;
+  _loadBook7x6: (path: number) => void;
+
+  _analyzePosition7x7: (pointer: number, threads: number) => number;
+  _loadBook7x7: (path: number) => void;
   _releaseSolver7x7(): void;
   _analyzePosition8x6(pointer: number, threads: number): number;
   _loadBook8x6(pointer: number): void;

@@ -83,7 +83,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
   }
 
   const Position::position_t key = P.key();
-  if(int val = transTable.get(key)) {
+  if(int val = transTable->get(key)) {
     if(val > Position::MAX_SCORE - Position::MIN_SCORE + 1) { // we have an lower bound
       min = val + 2 * Position::MIN_SCORE - Position::MAX_SCORE - 2;
       if(alpha < min) {
@@ -138,7 +138,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
         }
 #endif
       }
-      transTable.put(key, score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2); // save the lower bound of the position
+      transTable->put(key, score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2); // save the lower bound of the position
       return score;  // prune the exploration if we find a possible move better than what we were looking for.
     }
 #if BOARD_WIDTH_MACRO >= 8
@@ -149,7 +149,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
     if(score > alpha) alpha = score; 
   }
 
-  transTable.put(key, alpha - Position::MIN_SCORE + 1); // save the upper bound of the position
+  transTable->put(key, alpha - Position::MIN_SCORE + 1); // save the upper bound of the position
   return alpha;
 }
 
@@ -257,6 +257,44 @@ std::unique_ptr<Solver> Solver::create(size_t table_bytes) {
       // Clang __int128 fallback for massive boards with tiny memory constraints
       return std::make_unique<SolverImpl<unsigned __int128>>(table_bytes);
   }
+}
+
+template <typename SlotType>
+class TypedCache : public Cache {
+ public:
+  static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
+  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
+
+  TypedCache(size_t table_bytes) 
+    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)) {}
+    
+  void reset() override {
+    transTable->reset();
+  }
+};
+
+std::unique_ptr<Cache> Solver::createCache(size_t table_bytes) {
+  uint64_t min_32 = getMinimumTableBytes<uint32_t>();
+  uint64_t min_64 = getMinimumTableBytes<uint64_t>();
+
+  if (table_bytes >= min_32 && min_32 != UINT64_MAX) {
+      return std::make_unique<TypedCache<uint32_t>>(table_bytes);
+  } else if (table_bytes >= min_64 && min_64 != UINT64_MAX) {
+      return std::make_unique<TypedCache<uint64_t>>(table_bytes);
+  } else {
+      return std::make_unique<TypedCache<unsigned __int128>>(table_bytes);
+  }
+}
+
+std::unique_ptr<Solver> Solver::createWithCache(Cache* cache) {
+  if (auto c32 = dynamic_cast<TypedCache<uint32_t>*>(cache)) {
+      return std::make_unique<SolverImpl<uint32_t>>(c32->transTable);
+  } else if (auto c64 = dynamic_cast<TypedCache<uint64_t>*>(cache)) {
+      return std::make_unique<SolverImpl<uint64_t>>(c64->transTable);
+  } else if (auto c128 = dynamic_cast<TypedCache<unsigned __int128>*>(cache)) {
+      return std::make_unique<SolverImpl<unsigned __int128>>(c128->transTable);
+  }
+  return nullptr;
 }
 
 // Explicit template instantiations
