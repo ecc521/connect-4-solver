@@ -25,6 +25,7 @@
 #include <vector>
 #include <algorithm>
 #include <stdexcept>
+#include <memory>
 
 namespace GameSolver {
 namespace Connect4 {
@@ -63,6 +64,84 @@ public:
     virtual ~OpeningBookBase() = default;
     
     static std::unique_ptr<OpeningBookBase> load(std::string filename, int width, int height);
+};
+
+class EliasFanoBook : public OpeningBookBase {
+  uint64_t num_entries;
+  uint64_t U;
+  uint8_t L;
+  int depth;
+  std::vector<uint64_t> upper_bits;
+  std::vector<uint64_t> lower_bits;
+  std::vector<uint8_t> values;
+  std::vector<uint32_t> block_counts; // Prefix sum of popcounts for upper_bits blocks
+
+  void build_index() {
+    block_counts.assign(upper_bits.size() + 1, 0);
+    uint32_t current = 0;
+    for (size_t i = 0; i < upper_bits.size(); i++) {
+      block_counts[i] = current;
+      current += __builtin_popcountll(upper_bits[i]);
+    }
+    block_counts[upper_bits.size()] = current;
+  }
+
+  uint64_t select1(uint64_t rank) const {
+    // Binary search on block_counts to find the block containing the rank-th '1'
+    auto it = std::upper_bound(block_counts.begin(), block_counts.end(), (uint32_t)rank);
+    size_t block_idx = std::distance(block_counts.begin(), it) - 1;
+    
+    uint64_t val = upper_bits[block_idx];
+    uint32_t remaining = rank - block_counts[block_idx];
+    
+    // Find the remaining-th set bit in the 64-bit block
+    for (int i = 0; i < 64; i++) {
+      if ((val >> i) & 1) {
+        if (remaining == 0) return block_idx * 64 + i;
+        remaining--;
+      }
+    }
+    return block_idx * 64;
+  }
+
+  uint64_t get_key(uint64_t i) const {
+    uint64_t y = select1(i) - i;
+    return (y << L) | get_lower(i);
+  }
+
+  uint64_t get_lower(uint64_t i) const {
+    if (L == 0) return 0;
+    uint64_t bit_pos = i * L;
+    uint64_t idx = bit_pos / 64;
+    uint64_t shift = bit_pos % 64;
+    uint64_t val = lower_bits.empty() ? 0 : lower_bits[idx] >> shift;
+    if (shift + L > 64 && idx + 1 < lower_bits.size()) {
+      val |= lower_bits[idx + 1] << (64 - shift);
+    }
+    return val & ((1ULL << L) - 1);
+  }
+
+ public:
+  EliasFanoBook(uint64_t n, uint64_t U, uint8_t L, int depth, std::vector<uint64_t> ub, std::vector<uint64_t> lb, std::vector<uint8_t> v)
+    : num_entries{n}, U{U}, L{L}, depth{depth}, upper_bits(std::move(ub)), lower_bits(std::move(lb)), values(std::move(v)) {
+      build_index();
+    }
+
+  int get(const Position &P) const override {
+    if (num_entries == 0) return 0;
+    uint64_t x = P.key3();
+    
+    uint64_t low = 0;
+    uint64_t high = num_entries;
+    while (low < high) {
+      uint64_t mid = low + (high - low) / 2;
+      uint64_t mid_x = get_key(mid);
+      if (mid_x < x) low = mid + 1;
+      else if (mid_x > x) high = mid;
+      else return values[mid];
+    }
+    return 0;
+  }
 };
 
 template<typename KeyT, typename ValT>
@@ -104,7 +183,28 @@ std::unique_ptr<OpeningBookBase> load_dense_book_n(std::ifstream& ifs, size_t fi
         throw std::runtime_error("Failed to read Dense Array data from book file.");
       }
     }
-    return std::make_unique<DenseBook<PackedKey<N>, uint8_t>>(depth, std::move(keys), std::move(values));
+    return std::unique_ptr<OpeningBookBase>(new DenseBook<PackedKey<N>, uint8_t>(depth, std::move(keys), std::move(values)));
+}
+
+inline std::unique_ptr<OpeningBookBase> load_elias_fano_book(std::ifstream& ifs, int depth) {
+    uint64_t num_entries, U;
+    uint8_t L;
+    ifs.read(reinterpret_cast<char*>(&num_entries), 8);
+    ifs.read(reinterpret_cast<char*>(&U), 8);
+    ifs.read(reinterpret_cast<char*>(&L), 1);
+
+    uint64_t upper_bits_size = (num_entries + (U >> L) + 64) / 64;
+    uint64_t lower_bits_size = (num_entries * L + 63) / 64;
+
+    std::vector<uint64_t> upper_bits(upper_bits_size);
+    std::vector<uint64_t> lower_bits(lower_bits_size);
+    std::vector<uint8_t> values(num_entries);
+
+    ifs.read(reinterpret_cast<char*>(upper_bits.data()), upper_bits_size * 8);
+    ifs.read(reinterpret_cast<char*>(lower_bits.data()), lower_bits_size * 8);
+    ifs.read(reinterpret_cast<char*>(values.data()), num_entries);
+
+    return std::unique_ptr<OpeningBookBase>(new EliasFanoBook(num_entries, U, L, depth, std::move(upper_bits), std::move(lower_bits), std::move(values)));
 }
 
 inline std::unique_ptr<OpeningBookBase> OpeningBookBase::load(std::string filename, int width, int height) {
@@ -137,6 +237,10 @@ inline std::unique_ptr<OpeningBookBase> OpeningBookBase::load(std::string filena
 
     if (value_bytes != 1) {
       throw std::runtime_error("Invalid Connect 4 opening book format. Only 1-byte values supported currently.");
+    }
+
+    if (log_size == (char)0xFF) {
+      return load_elias_fano_book(ifs, _depth);
     }
 
     ifs.seekg(0, std::ios::end);
