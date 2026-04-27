@@ -61,7 +61,7 @@ class Solver {
 template <typename SlotType>
 class SolverImpl : public Solver {
  private:
-  TranspositionTable<SlotType> transTable;
+  TranspositionTable<SlotType, uint8_t, 7> transTable;
   std::unique_ptr<OpeningBookBase> book;
   std::atomic<unsigned long long> nodeCount;
   int columnOrder[Position::WIDTH];

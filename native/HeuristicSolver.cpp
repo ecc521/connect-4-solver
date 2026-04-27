@@ -50,11 +50,21 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
 
   const typename GenericPosition<WIDTH, HEIGHT>::position_t key = P.key();
   uint32_t tt_val = transTable->get(key);
-  int val = tt_val ? ((int)(tt_val & 0xFFFFFF) - 1000000) : 0;
-  int tt_flags = (tt_val >> 24) & 0x03; // 1 = exact, 2 = lower bound, 3 = upper bound
-  int best_move_col = tt_val ? (tt_val >> 26) - 1 : -1;
+  
+  // Layout: Score(16) | Depth(6) | Flags(2) | Move(4) | Key(4)
+  int val = tt_val ? ((int)(tt_val & 0xFFFF) - 32768) : 0;
+  int tt_depth = (tt_val >> 16) & 0x3F;
+  int tt_flags = (tt_val >> 22) & 0x03; 
+  int best_move_col = tt_val ? (tt_val >> 24) - 1 : -1;
+  uint32_t tt_extra_key = (tt_val >> 28) & 0xF;
 
-  if(tt_val) {
+  // We have 32 bits of partial_key in TT + 22 bits in index = 54 bits.
+  // The key is 64 bits, so 10 bits remain. We store 4 of them here.
+  // Size is ~4M (22 bits). partial_key = key / size. 
+  // TT stores partial_key % 2^32. So we want (partial_key >> 32) & 0xF.
+  uint32_t current_extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
+
+  if(tt_val && tt_depth >= depth && tt_extra_key == current_extra_key) {
     if(tt_flags == 2) { // lower bound
       if(alpha < val) {
         alpha = val;                     
@@ -89,13 +99,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     P2.play(next);  
     int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1); 
     
-    int next_col = 0;
-    for(int c = 0; c < WIDTH; c++) {
-      if(next & GenericPosition<WIDTH, HEIGHT>::column_mask(c)) {
-        next_col = c;
-        break;
-      }
-    }
+    int next_col = GenericPosition<WIDTH, HEIGHT>::getCol(next);
 
     if(score > best_score) {
       best_score = score;
@@ -103,7 +107,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     }
 
     if(score >= beta) {
-      transTable->put(key, ((uint32_t)(next_col + 1) << 26) | (2 << 24) | (score + 1000000)); 
+      uint32_t extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
+      transTable->put(key, (extra_key << 28) | ((uint32_t)(next_col + 1) << 24) | (2 << 22) | ((uint32_t)depth << 16) | (uint32_t)(score + 32768)); 
       return score;  
     }
     if(score > alpha) {
@@ -112,7 +117,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   }
 
   int flags = (best_score <= orig_alpha) ? 3 : 1; 
-  transTable->put(key, ((uint32_t)(best_seen_col == -1 ? 0 : best_seen_col + 1) << 26) | (flags << 24) | (best_score + 1000000)); 
+  uint32_t extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
+  transTable->put(key, (extra_key << 28) | ((uint32_t)(best_seen_col == -1 ? 0 : best_seen_col + 1) << 24) | ((uint32_t)flags << 22) | ((uint32_t)depth << 16) | (uint32_t)(best_score + 32768)); 
   return best_score;
 }
 
@@ -213,7 +219,7 @@ std::vector<int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const Generic
 template <int WIDTH, int HEIGHT>
 HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver() : nodeCount{0} {
   size_t table_bytes = (WIDTH * HEIGHT >= 56) ? 16777216 : 33554432; // Default heuristic table size 16MB or 32MB
-  transTable = std::make_unique<TranspositionTable<uint32_t>>(table_bytes);
+  transTable = std::make_unique<TranspositionTable<uint64_t, uint32_t, 32>>(table_bytes);
   for(int i = 0; i < WIDTH; i++) // initialize the column exploration order, starting with center columns
     columnOrder[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; // example for WIDTH=7: columnOrder = {3, 4, 2, 5, 1, 6, 0}
 }

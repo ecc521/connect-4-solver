@@ -24,7 +24,7 @@ class HeuristicSolver {
  private:
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
   
-  std::unique_ptr<TranspositionTable<uint32_t>> transTable;
+  std::unique_ptr<TranspositionTable<uint64_t, uint32_t, 32>> transTable;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
   int columnOrder[WIDTH]; // column exploration order
 

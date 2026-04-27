@@ -229,8 +229,8 @@ class GenericPosition {
 
     // 1. Double-edged threats: If we play under it, we allow the opponent to claim it.
     // Having a threat here is actively bad. We want the opponent to have threats here so we can force them to play under it.
-    score -= popcount(my_threats & double_edged) * 50;
-    score += popcount(opp_threats & double_edged) * 50;
+    score += popcount(my_threats & double_edged) * 50;
+    score -= popcount(opp_threats & double_edged) * 50;
 
     // 2. Strict Parity Control (Victor Allis's Uncontested Threats)
     // Smear threats upward to identify cells that are vertically "blocked" by an opponent's threat
@@ -372,6 +372,22 @@ class GenericPosition {
 
   static unsigned int popcount(position_t m) {
     return popcount_impl<position_t>(m);
+  }
+
+  template <typename T>
+  static typename std::enable_if<sizeof(T) <= 8, unsigned int>::type ctz_impl(T m) {
+    return __builtin_ctzll((uint64_t)m);
+  }
+
+  template <typename T>
+  static typename std::enable_if<(sizeof(T) > 8), unsigned int>::type ctz_impl(T m) {
+    uint64_t low = (uint64_t)m;
+    if (low) return __builtin_ctzll(low);
+    return 64 + __builtin_ctzll((uint64_t)(m >> 64));
+  }
+
+  static unsigned int getCol(position_t m) {
+    return ctz_impl<position_t>(m) / (HEIGHT + 1);
   }
 
   /**

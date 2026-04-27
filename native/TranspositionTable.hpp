@@ -59,11 +59,16 @@ template<int S> using uint_t =
  * designed for L1/L3 Cache utilization. It packs a partial key
  * and an 8-bit value into a single atomic slot.
  */
-template<typename SlotType>
+template<typename SlotType, typename ValueType = uint8_t, unsigned int ValueBits = 8>
 class TranspositionTable {
  private:
+  struct Slot {
+    std::atomic<SlotType> data;
+    Slot() : data(0) {}
+  };
+
   size_t size;
-  std::atomic<SlotType> *Data;
+  Slot *Data;
 
   size_t index(uint64_t key) const {
     return key % size;
@@ -71,9 +76,9 @@ class TranspositionTable {
 
  public:
   TranspositionTable(size_t table_bytes) {
-    size_t slots = table_bytes / sizeof(SlotType);
+    size_t slots = table_bytes / sizeof(Slot);
     size = next_prime(slots);
-    Data = new std::atomic<SlotType>[size];
+    Data = new Slot[size];
     reset();
   }
 
@@ -83,36 +88,38 @@ class TranspositionTable {
 
   void reset() {
     for (size_t i = 0; i < size; i++) {
-      Data[i].store(0, std::memory_order_relaxed);
+      Data[i].data.store(0, std::memory_order_relaxed);
     }
   }
 
-  void put(uint64_t key, uint8_t value) {
-    size_t pos = index(key);
-    
-    // Partial key is simply the key divided by the size (CRT)
+  void put_if_empty(uint64_t key, ValueType value) {
+    size_t i = index(key);
     uint64_t partial_key = key / size;
-    
-    // Shift the partial key to the left by 8 bits, and store the value in the bottom 8 bits
-    SlotType combined = (static_cast<SlotType>(partial_key) << 8) | static_cast<SlotType>(value);
-
+    SlotType new_data = (static_cast<SlotType>(partial_key) << ValueBits) | static_cast<SlotType>(value);
     SlotType expected = 0;
-    // Lock-free atomic compare and swap: if 0, insert it.
-    if (!Data[pos].compare_exchange_strong(expected, combined, std::memory_order_relaxed)) {
-        // If slot is taken, ALWAYS replace it unconditionally. 
-        Data[pos].store(combined, std::memory_order_relaxed);
-    }
+    Data[i].data.compare_exchange_strong(expected, new_data, std::memory_order_relaxed);
   }
 
-  uint8_t get(uint64_t key) const {
+  void put(uint64_t key, ValueType value) {
+    size_t i = index(key);
+    uint64_t partial_key = key / size;
+    SlotType new_data = (static_cast<SlotType>(partial_key) << ValueBits) | static_cast<SlotType>(value);
+    Data[i].data.store(new_data, std::memory_order_relaxed);
+  }
+
+  size_t getSize() const {
+    return size;
+  }
+
+  ValueType get(uint64_t key) const {
     size_t pos = index(key);
     uint64_t partial_key = key / size;
     
-    SlotType combined = Data[pos].load(std::memory_order_relaxed);
+    SlotType combined = Data[pos].data.load(std::memory_order_relaxed);
     if (combined == 0) return 0; // Hit empty slot, item not found
     
-    if ((combined >> 8) == static_cast<SlotType>(partial_key)) {
-        return static_cast<uint8_t>(combined & 0xFF);
+    if ((combined >> ValueBits) == static_cast<SlotType>(partial_key)) {
+        return static_cast<ValueType>(combined & ((1ULL << ValueBits) - 1));
     }
     
     return 0;
