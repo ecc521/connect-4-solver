@@ -110,9 +110,9 @@ export class HeuristicConnect4Solver extends Connect4Solver {
     positionStr: string,
     opts?: { threads?: number; maxDepth?: number; timeoutMs?: number },
   ): PositionAnalysis {
-    const depth = opts?.maxDepth ?? 10;
+    const depth = opts?.maxDepth ?? 18;
     const threads = opts?.threads ?? 1;
-    const timeoutMs = opts?.timeoutMs ?? 0;
+    const timeoutMs = opts?.timeoutMs ?? 100;
     const resArr = this.rawAnalyzeHeuristic(positionStr, depth, threads, timeoutMs);
 
     const originalPosition = positionStr;
