@@ -97,7 +97,7 @@ class GenericPosition {
   static constexpr int MIN_SCORE = -(W*H) / 2 + 3;
   static constexpr int MAX_SCORE = (W * H + 1) / 2 - 3;
 
-  static constexpr std::array<int32_t, WIDTH * (HEIGHT + 1)> compute_tromp_weights() {
+  static std::array<int32_t, WIDTH * (HEIGHT + 1)> compute_tromp_weights() {
     std::array<int32_t, WIDTH * (HEIGHT + 1)> weights = {};
     for (int col = 0; col < WIDTH; col++) {
       for (int row = 0; row < HEIGHT; row++) {
@@ -112,16 +112,32 @@ class GenericPosition {
         int min_i_h = i < h ? i : h;
         int min_3_min_i_h = min_i_h < 3 ? min_i_h : 3;
         
-        int score = 4 + min_3_i + max_neg1_diff + min_3_min_i_h + min_3_h;
-        
-        int bit_idx = col * (HEIGHT + 1) + row;
-        weights[bit_idx] = score;
+        int val = 4 + min_3_i + max_neg1_diff + min_3_min_i_h + min_3_h;
+        weights[col * (HEIGHT + 1) + row] = val;
       }
     }
     return weights;
   }
 
-  static constexpr std::array<int32_t, WIDTH * (HEIGHT + 1)> TROMP_WEIGHTS = compute_tromp_weights();
+  static constexpr std::array<position_t, WIDTH> compute_center_masks() {
+    std::array<position_t, WIDTH> masks = {};
+    for(int i = 0; i < WIDTH; i++) masks[i] = column_mask(i);
+    return masks;
+  }
+
+  static constexpr std::array<int, WIDTH> compute_center_weights() {
+    std::array<int, WIDTH> w = {};
+    for(int i = 0; i < WIDTH; i++) {
+        int dist = i - WIDTH / 2;
+        if (dist < 0) dist = -dist;
+        w[i] = WIDTH - dist; 
+    }
+    return w;
+  }
+
+  static const std::array<int32_t, W * (H + 1)> TROMP_WEIGHTS;
+  static const std::array<position_t, W> CENTER_MASKS;
+  static const std::array<int, W> CENTER_WEIGHTS;
 
   static_assert(W <= 16, "Board's width must be <= 16 due to alphanumeric parsing limits");
   static_assert(W * (H + 1) <= sizeof(position_t)*8, "Board does not fit into position_t bitmask");
@@ -255,7 +271,9 @@ class GenericPosition {
     position_t double_edged = (playable << 1) & board_mask;
 
     // 1. Double-edged threats: If we play under it, we allow the opponent to claim it.
-    // Having a threat here is actively bad. We want the opponent to have threats here so we can force them to play under it.
+    // Having a threat here is actively GOOD, because it mathematically prevents the 
+    // opponent from playing in that column, effectively locking them out.
+    // We award +50 points for locking the opponent out, and subtract 50 if we are locked out.
     score += popcount(my_threats & double_edged) * 50;
     score -= popcount(opp_threats & double_edged) * 50;
 
@@ -285,24 +303,23 @@ class GenericPosition {
     position_t my_parity = (moves % 2 == 0) ? even_rows : odd_rows;
     position_t opp_parity = (moves % 2 == 0) ? odd_rows : even_rows;
 
-    position_t my_uncontested_parity = (my_threats & my_parity) & ~my_useless_threats;
-    position_t opp_uncontested_parity = (opp_threats & opp_parity) & ~opp_useless_threats;
+    // Isolate only the lowest threat per column (since higher ones are implicitly blocked by the lower one)
+    position_t lowest_my_threats = my_threats & ~my_threats_above;
+    position_t lowest_opp_threats = opp_threats & ~opp_threats_above;
+
+    position_t my_uncontested_parity = (lowest_my_threats & my_parity) & ~my_useless_threats;
+    position_t opp_uncontested_parity = (lowest_opp_threats & opp_parity) & ~opp_useless_threats;
 
     // Uncontested parity threats are highly prized (but kept below +1000 forced win threshold)
     score += popcount(my_uncontested_parity) * 200;
     score -= popcount(opp_uncontested_parity) * 200;
     
     // 3. Base threat weight (ignore useless threats)
-    score += (popcount(my_threats & ~my_useless_threats) - popcount(opp_threats & ~opp_useless_threats)) * 10;
+    score += (popcount(lowest_my_threats & ~my_useless_threats) - popcount(lowest_opp_threats & ~opp_useless_threats)) * 10;
     
     // 4. Center-control weighting
     for(int i = 0; i < WIDTH; i++) {
-      int dist = i - WIDTH / 2;
-      if (dist < 0) dist = -dist;
-      int weight = WIDTH - dist; 
-      position_t col_mask = column_mask(i);
-      
-      score += (popcount(current_position & col_mask) - popcount(opp_position & col_mask)) * weight;
+      score += (popcount(current_position & CENTER_MASKS[i]) - popcount(opp_position & CENTER_MASKS[i])) * CENTER_WEIGHTS[i];
     }
     
     return score;
@@ -528,6 +545,15 @@ class GenericPosition {
     return (position_t((1ULL << HEIGHT) - 1)) << (col * (HEIGHT + 1));
   }
 };
+
+template <int W, int H>
+const std::array<int32_t, W * (H + 1)> GenericPosition<W, H>::TROMP_WEIGHTS = GenericPosition<W, H>::compute_tromp_weights();
+
+template <int W, int H>
+const std::array<typename GenericPosition<W, H>::position_t, W> GenericPosition<W, H>::CENTER_MASKS = GenericPosition<W, H>::compute_center_masks();
+
+template <int W, int H>
+const std::array<int, W> GenericPosition<W, H>::CENTER_WEIGHTS = GenericPosition<W, H>::compute_center_weights();
 
 #ifndef BOARD_WIDTH_MACRO
 #define BOARD_WIDTH_MACRO 7

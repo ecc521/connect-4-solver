@@ -124,13 +124,15 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
 
     if(score >= beta) {
       if constexpr (Position::WIDTH >= 8) {
-        for (int i = 0; i < searched_cnt; i++) {
-          if (history[searched[i]] > -500000) history[searched[i]]--;
-        }
-        history[bit_idx] += searched_cnt;
-        if (history[bit_idx] > 500000) {
-          for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
-            history[i] /= 2;
+        if (searched_cnt > 0) {
+          for (int i = 0; i < searched_cnt; i++) {
+            if (history[searched[i]] > -500000) history[searched[i]]--;
+          }
+          history[bit_idx] += searched_cnt;
+          if (history[bit_idx] > 500000) {
+            for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
+              history[i] /= 2;
+            }
           }
         }
       }
