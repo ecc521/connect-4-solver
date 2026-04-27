@@ -1,0 +1,23 @@
+# Ignore large test and data sets
+data/
+test-data/
+*.book
+*.data
+
+# Build outputs and dependencies
+node_modules/
+dist/
+build/
+android/.cxx/
+android/build/
+example/node_modules/
+example/ios/Pods/
+example/ios/build/
+example/android/.gradle/
+example/android/build/
+example/android/local.properties
+example/android/app/build/
+example/android/.cxx/
+native_old/
+tools/pos*.txt
+tools/scored*.txt
