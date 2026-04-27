@@ -37,7 +37,7 @@ using namespace GameSolver::Connect4;
  *  will generate an error message to standard error and an empty line to standard output.
  */
 int main(int argc, char** argv) {
-  Solver solver;
+  std::unique_ptr<Solver> solver;
   bool weak = false;
   bool analyze = false;
   int cores = 1;
@@ -57,7 +57,8 @@ int main(int argc, char** argv) {
       }
     }
   }
-  if (!opening_book.empty()) solver.loadBook(opening_book);
+  if (!solver) solver = Solver::create(67108864); // 64MB default
+  if (!opening_book.empty()) solver->loadBook(opening_book);
 
   if (cores > 1) {
     std::mutex io_mutex;
@@ -79,10 +80,10 @@ int main(int argc, char** argv) {
         } else {
           std::string result = current_line;
           if(analyze) {
-            std::vector<int> scores = solver.analyze(P, weak);
+            std::vector<int> scores = solver->analyze(P, weak);
             for(int i = 0; i < Position::WIDTH; i++) result += " " + std::to_string(scores[i]);
           } else {
-            int score = solver.solve(P, weak);
+            int score = solver->solve(P, weak);
             result += " " + std::to_string(score);
           }
           std::lock_guard<std::mutex> lock(io_mutex);
@@ -109,11 +110,11 @@ int main(int argc, char** argv) {
       } else {
         std::cout << line;
         if(analyze) {
-          std::vector<int> scores = solver.analyze(P, weak);
+          std::vector<int> scores = solver->analyze(P, weak);
           for(int i = 0; i < Position::WIDTH; i++) std::cout << " " << scores[i];
         }
         else {
-          int score = solver.solve(P, weak);
+          int score = solver->solve(P, weak);
           std::cout << " " << score;
         }
         std::cout << "\n";

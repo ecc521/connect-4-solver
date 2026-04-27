@@ -26,7 +26,7 @@ std::string get_random_sequence(int depth) {
 
 int main() {
     srand(42);
-    Solver solver;
+    std::unique_ptr<Solver> solver = Solver::create(67108864);
     std::cout << "[+] Measuring pure solver speed natively (without ANY book)...\n\n";
 
     std::vector<int> test_depths = {10, 11, 12, 13, 14, 15};
@@ -42,7 +42,7 @@ int main() {
             Position P; P.play(seq);
             
             auto start = std::chrono::high_resolution_clock::now();
-            solver.analyze(P, false, 4);
+            solver->analyze(P, false, 4);
             auto end = std::chrono::high_resolution_clock::now();
             
             std::chrono::duration<double> duration = end - start;
