@@ -109,8 +109,9 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   for(int i = WIDTH; i--;) {
     int col = columnOrder[i];
     if(typename GenericPosition<WIDTH, HEIGHT>::position_t move = possible & GenericPosition<WIDTH, HEIGHT>::column_mask(col)) {
-      int base_score = P.moveScore(move);
-      if(col == best_move_col) base_score += 10000;
+      int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<position_t>(move);
+      int base_score = P.moveScore(move) * 1000000 + history[bit_idx];
+      if(col == best_move_col) base_score += 1000000000;
       moves.add(move, base_score);
     }
   }
@@ -119,6 +120,9 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   int orig_alpha = alpha;
   int best_score = -1000000;
   bool first_move = true;
+
+  int searched[WIDTH];
+  int searched_cnt = 0;
 
   while(typename GenericPosition<WIDTH, HEIGHT>::position_t next = moves.getNext()) {
     if (stopSearch.load()) break;
@@ -135,11 +139,25 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     }
 
     if(score > alpha) alpha = score;
+    int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<position_t>(next);
+
     if(alpha >= beta) {
+      if constexpr (WIDTH >= 8) {
+        for (int i = 0; i < searched_cnt; i++) {
+          if (history[searched[i]] > -500000) history[searched[i]]--;
+        }
+        history[bit_idx] += searched_cnt;
+        if (history[bit_idx] > 500000) {
+          for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
+            history[i] /= 2;
+          }
+        }
+      }
       uint32_t extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
       transTable->put(key, (extra_key << 28) | ((uint32_t)(next_col + 1) << 24) | (2 << 22) | ((uint32_t)depth << 16) | (uint32_t)(score + 32768)); 
       return score;  
     }
+    searched[searched_cnt++] = bit_idx;
     if(score > alpha) {
       alpha = score; 
     }
@@ -270,6 +288,9 @@ HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver() : nodeCount{0} {
   transTable = std::make_unique<TranspositionTable<uint64_t, uint32_t, 32>>(table_bytes);
   for(int i = 0; i < WIDTH; i++) // initialize the column exploration order, starting with center columns
     columnOrder[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; // example for WIDTH=7: columnOrder = {3, 4, 2, 5, 1, 6, 0}
+  for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
+    history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
+  }
 }
 
 } // namespace Connect4

@@ -30,6 +30,7 @@ class HeuristicSolver {
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
   std::atomic<bool> stopSearch;
   int columnOrder[WIDTH]; // column exploration order
+  int32_t history[WIDTH * (HEIGHT + 1)];
 
   /**
    * Heuristic negamax with depth limit.
@@ -56,6 +57,9 @@ class HeuristicSolver {
     nodeCount = 0;
     stopSearch = false;
     transTable->reset();
+    for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
+      history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
+    }
   }
 
   HeuristicSolver(); // Constructor

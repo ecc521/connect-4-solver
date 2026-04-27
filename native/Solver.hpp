@@ -78,6 +78,7 @@ class SolverImpl : public Solver {
   std::unique_ptr<OpeningBookBase> book;
   std::atomic<unsigned long long> nodeCount;
   int columnOrder[Position::WIDTH];
+  int32_t history[Position::WIDTH * (Position::HEIGHT + 1)];
 
   int negamax(const Position &P, int alpha, int beta);
 
@@ -85,6 +86,9 @@ class SolverImpl : public Solver {
   SolverImpl(size_t table_bytes) : transTable(table_bytes), nodeCount{0} {
     for(int i = 0; i < Position::WIDTH; i++) {
       columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
+    }
+    for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
+      history[i] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[i];
     }
   }
 
@@ -98,6 +102,9 @@ class SolverImpl : public Solver {
   void reset() override {
     nodeCount = 0;
     transTable.reset();
+    for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
+      history[i] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[i];
+    }
   }
 
   void loadBook(std::string book_file) override {

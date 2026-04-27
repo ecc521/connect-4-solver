@@ -22,6 +22,7 @@
 #include <string>
 #include <cstdint>
 #include <cassert>
+#include <array>
 
 namespace GameSolver {
 namespace Connect4 {
@@ -95,6 +96,32 @@ class GenericPosition {
 
   static constexpr int MIN_SCORE = -(W*H) / 2 + 3;
   static constexpr int MAX_SCORE = (W * H + 1) / 2 - 3;
+
+  static constexpr std::array<int32_t, WIDTH * (HEIGHT + 1)> compute_tromp_weights() {
+    std::array<int32_t, WIDTH * (HEIGHT + 1)> weights = {};
+    for (int col = 0; col < WIDTH; col++) {
+      for (int row = 0; row < HEIGHT; row++) {
+        int i = col < WIDTH / 2 ? col : WIDTH - 1 - col;
+        int h = row < HEIGHT / 2 ? row : HEIGHT - 1 - row;
+        
+        int min_3_i = i < 3 ? i : 3;
+        int min_3_h = h < 3 ? h : 3;
+        int max_0_3_i = (3 - i) > 0 ? (3 - i) : 0;
+        int diff = min_3_h - max_0_3_i;
+        int max_neg1_diff = diff > -1 ? diff : -1;
+        int min_i_h = i < h ? i : h;
+        int min_3_min_i_h = min_i_h < 3 ? min_i_h : 3;
+        
+        int score = 4 + min_3_i + max_neg1_diff + min_3_min_i_h + min_3_h;
+        
+        int bit_idx = col * (HEIGHT + 1) + row;
+        weights[bit_idx] = score;
+      }
+    }
+    return weights;
+  }
+
+  static constexpr std::array<int32_t, WIDTH * (HEIGHT + 1)> TROMP_WEIGHTS = compute_tromp_weights();
 
   static_assert(W <= 16, "Board's width must be <= 16 due to alphanumeric parsing limits");
   static_assert(W * (H + 1) <= sizeof(position_t)*8, "Board does not fit into position_t bitmask");
@@ -502,9 +529,11 @@ class GenericPosition {
   }
 };
 
-#ifdef BOARD_WIDTH_MACRO
-using Position = GenericPosition<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>;
+#ifndef BOARD_WIDTH_MACRO
+#define BOARD_WIDTH_MACRO 7
+#define BOARD_HEIGHT_MACRO 6
 #endif
+using Position = GenericPosition<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>;
 
 } // namespace Connect4
 } // namespace GameSolver
