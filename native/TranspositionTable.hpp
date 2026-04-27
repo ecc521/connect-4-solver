@@ -68,7 +68,7 @@ template<int S> using uint_t =
 template<class partial_key_t, class key_t, class value_t, int log_size>
 class TranspositionTable {
  private:
-  static const size_t size = next_prime(1 << log_size);
+  static const size_t size = next_prime(1ULL << log_size);
   std::atomic<uint16_t> *Data;
 
   size_t index(key_t key) const {
@@ -99,7 +99,8 @@ class TranspositionTable {
     uint16_t combined = (partial << 8) | packed_val;
     size_t start_pos = pos;
 
-    while (true) {
+    int probes = 0;
+    while (probes < 32) {
         uint16_t expected = 0;
         // Lock-free atomic compare and swap: if 0, insert it.
         if (Data[pos].compare_exchange_strong(expected, combined, std::memory_order_relaxed)) {
@@ -112,8 +113,14 @@ class TranspositionTable {
         }
         // Linear probe within identical cache line gracefully
         pos = (pos + 1) % size;
-        if (pos == start_pos) break; // Table full fail-safe
+        probes++;
     }
+    
+    // Eviction Policy: If the local cache line is completely saturated, 
+    // aggressively overwrite the original hash index. This guarantees that 
+    // new board positions (e.g., a user starting a new game) always take 
+    // priority over old, stale cache data, preventing 0% cache-hit starvation!
+    Data[start_pos].store(combined, std::memory_order_relaxed);
   }
 
   value_t get(key_t key) const {
@@ -121,7 +128,8 @@ class TranspositionTable {
     uint16_t partial = key & 0xFF;
     size_t start_pos = pos;
     
-    while (true) {
+    int probes = 0;
+    while (probes < 32) {
         uint16_t combined = Data[pos].load(std::memory_order_relaxed);
         if (combined == 0) return 0; // Hit empty slot, item not found
         
@@ -130,7 +138,7 @@ class TranspositionTable {
         }
         
         pos = (pos + 1) % size;
-        if (pos == start_pos) return 0; // Looped through full table
+        probes++;
     }
     return 0;
   }

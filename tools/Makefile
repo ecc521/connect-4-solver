@@ -1,10 +1,10 @@
 CXX=g++
-CXXFLAGS=--std=c++14 -W -Wall -O3 -DNDEBUG -I../native -march=native
+CXXFLAGS=--std=c++14 -W -Wall -O3 -DNDEBUG -I../native -march=native -pthread
 
 SRCS=../native/Solver.cpp
 OBJS=$(subst .cpp,.o,$(SRCS))
 
-all: c4solver generator cuckoo_pack pack_book find_depth_limit
+all: c4solver generator pack_dense_book pack_book find_depth_limit
 
 c4solver: main.o $(OBJS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o c4solver main.o $(OBJS) $(LDLIBS)
@@ -12,8 +12,8 @@ c4solver: main.o $(OBJS)
 generator: generator.o
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o generator generator.o $(LDLIBS)
 
-cuckoo_pack: cuckoo_pack.o $(OBJS)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o cuckoo_pack cuckoo_pack.o $(OBJS) $(LDLIBS)
+pack_dense_book: pack_dense_book.o $(OBJS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o pack_dense_book pack_dense_book.o $(OBJS) $(LDLIBS)
 
 pack_book: pack_book.o $(OBJS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o pack_book pack_book.o $(OBJS) $(LDLIBS)
@@ -27,4 +27,4 @@ find_depth_limit: find_depth_limit.o $(OBJS)
 -include .depend
 
 clean:
-	rm -f *.o ../native/*.o .depend c4solver generator cuckoo_pack pack_book find_depth_limit
+	rm -f *.o ../native/*.o .depend c4solver generator pack_dense_book pack_book find_depth_limit

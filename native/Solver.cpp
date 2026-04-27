@@ -81,7 +81,9 @@ int Solver::negamax(const Position &P, int alpha, int beta) {
     }
   }
 
-  if(int val = book.get(P)) return val + Position::MIN_SCORE - 1; // look for solutions stored in opening book
+  if(book) {
+    if(int val = book->get(P)) return val + Position::MIN_SCORE - 1; // look for solutions stored in opening book
+  }
 
   MoveSorter moves;
   for(int i = Position::WIDTH; i--;)
@@ -129,6 +131,7 @@ int Solver::solve(const Position &P, bool weak) {
 }
 
 std::vector<int> Solver::analyze(const Position &P, bool weak, int threads) {
+  (void)threads;
   std::vector<int> scores(Position::WIDTH, -1000);
 
 #ifdef USE_PTHREADS

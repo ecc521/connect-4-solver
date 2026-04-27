@@ -21,6 +21,7 @@
 
 #include <vector>
 #include <string>
+#include <memory>
 #include <atomic>
 #include "Position.hpp"
 #include "TranspositionTable.hpp"
@@ -29,11 +30,16 @@
 namespace GameSolver {
 namespace Connect4 {
 
+#ifndef EXACT_TABLE_SIZE
+#define EXACT_TABLE_SIZE 23
+#endif
+
 class Solver {
  private:
-  static constexpr int TABLE_SIZE = 23; // store 2^TABLE_SIZE elements in the transpositiontbale
+  // Dynamically reduce table size for massive boards (e.g. 9x7) to offset the uint64_t memory overhead
+  static constexpr int TABLE_SIZE = (Position::WIDTH * Position::HEIGHT >= 56) ? (EXACT_TABLE_SIZE - 1) : EXACT_TABLE_SIZE;
   TranspositionTable < uint_t < Position::WIDTH*(Position::HEIGHT + 1) - TABLE_SIZE >, Position::position_t, uint8_t, TABLE_SIZE > transTable;
-  OpeningBook book{Position::WIDTH, Position::HEIGHT}; // opening book
+  std::unique_ptr<OpeningBookBase> book; // opening book
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
   int columnOrder[Position::WIDTH]; // column exploration order
 
@@ -75,7 +81,7 @@ class Solver {
   }
 
   void loadBook(std::string book_file) {
-    book.load(book_file);
+    book = OpeningBookBase::load(book_file, Position::WIDTH, Position::HEIGHT);
   }
 
   Solver(); // Constructor

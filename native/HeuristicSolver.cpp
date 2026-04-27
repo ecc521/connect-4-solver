@@ -29,7 +29,11 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     return 0;
 
   if (depth <= 0) {
-    return P.heuristic_evaluate();
+    if (GenericPosition<WIDTH, HEIGHT>::popcount(possible) == 1) {
+      depth = 1; // Quiescence extension: Forced move resolves tactical tension
+    } else {
+      return P.heuristic_evaluate();
+    }
   }
 
   int min = -(WIDTH * HEIGHT - 2 - P.nbMoves()) / 2 * 1000;

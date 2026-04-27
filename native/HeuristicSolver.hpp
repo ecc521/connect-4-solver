@@ -15,11 +15,16 @@
 namespace GameSolver {
 namespace Connect4 {
 
+#ifndef HEURISTIC_TABLE_SIZE
+#define HEURISTIC_TABLE_SIZE 22
+#endif
+
 template <int WIDTH, int HEIGHT>
 class HeuristicSolver {
  private:
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
-  static constexpr int TABLE_SIZE = 22; // store 2^TABLE_SIZE elements in the transpositiontbale
+  // Dynamically reduce table size for massive boards (e.g. 9x7, 10x10) to offset the uint64_t memory overhead
+  static constexpr int TABLE_SIZE = (WIDTH * HEIGHT >= 56) ? (HEURISTIC_TABLE_SIZE - 1) : HEURISTIC_TABLE_SIZE;
   TranspositionTable < uint_t < WIDTH*(HEIGHT + 1) - TABLE_SIZE >, position_t, uint32_t, TABLE_SIZE > transTable;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
   int columnOrder[WIDTH]; // column exploration order

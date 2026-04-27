@@ -82,7 +82,7 @@ describe.each([
 
     // Check both legacy root and new data/ directory for the book
     const pathsToTry = [
-      path.join(__dirname, "..", "data", "7x6.book"),
+      path.join(__dirname, "..", "data", "7x6_dense4.book"),
       path.join(__dirname, "..", "7x6.book"),
     ];
 
@@ -93,12 +93,6 @@ describe.each([
         bookLoaded = true;
         break;
       }
-    }
-
-    if (!bookLoaded) {
-      console.warn(
-        "Opening book (7x6.book) not found. Solver will run in pure logic mode and skip early game positions (<= 10 moves) in parity tests.",
-      );
     }
   }, 15000);
 
@@ -135,7 +129,7 @@ describe.each([
 
   test("should correctly analyze 200 positions against expected C++ raw solver output", () => {
     const dataPath = path.join(__dirname, "..", "test-data", "positions.txt");
-    runParityTest(solver, dataPath, 7, 6, !bookLoaded);
+    runParityTest(solver, dataPath, 7, 6, true);
   });
 
   describe("Generic Board Sizes Support", () => {

@@ -9,6 +9,7 @@ interface NativeSolverType {
     h: number,
     weak: boolean,
   ): Promise<number[]>;
+  releaseSolver(w: number, h: number): Promise<boolean>;
 }
 
 export class ReactNativeConnect4Solver extends Connect4Solver {
@@ -150,5 +151,23 @@ export class ReactNativeConnect4Solver extends Connect4Solver {
       evaluation,
       moveOptions,
     };
+  }
+
+  /**
+   * Instantly releases the native Android/iOS memory caches allocated for this specific board size back to the OS.
+   * Useful when navigating away from a game screen to prevent memory stacking.
+   */
+  unload(): void {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const rn = require("react-native") as {
+        NativeModules: { Connect4Solver?: NativeSolverType };
+      };
+      if (rn.NativeModules.Connect4Solver) {
+        rn.NativeModules.Connect4Solver.releaseSolver(this.width, this.height).catch(() => {});
+      }
+    } catch {
+      // Ignore if not in React Native environment
+    }
   }
 }

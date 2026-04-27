@@ -224,8 +224,31 @@ class GenericPosition {
 
     position_t my_threats = compute_winning_position(current_position, mask);
     position_t opp_threats = compute_winning_position(opp_position, mask);
+    position_t playable = possible();
+    position_t double_edged = (playable << 1) & board_mask;
+
+    // 1. Double-edged threats: If we play under it, we allow the opponent to claim it.
+    // Having a threat here is actively bad. We want the opponent to have threats here so we can force them to play under it.
+    score -= popcount(my_threats & double_edged) * 50;
+    score += popcount(opp_threats & double_edged) * 50;
+
+    // 2. Parity Control
+    position_t even_rows = 0;
+    for (int r = 0; r < HEIGHT; r += 2) {
+        even_rows |= (bottom_mask << r);
+    }
+    position_t odd_rows = (even_rows << 1) & board_mask;
+    
+    position_t my_parity = (moves % 2 == 0) ? even_rows : odd_rows;
+    position_t opp_parity = (moves % 2 == 0) ? odd_rows : even_rows;
+
+    score += popcount(my_threats & my_parity) * 20;
+    score -= popcount(opp_threats & opp_parity) * 20;
+    
+    // 3. Base threat weight
     score += (popcount(my_threats) - popcount(opp_threats)) * 10;
     
+    // 4. Center-control weighting
     for(int i = 0; i < WIDTH; i++) {
       int dist = i - WIDTH / 2;
       if (dist < 0) dist = -dist;
@@ -314,6 +337,7 @@ class GenericPosition {
   /**
    * counts number of bit set to one in a 64bits or 128bits integer safely
    */
+ public:
   template <typename T>
   static typename std::enable_if<sizeof(T) <= 8, unsigned int>::type popcount_impl(T m) {
     return __builtin_popcountll((uint64_t)m);

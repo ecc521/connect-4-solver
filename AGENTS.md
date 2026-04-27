@@ -28,3 +28,9 @@ This repository provides an extremely fast, high-performance, and "perfect" Conn
 
 * **`eslint.config.mjs`** & **`tsconfig.json`**
   Establish rigorous code-quality constraints for the TypeScript portion of the repository. They utilize `recommendedTypeChecked`, prohibit `any` types, and enforce explicit function return types.
+
+## Generating New Books
+
+The `TranspositionTable` cache sizes natively default to tight memory constraints optimized for WebAssembly, mobile environments, and browsers (e.g. `TABLE_SIZE=23` mapping to ~32MB, and `HEURISTIC_TABLE_SIZE=22` mapping to ~24MB). 
+
+If you are running the `tools/compute_dense_book.py` script to recursively generate a highly complex dense opening book natively, the script will automatically pass `-DBOOK_SIZE=...` and `-DEXACT_TABLE_SIZE=...` overrides to the `c4solver` compiler. This temporarily inflates the transposition table size (e.g., 29) to utilize gigabytes of host RAM during the alpha-beta search without forcing massive memory footprints onto the consumer-facing `.wasm` or native libraries.

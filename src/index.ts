@@ -247,6 +247,25 @@ export class Connect4Solver {
       }, 0);
     });
   }
+
+  /**
+   * Instantly releases the native WASM memory caches allocated for this specific board size back to the OS.
+   * Useful when navigating away from a game screen to prevent memory stacking.
+   */
+  unload(): void {
+    if (!this.initialized) return;
+    const mod = this.mod;
+    if (this.width === 6 && this.height === 5) mod._releaseSolver6x5();
+    else if (this.width === 6 && this.height === 6) mod._releaseSolver6x6();
+    else if (this.width === 7 && this.height === 6) mod._releaseSolver7x6();
+    else if (this.width === 7 && this.height === 7) mod._releaseSolver7x7();
+    else if (this.width === 8 && this.height === 6) mod._releaseSolver8x6();
+    else if (this.width === 9 && this.height === 7) mod._releaseSolver9x7();
+    else if (this.width === 8 && this.height === 8) mod._releaseSolver8x8();
+    else if (this.width === 10 && this.height === 7) mod._releaseSolver10x7();
+    else if (this.width === 9 && this.height === 9) mod._releaseSolver9x9();
+    else if (this.width === 10 && this.height === 10) mod._releaseSolver10x10();
+  }
 }
 
 export * from "./threaded";

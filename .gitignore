@@ -12,6 +12,18 @@ native/c4solver
 native/generator
 native/.depend
 
+# Tools binaries and large log files
+tools/pos*.txt
+tools/scored*.txt
+tools/c4solver*
+tools/bench*
+tools/test_*
+tools/verify_book
+tools/generator_*
+tools/pack_dense_book
+tools/.depend
+native_old/
+
 # Library Native Android Builds
 android/.cxx/
 android/build/

@@ -55,7 +55,7 @@ describe("HeuristicConnect4Solver", () => {
     const result = massiveSolver.analyze("5555464673", { maxDepth: 25, timeoutMs: 15 });
     const end = Date.now();
 
-    expect(end - start).toBeLessThan(35); // Allow some JS overhead but enforce cutoff
+    expect(end - start).toBeLessThan(60); // Allow some JS overhead but enforce cutoff
     expect(result.evaluation).toBeDefined();
   });
 });

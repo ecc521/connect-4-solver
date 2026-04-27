@@ -103,23 +103,129 @@ namespace C4_9x7 {
 #undef OPENING_BOOK_HPP
 #undef MOVE_SORTER_HPP
 
+#include <memory>
+
 // Expose singletons gracefully to whoever includes this header
 namespace SharedInstances {
-    static C4_6x5::GameSolver::Connect4::Solver solver6x5;
-    static C4_6x6::GameSolver::Connect4::Solver solver6x6;
-    static C4_7x6::GameSolver::Connect4::Solver solver7x6;
-    static C4_7x7::GameSolver::Connect4::Solver solver7x7;
-    static C4_8x6::GameSolver::Connect4::Solver solver8x6;
-    static C4_9x7::GameSolver::Connect4::Solver solver9x7;
+    // 6x5
+    inline std::unique_ptr<C4_6x5::GameSolver::Connect4::Solver>& getSolver6x5() {
+        static std::unique_ptr<C4_6x5::GameSolver::Connect4::Solver> solver = nullptr;
+        if (!solver) solver = std::make_unique<C4_6x5::GameSolver::Connect4::Solver>();
+        return solver;
+    }
+    inline void releaseSolver6x5() { getSolver6x5().reset(); }
 
-    static GameSolver::Connect4::HeuristicSolver<6, 5> heuristicSolver6x5;
-    static GameSolver::Connect4::HeuristicSolver<6, 6> heuristicSolver6x6;
-    static GameSolver::Connect4::HeuristicSolver<7, 6> heuristicSolver7x6;
-    static GameSolver::Connect4::HeuristicSolver<7, 7> heuristicSolver7x7;
-    static GameSolver::Connect4::HeuristicSolver<8, 6> heuristicSolver8x6;
-    static GameSolver::Connect4::HeuristicSolver<9, 7> heuristicSolver9x7;
-    static GameSolver::Connect4::HeuristicSolver<8, 8> heuristicSolver8x8;
-    static GameSolver::Connect4::HeuristicSolver<10, 7> heuristicSolver10x7;
-    static GameSolver::Connect4::HeuristicSolver<9, 9> heuristicSolver9x9;
-    static GameSolver::Connect4::HeuristicSolver<10, 10> heuristicSolver10x10;
+    inline std::unique_ptr<GameSolver::Connect4::HeuristicSolver<6, 5>>& getHeuristicSolver6x5() {
+        static std::unique_ptr<GameSolver::Connect4::HeuristicSolver<6, 5>> solver = nullptr;
+        if (!solver) solver = std::make_unique<GameSolver::Connect4::HeuristicSolver<6, 5>>();
+        return solver;
+    }
+    inline void releaseHeuristicSolver6x5() { getHeuristicSolver6x5().reset(); }
+
+    // 6x6
+    inline std::unique_ptr<C4_6x6::GameSolver::Connect4::Solver>& getSolver6x6() {
+        static std::unique_ptr<C4_6x6::GameSolver::Connect4::Solver> solver = nullptr;
+        if (!solver) solver = std::make_unique<C4_6x6::GameSolver::Connect4::Solver>();
+        return solver;
+    }
+    inline void releaseSolver6x6() { getSolver6x6().reset(); }
+
+    inline std::unique_ptr<GameSolver::Connect4::HeuristicSolver<6, 6>>& getHeuristicSolver6x6() {
+        static std::unique_ptr<GameSolver::Connect4::HeuristicSolver<6, 6>> solver = nullptr;
+        if (!solver) solver = std::make_unique<GameSolver::Connect4::HeuristicSolver<6, 6>>();
+        return solver;
+    }
+    inline void releaseHeuristicSolver6x6() { getHeuristicSolver6x6().reset(); }
+
+    // 7x6
+    inline std::unique_ptr<C4_7x6::GameSolver::Connect4::Solver>& getSolver7x6() {
+        static std::unique_ptr<C4_7x6::GameSolver::Connect4::Solver> solver = nullptr;
+        if (!solver) solver = std::make_unique<C4_7x6::GameSolver::Connect4::Solver>();
+        return solver;
+    }
+    inline void releaseSolver7x6() { getSolver7x6().reset(); }
+
+    inline std::unique_ptr<GameSolver::Connect4::HeuristicSolver<7, 6>>& getHeuristicSolver7x6() {
+        static std::unique_ptr<GameSolver::Connect4::HeuristicSolver<7, 6>> solver = nullptr;
+        if (!solver) solver = std::make_unique<GameSolver::Connect4::HeuristicSolver<7, 6>>();
+        return solver;
+    }
+    inline void releaseHeuristicSolver7x6() { getHeuristicSolver7x6().reset(); }
+
+    // 7x7
+    inline std::unique_ptr<C4_7x7::GameSolver::Connect4::Solver>& getSolver7x7() {
+        static std::unique_ptr<C4_7x7::GameSolver::Connect4::Solver> solver = nullptr;
+        if (!solver) solver = std::make_unique<C4_7x7::GameSolver::Connect4::Solver>();
+        return solver;
+    }
+    inline void releaseSolver7x7() { getSolver7x7().reset(); }
+
+    inline std::unique_ptr<GameSolver::Connect4::HeuristicSolver<7, 7>>& getHeuristicSolver7x7() {
+        static std::unique_ptr<GameSolver::Connect4::HeuristicSolver<7, 7>> solver = nullptr;
+        if (!solver) solver = std::make_unique<GameSolver::Connect4::HeuristicSolver<7, 7>>();
+        return solver;
+    }
+    inline void releaseHeuristicSolver7x7() { getHeuristicSolver7x7().reset(); }
+
+    // 8x6
+    inline std::unique_ptr<C4_8x6::GameSolver::Connect4::Solver>& getSolver8x6() {
+        static std::unique_ptr<C4_8x6::GameSolver::Connect4::Solver> solver = nullptr;
+        if (!solver) solver = std::make_unique<C4_8x6::GameSolver::Connect4::Solver>();
+        return solver;
+    }
+    inline void releaseSolver8x6() { getSolver8x6().reset(); }
+
+    inline std::unique_ptr<GameSolver::Connect4::HeuristicSolver<8, 6>>& getHeuristicSolver8x6() {
+        static std::unique_ptr<GameSolver::Connect4::HeuristicSolver<8, 6>> solver = nullptr;
+        if (!solver) solver = std::make_unique<GameSolver::Connect4::HeuristicSolver<8, 6>>();
+        return solver;
+    }
+    inline void releaseHeuristicSolver8x6() { getHeuristicSolver8x6().reset(); }
+
+    // 9x7
+    inline std::unique_ptr<C4_9x7::GameSolver::Connect4::Solver>& getSolver9x7() {
+        static std::unique_ptr<C4_9x7::GameSolver::Connect4::Solver> solver = nullptr;
+        if (!solver) solver = std::make_unique<C4_9x7::GameSolver::Connect4::Solver>();
+        return solver;
+    }
+    inline void releaseSolver9x7() { getSolver9x7().reset(); }
+
+    inline std::unique_ptr<GameSolver::Connect4::HeuristicSolver<9, 7>>& getHeuristicSolver9x7() {
+        static std::unique_ptr<GameSolver::Connect4::HeuristicSolver<9, 7>> solver = nullptr;
+        if (!solver) solver = std::make_unique<GameSolver::Connect4::HeuristicSolver<9, 7>>();
+        return solver;
+    }
+    inline void releaseHeuristicSolver9x7() { getHeuristicSolver9x7().reset(); }
+
+    // 8x8 (Heuristic Only)
+    inline std::unique_ptr<GameSolver::Connect4::HeuristicSolver<8, 8>>& getHeuristicSolver8x8() {
+        static std::unique_ptr<GameSolver::Connect4::HeuristicSolver<8, 8>> solver = nullptr;
+        if (!solver) solver = std::make_unique<GameSolver::Connect4::HeuristicSolver<8, 8>>();
+        return solver;
+    }
+    inline void releaseHeuristicSolver8x8() { getHeuristicSolver8x8().reset(); }
+
+    // 10x7 (Heuristic Only)
+    inline std::unique_ptr<GameSolver::Connect4::HeuristicSolver<10, 7>>& getHeuristicSolver10x7() {
+        static std::unique_ptr<GameSolver::Connect4::HeuristicSolver<10, 7>> solver = nullptr;
+        if (!solver) solver = std::make_unique<GameSolver::Connect4::HeuristicSolver<10, 7>>();
+        return solver;
+    }
+    inline void releaseHeuristicSolver10x7() { getHeuristicSolver10x7().reset(); }
+
+    // 9x9 (Heuristic Only)
+    inline std::unique_ptr<GameSolver::Connect4::HeuristicSolver<9, 9>>& getHeuristicSolver9x9() {
+        static std::unique_ptr<GameSolver::Connect4::HeuristicSolver<9, 9>> solver = nullptr;
+        if (!solver) solver = std::make_unique<GameSolver::Connect4::HeuristicSolver<9, 9>>();
+        return solver;
+    }
+    inline void releaseHeuristicSolver9x9() { getHeuristicSolver9x9().reset(); }
+
+    // 10x10 (Heuristic Only)
+    inline std::unique_ptr<GameSolver::Connect4::HeuristicSolver<10, 10>>& getHeuristicSolver10x10() {
+        static std::unique_ptr<GameSolver::Connect4::HeuristicSolver<10, 10>> solver = nullptr;
+        if (!solver) solver = std::make_unique<GameSolver::Connect4::HeuristicSolver<10, 10>>();
+        return solver;
+    }
+    inline void releaseHeuristicSolver10x10() { getHeuristicSolver10x10().reset(); }
 }

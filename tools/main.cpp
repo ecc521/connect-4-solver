@@ -18,6 +18,10 @@
 
 #include "Solver.hpp"
 #include <iostream>
+#include <thread>
+#include <mutex>
+#include <vector>
+#include <string>
 
 using namespace GameSolver::Connect4;
 
@@ -36,8 +40,9 @@ int main(int argc, char** argv) {
   Solver solver;
   bool weak = false;
   bool analyze = false;
+  int cores = 1;
 
-  std::string opening_book = "7x6_sparse14-16.book";
+  std::string opening_book = "";
   for(int i = 1; i < argc; i++) {
     if(argv[i][0] == '-') {
       if(argv[i][1] == 'w') weak = true; // parameter -w: use weak solver
@@ -47,27 +52,72 @@ int main(int argc, char** argv) {
       else if(argv[i][1] == 'a') { // paramater -a: make an analysis of all possible moves
         analyze = true;
       }
+      else if(std::string(argv[i]) == "--cores") {
+        if(++i < argc) cores = std::stoi(argv[i]);
+      }
     }
   }
-  solver.loadBook(opening_book);
+  if (!opening_book.empty()) solver.loadBook(opening_book);
 
-  std::string line;
+  if (cores > 1) {
+    std::mutex io_mutex;
+    
+    auto worker = [&]() {
+      while (true) {
+        std::string current_line;
+        {
+          std::lock_guard<std::mutex> lock(io_mutex);
+          if (!std::getline(std::cin, current_line)) {
+            return;
+          }
+        }
+        
+        Position P;
+        if(P.play(current_line) != current_line.size()) {
+          std::lock_guard<std::mutex> lock(io_mutex);
+          std::cerr << "Invalid move \"" << current_line << "\"" << std::endl;
+        } else {
+          std::string result = current_line;
+          if(analyze) {
+            std::vector<int> scores = solver.analyze(P, weak);
+            for(int i = 0; i < Position::WIDTH; i++) result += " " + std::to_string(scores[i]);
+          } else {
+            int score = solver.solve(P, weak);
+            result += " " + std::to_string(score);
+          }
+          std::lock_guard<std::mutex> lock(io_mutex);
+          std::cout << result << "\n";
+        }
+      }
+    };
 
-  for(int l = 1; std::getline(std::cin, line); l++) {
-    Position P;
-    if(P.play(line) != line.size()) {
-      std::cerr << "Line " << l << ": Invalid move " << (P.nbMoves() + 1) << " \"" << line << "\"" << std::endl;
-    } else {
-      std::cout << line;
-      if(analyze) {
-        std::vector<int> scores = solver.analyze(P, weak);
-        for(int i = 0; i < Position::WIDTH; i++) std::cout << " " << scores[i];
+    std::vector<std::thread> threads;
+    for (int i = 0; i < cores - 1; i++) {
+      threads.emplace_back(worker);
+    }
+    worker(); // run in main thread too
+    
+    for (auto& t : threads) {
+      if (t.joinable()) t.join();
+    }
+  } else {
+    std::string line;
+    for(int l = 1; std::getline(std::cin, line); l++) {
+      Position P;
+      if(P.play(line) != line.size()) {
+        std::cerr << "Line " << l << ": Invalid move " << (P.nbMoves() + 1) << " \"" << line << "\"" << std::endl;
+      } else {
+        std::cout << line;
+        if(analyze) {
+          std::vector<int> scores = solver.analyze(P, weak);
+          for(int i = 0; i < Position::WIDTH; i++) std::cout << " " << scores[i];
+        }
+        else {
+          int score = solver.solve(P, weak);
+          std::cout << " " << score;
+        }
+        std::cout << "\n";
       }
-      else {
-        int score = solver.solve(P, weak);
-        std::cout << " " << score;
-      }
-      std::cout << std::endl;
     }
   }
 }

@@ -65,17 +65,17 @@ Java_com_connect4solver_Connect4SolverModule_nativeAnalyze(
     jintArray result = nullptr;
     
     if (width == 6 && height == 5) {
-      result = runNativeAnalysis<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6>(env, SharedInstances::solver6x5, posChars, threads);
+      result = runNativeAnalysis<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6>(env, *SharedInstances::getSolver6x5(), posChars, threads);
     } else if (width == 6 && height == 6) {
-      result = runNativeAnalysis<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6>(env, SharedInstances::solver6x6, posChars, threads);
+      result = runNativeAnalysis<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6>(env, *SharedInstances::getSolver6x6(), posChars, threads);
     } else if (width == 7 && height == 6) {
-      result = runNativeAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7>(env, SharedInstances::solver7x6, posChars, threads);
+      result = runNativeAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7>(env, *SharedInstances::getSolver7x6(), posChars, threads);
     } else if (width == 7 && height == 7) {
-      result = runNativeAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7>(env, SharedInstances::solver7x7, posChars, threads);
+      result = runNativeAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7>(env, *SharedInstances::getSolver7x7(), posChars, threads);
     } else if (width == 8 && height == 6) {
-      result = runNativeAnalysis<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8>(env, SharedInstances::solver8x6, posChars, threads);
+      result = runNativeAnalysis<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8>(env, *SharedInstances::getSolver8x6(), posChars, threads);
     } else if (width == 9 && height == 7) {
-      result = runNativeAnalysis<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9>(env, SharedInstances::solver9x7, posChars, threads);
+      result = runNativeAnalysis<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9>(env, *SharedInstances::getSolver9x7(), posChars, threads);
     }
     
     env->ReleaseStringUTFChars(position, posChars);
@@ -98,27 +98,63 @@ Java_com_connect4solver_Connect4SolverModule_nativeAnalyzeHeuristic(
     jintArray result = nullptr;
     
     if (width == 6 && height == 5) {
-      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<6, 5>, GameSolver::Connect4::GenericPosition<6, 5>, 6>(env, SharedInstances::heuristicSolver6x5, posChars, maxDepth, threads, timeoutMs);
+      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<6, 5>, GameSolver::Connect4::GenericPosition<6, 5>, 6>(env, *SharedInstances::getHeuristicSolver6x5(), posChars, maxDepth, threads, timeoutMs);
     } else if (width == 6 && height == 6) {
-      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<6, 6>, GameSolver::Connect4::GenericPosition<6, 6>, 6>(env, SharedInstances::heuristicSolver6x6, posChars, maxDepth, threads, timeoutMs);
+      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<6, 6>, GameSolver::Connect4::GenericPosition<6, 6>, 6>(env, *SharedInstances::getHeuristicSolver6x6(), posChars, maxDepth, threads, timeoutMs);
     } else if (width == 7 && height == 6) {
-      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 6>, GameSolver::Connect4::GenericPosition<7, 6>, 7>(env, SharedInstances::heuristicSolver7x6, posChars, maxDepth, threads, timeoutMs);
+      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 6>, GameSolver::Connect4::GenericPosition<7, 6>, 7>(env, *SharedInstances::getHeuristicSolver7x6(), posChars, maxDepth, threads, timeoutMs);
     } else if (width == 7 && height == 7) {
-      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7>(env, SharedInstances::heuristicSolver7x7, posChars, maxDepth, threads, timeoutMs);
+      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7>(env, *SharedInstances::getHeuristicSolver7x7(), posChars, maxDepth, threads, timeoutMs);
     } else if (width == 8 && height == 6) {
-      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<8, 6>, GameSolver::Connect4::GenericPosition<8, 6>, 8>(env, SharedInstances::heuristicSolver8x6, posChars, maxDepth, threads, timeoutMs);
+      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<8, 6>, GameSolver::Connect4::GenericPosition<8, 6>, 8>(env, *SharedInstances::getHeuristicSolver8x6(), posChars, maxDepth, threads, timeoutMs);
     } else if (width == 9 && height == 7) {
-      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 7>, GameSolver::Connect4::GenericPosition<9, 7>, 9>(env, SharedInstances::heuristicSolver9x7, posChars, maxDepth, threads, timeoutMs);
+      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 7>, GameSolver::Connect4::GenericPosition<9, 7>, 9>(env, *SharedInstances::getHeuristicSolver9x7(), posChars, maxDepth, threads, timeoutMs);
     } else if (width == 8 && height == 8) {
-      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<8, 8>, GameSolver::Connect4::GenericPosition<8, 8>, 8>(env, SharedInstances::heuristicSolver8x8, posChars, maxDepth, threads, timeoutMs);
+      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<8, 8>, GameSolver::Connect4::GenericPosition<8, 8>, 8>(env, *SharedInstances::getHeuristicSolver8x8(), posChars, maxDepth, threads, timeoutMs);
     } else if (width == 10 && height == 7) {
-      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<10, 7>, GameSolver::Connect4::GenericPosition<10, 7>, 10>(env, SharedInstances::heuristicSolver10x7, posChars, maxDepth, threads, timeoutMs);
+      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<10, 7>, GameSolver::Connect4::GenericPosition<10, 7>, 10>(env, *SharedInstances::getHeuristicSolver10x7(), posChars, maxDepth, threads, timeoutMs);
     } else if (width == 9 && height == 9) {
-      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 9>, GameSolver::Connect4::GenericPosition<9, 9>, 9>(env, SharedInstances::heuristicSolver9x9, posChars, maxDepth, threads, timeoutMs);
+      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 9>, GameSolver::Connect4::GenericPosition<9, 9>, 9>(env, *SharedInstances::getHeuristicSolver9x9(), posChars, maxDepth, threads, timeoutMs);
     } else if (width == 10 && height == 10) {
-      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<10, 10>, GameSolver::Connect4::GenericPosition<10, 10>, 10>(env, SharedInstances::heuristicSolver10x10, posChars, maxDepth, threads, timeoutMs);
+      result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<10, 10>, GameSolver::Connect4::GenericPosition<10, 10>, 10>(env, *SharedInstances::getHeuristicSolver10x10(), posChars, maxDepth, threads, timeoutMs);
     }
     
     env->ReleaseStringUTFChars(position, posChars);
     return result;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_connect4solver_Connect4SolverModule_nativeReleaseSolver(
+        JNIEnv *env,
+        jobject /* this */,
+        jint width,
+        jint height) {
+        
+    if (width == 6 && height == 5) {
+        SharedInstances::releaseSolver6x5();
+        SharedInstances::releaseHeuristicSolver6x5();
+    } else if (width == 6 && height == 6) {
+        SharedInstances::releaseSolver6x6();
+        SharedInstances::releaseHeuristicSolver6x6();
+    } else if (width == 7 && height == 6) {
+        SharedInstances::releaseSolver7x6();
+        SharedInstances::releaseHeuristicSolver7x6();
+    } else if (width == 7 && height == 7) {
+        SharedInstances::releaseSolver7x7();
+        SharedInstances::releaseHeuristicSolver7x7();
+    } else if (width == 8 && height == 6) {
+        SharedInstances::releaseSolver8x6();
+        SharedInstances::releaseHeuristicSolver8x6();
+    } else if (width == 9 && height == 7) {
+        SharedInstances::releaseSolver9x7();
+        SharedInstances::releaseHeuristicSolver9x7();
+    } else if (width == 8 && height == 8) {
+        SharedInstances::releaseHeuristicSolver8x8();
+    } else if (width == 10 && height == 7) {
+        SharedInstances::releaseHeuristicSolver10x7();
+    } else if (width == 9 && height == 9) {
+        SharedInstances::releaseHeuristicSolver9x9();
+    } else if (width == 10 && height == 10) {
+        SharedInstances::releaseHeuristicSolver10x10();
+    }
 }

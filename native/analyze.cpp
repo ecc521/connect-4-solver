@@ -65,36 +65,46 @@ int32_t* runHeuristicAnalysis(CoreSolver& solver, const char* positionCharArr, i
 // ==========================================
 extern "C" {
 
-EMSCRIPTEN_KEEPALIVE void loadBook6x5(const char* path) { SharedInstances::solver6x5.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x5(const char* pos, int threads) { return runAnalysis<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6>(SharedInstances::solver6x5, pos, threads); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition6x5(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<6, 5>, GameSolver::Connect4::GenericPosition<6, 5>, 6>(SharedInstances::heuristicSolver6x5, pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void loadBook6x5(const char* path) { SharedInstances::getSolver6x5()->loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x5(const char* pos, int threads) { return runAnalysis<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6>(*SharedInstances::getSolver6x5(), pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition6x5(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<6, 5>, GameSolver::Connect4::GenericPosition<6, 5>, 6>(*SharedInstances::getHeuristicSolver6x5(), pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void releaseSolver6x5() { SharedInstances::releaseSolver6x5(); SharedInstances::releaseHeuristicSolver6x5(); }
 
-EMSCRIPTEN_KEEPALIVE void loadBook6x6(const char* path) { SharedInstances::solver6x6.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x6(const char* pos, int threads) { return runAnalysis<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6>(SharedInstances::solver6x6, pos, threads); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition6x6(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<6, 6>, GameSolver::Connect4::GenericPosition<6, 6>, 6>(SharedInstances::heuristicSolver6x6, pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void loadBook6x6(const char* path) { SharedInstances::getSolver6x6()->loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition6x6(const char* pos, int threads) { return runAnalysis<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6>(*SharedInstances::getSolver6x6(), pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition6x6(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<6, 6>, GameSolver::Connect4::GenericPosition<6, 6>, 6>(*SharedInstances::getHeuristicSolver6x6(), pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void releaseSolver6x6() { SharedInstances::releaseSolver6x6(); SharedInstances::releaseHeuristicSolver6x6(); }
 
-EMSCRIPTEN_KEEPALIVE void loadBook7x6(const char* path) { SharedInstances::solver7x6.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x6(const char* pos, int threads) { return runAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7>(SharedInstances::solver7x6, pos, threads); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition7x6(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 6>, GameSolver::Connect4::GenericPosition<7, 6>, 7>(SharedInstances::heuristicSolver7x6, pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void loadBook7x6(const char* path) { SharedInstances::getSolver7x6()->loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x6(const char* pos, int threads) { return runAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7>(*SharedInstances::getSolver7x6(), pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition7x6(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 6>, GameSolver::Connect4::GenericPosition<7, 6>, 7>(*SharedInstances::getHeuristicSolver7x6(), pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void releaseSolver7x6() { SharedInstances::releaseSolver7x6(); SharedInstances::releaseHeuristicSolver7x6(); }
 
-EMSCRIPTEN_KEEPALIVE void loadBook7x7(const char* path) { SharedInstances::solver7x7.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x7(const char* pos, int threads) { return runAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7>(SharedInstances::solver7x7, pos, threads); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition7x7(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7>(SharedInstances::heuristicSolver7x7, pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void loadBook7x7(const char* path) { SharedInstances::getSolver7x7()->loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition7x7(const char* pos, int threads) { return runAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7>(*SharedInstances::getSolver7x7(), pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition7x7(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7>(*SharedInstances::getHeuristicSolver7x7(), pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void releaseSolver7x7() { SharedInstances::releaseSolver7x7(); SharedInstances::releaseHeuristicSolver7x7(); }
 
-EMSCRIPTEN_KEEPALIVE void loadBook8x6(const char* path) { SharedInstances::solver8x6.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition8x6(const char* pos, int threads) { return runAnalysis<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8>(SharedInstances::solver8x6, pos, threads); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition8x6(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<8, 6>, GameSolver::Connect4::GenericPosition<8, 6>, 8>(SharedInstances::heuristicSolver8x6, pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void loadBook8x6(const char* path) { SharedInstances::getSolver8x6()->loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition8x6(const char* pos, int threads) { return runAnalysis<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8>(*SharedInstances::getSolver8x6(), pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition8x6(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<8, 6>, GameSolver::Connect4::GenericPosition<8, 6>, 8>(*SharedInstances::getHeuristicSolver8x6(), pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void releaseSolver8x6() { SharedInstances::releaseSolver8x6(); SharedInstances::releaseHeuristicSolver8x6(); }
 
-EMSCRIPTEN_KEEPALIVE void loadBook9x7(const char* path) { SharedInstances::solver9x7.loadBook(std::string(path)); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition9x7(const char* pos, int threads) { return runAnalysis<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9>(SharedInstances::solver9x7, pos, threads); }
-EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition9x7(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 7>, GameSolver::Connect4::GenericPosition<9, 7>, 9>(SharedInstances::heuristicSolver9x7, pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void loadBook9x7(const char* path) { SharedInstances::getSolver9x7()->loadBook(std::string(path)); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzePosition9x7(const char* pos, int threads) { return runAnalysis<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9>(*SharedInstances::getSolver9x7(), pos, threads); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition9x7(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 7>, GameSolver::Connect4::GenericPosition<9, 7>, 9>(*SharedInstances::getHeuristicSolver9x7(), pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void releaseSolver9x7() { SharedInstances::releaseSolver9x7(); SharedInstances::releaseHeuristicSolver9x7(); }
 
-EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition8x8(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<8, 8>, GameSolver::Connect4::GenericPosition<8, 8>, 8>(SharedInstances::heuristicSolver8x8, pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition8x8(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<8, 8>, GameSolver::Connect4::GenericPosition<8, 8>, 8>(*SharedInstances::getHeuristicSolver8x8(), pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void releaseSolver8x8() { SharedInstances::releaseHeuristicSolver8x8(); }
 
-EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition10x7(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<10, 7>, GameSolver::Connect4::GenericPosition<10, 7>, 10>(SharedInstances::heuristicSolver10x7, pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition10x7(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<10, 7>, GameSolver::Connect4::GenericPosition<10, 7>, 10>(*SharedInstances::getHeuristicSolver10x7(), pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void releaseSolver10x7() { SharedInstances::releaseHeuristicSolver10x7(); }
 
-EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition9x9(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 9>, GameSolver::Connect4::GenericPosition<9, 9>, 9>(SharedInstances::heuristicSolver9x9, pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition9x9(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 9>, GameSolver::Connect4::GenericPosition<9, 9>, 9>(*SharedInstances::getHeuristicSolver9x9(), pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void releaseSolver9x9() { SharedInstances::releaseHeuristicSolver9x9(); }
 
-EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition10x10(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<10, 10>, GameSolver::Connect4::GenericPosition<10, 10>, 10>(SharedInstances::heuristicSolver10x10, pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE int32_t* analyzeHeuristicPosition10x10(const char* pos, int max_depth, int threads, double timeout_ms) { return runHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<10, 10>, GameSolver::Connect4::GenericPosition<10, 10>, 10>(*SharedInstances::getHeuristicSolver10x10(), pos, max_depth, threads, timeout_ms); }
+EMSCRIPTEN_KEEPALIVE void releaseSolver10x10() { SharedInstances::releaseHeuristicSolver10x10(); }
 
 } // extern "C"

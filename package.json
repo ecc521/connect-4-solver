@@ -23,6 +23,7 @@
   },
   "files": [
     "dist",
+    "data",
     "build/analyze.js",
     "build/analyze_threaded.js",
     "android",
