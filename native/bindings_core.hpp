@@ -108,9 +108,9 @@ namespace C4_9x7 {
 // Expose singletons gracefully to whoever includes this header
 namespace SharedInstances {
     // 6x5
-    inline std::unique_ptr<C4_6x5::GameSolver::Connect4::Solver>& getSolver6x5() {
+    inline std::unique_ptr<C4_6x5::GameSolver::Connect4::Solver>& getSolver6x5(size_t table_bytes = 67108864) {
         static std::unique_ptr<C4_6x5::GameSolver::Connect4::Solver> solver = nullptr;
-        if (!solver) solver = std::make_unique<C4_6x5::GameSolver::Connect4::Solver>();
+        if (!solver) solver = C4_6x5::GameSolver::Connect4::Solver::create(table_bytes);
         return solver;
     }
     inline void releaseSolver6x5() { getSolver6x5().reset(); }
@@ -123,9 +123,9 @@ namespace SharedInstances {
     inline void releaseHeuristicSolver6x5() { getHeuristicSolver6x5().reset(); }
 
     // 6x6
-    inline std::unique_ptr<C4_6x6::GameSolver::Connect4::Solver>& getSolver6x6() {
+    inline std::unique_ptr<C4_6x6::GameSolver::Connect4::Solver>& getSolver6x6(size_t table_bytes = 67108864) {
         static std::unique_ptr<C4_6x6::GameSolver::Connect4::Solver> solver = nullptr;
-        if (!solver) solver = std::make_unique<C4_6x6::GameSolver::Connect4::Solver>();
+        if (!solver) solver = C4_6x6::GameSolver::Connect4::Solver::create(table_bytes);
         return solver;
     }
     inline void releaseSolver6x6() { getSolver6x6().reset(); }
@@ -138,9 +138,9 @@ namespace SharedInstances {
     inline void releaseHeuristicSolver6x6() { getHeuristicSolver6x6().reset(); }
 
     // 7x6
-    inline std::unique_ptr<C4_7x6::GameSolver::Connect4::Solver>& getSolver7x6() {
+    inline std::unique_ptr<C4_7x6::GameSolver::Connect4::Solver>& getSolver7x6(size_t table_bytes = 134217728) {
         static std::unique_ptr<C4_7x6::GameSolver::Connect4::Solver> solver = nullptr;
-        if (!solver) solver = std::make_unique<C4_7x6::GameSolver::Connect4::Solver>();
+        if (!solver) solver = C4_7x6::GameSolver::Connect4::Solver::create(table_bytes);
         return solver;
     }
     inline void releaseSolver7x6() { getSolver7x6().reset(); }
@@ -153,9 +153,9 @@ namespace SharedInstances {
     inline void releaseHeuristicSolver7x6() { getHeuristicSolver7x6().reset(); }
 
     // 7x7
-    inline std::unique_ptr<C4_7x7::GameSolver::Connect4::Solver>& getSolver7x7() {
+    inline std::unique_ptr<C4_7x7::GameSolver::Connect4::Solver>& getSolver7x7(size_t table_bytes = 134217728) {
         static std::unique_ptr<C4_7x7::GameSolver::Connect4::Solver> solver = nullptr;
-        if (!solver) solver = std::make_unique<C4_7x7::GameSolver::Connect4::Solver>();
+        if (!solver) solver = C4_7x7::GameSolver::Connect4::Solver::create(table_bytes);
         return solver;
     }
     inline void releaseSolver7x7() { getSolver7x7().reset(); }
@@ -168,9 +168,9 @@ namespace SharedInstances {
     inline void releaseHeuristicSolver7x7() { getHeuristicSolver7x7().reset(); }
 
     // 8x6
-    inline std::unique_ptr<C4_8x6::GameSolver::Connect4::Solver>& getSolver8x6() {
+    inline std::unique_ptr<C4_8x6::GameSolver::Connect4::Solver>& getSolver8x6(size_t table_bytes = 134217728) {
         static std::unique_ptr<C4_8x6::GameSolver::Connect4::Solver> solver = nullptr;
-        if (!solver) solver = std::make_unique<C4_8x6::GameSolver::Connect4::Solver>();
+        if (!solver) solver = C4_8x6::GameSolver::Connect4::Solver::create(table_bytes);
         return solver;
     }
     inline void releaseSolver8x6() { getSolver8x6().reset(); }
@@ -183,9 +183,9 @@ namespace SharedInstances {
     inline void releaseHeuristicSolver8x6() { getHeuristicSolver8x6().reset(); }
 
     // 9x7
-    inline std::unique_ptr<C4_9x7::GameSolver::Connect4::Solver>& getSolver9x7() {
+    inline std::unique_ptr<C4_9x7::GameSolver::Connect4::Solver>& getSolver9x7(size_t table_bytes = 134217728) {
         static std::unique_ptr<C4_9x7::GameSolver::Connect4::Solver> solver = nullptr;
-        if (!solver) solver = std::make_unique<C4_9x7::GameSolver::Connect4::Solver>();
+        if (!solver) solver = C4_9x7::GameSolver::Connect4::Solver::create(table_bytes);
         return solver;
     }
     inline void releaseSolver9x7() { getSolver9x7().reset(); }

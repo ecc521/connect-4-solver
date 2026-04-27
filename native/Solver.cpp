@@ -39,7 +39,8 @@ namespace Connect4 {
  * - if actual score of position >= beta then beta <= return value <= actual score
  * - if alpha <= actual score <= beta then return value = actual score
  */
-int Solver::negamax(const Position &P, int alpha, int beta) {
+template <typename SlotType>
+int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
   assert(alpha < beta);
   assert(!P.canWinNext());
 
@@ -109,7 +110,8 @@ int Solver::negamax(const Position &P, int alpha, int beta) {
   return alpha;
 }
 
-int Solver::solve(const Position &P, bool weak) {
+template <typename SlotType>
+int SolverImpl<SlotType>::solve(const Position &P, bool weak) {
   if(P.canWinNext()) // check if win in one move as the Negamax function does not support this case.
     return (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
   int min = -(Position::WIDTH * Position::HEIGHT - P.nbMoves()) / 2;
@@ -130,7 +132,8 @@ int Solver::solve(const Position &P, bool weak) {
   return min;
 }
 
-std::vector<int> Solver::analyze(const Position &P, bool weak, int threads) {
+template <typename SlotType>
+std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads) {
   (void)threads;
   std::vector<int> scores(Position::WIDTH, -1000);
 
@@ -199,11 +202,24 @@ std::vector<int> Solver::analyze(const Position &P, bool weak, int threads) {
   return scores;
 }
 
-// Constructor
-Solver::Solver() : nodeCount{0} {
-  for(int i = 0; i < Position::WIDTH; i++) // initialize the column exploration order, starting with center columns
-    columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; // example for WIDTH=7: columnOrder = {3, 4, 2, 5, 1, 6, 0}
+std::unique_ptr<Solver> Solver::create(size_t table_bytes) {
+  size_t min_32 = getMinimumTableBytes<uint32_t>();
+  size_t min_64 = getMinimumTableBytes<uint64_t>();
+
+  if (table_bytes >= min_32 && min_32 != SIZE_MAX) {
+      return std::make_unique<SolverImpl<uint32_t>>(table_bytes);
+  } else if (table_bytes >= min_64 && min_64 != SIZE_MAX) {
+      return std::make_unique<SolverImpl<uint64_t>>(table_bytes);
+  } else {
+      // Clang __int128 fallback for massive boards with tiny memory constraints
+      return std::make_unique<SolverImpl<unsigned __int128>>(table_bytes);
+  }
 }
+
+// Explicit template instantiations
+template class SolverImpl<uint32_t>;
+template class SolverImpl<uint64_t>;
+template class SolverImpl<unsigned __int128>;
 
 } // namespace Connect4
 } // namespace GameSolver

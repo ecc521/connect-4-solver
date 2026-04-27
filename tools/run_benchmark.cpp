@@ -14,7 +14,7 @@ int main() {
     
     std::string line;
     int matches = 0, mismatches = 0;
-    Solver solver;
+    auto solver = Solver::create(134217728);
     
     auto start = std::chrono::high_resolution_clock::now();
     
@@ -29,8 +29,8 @@ int main() {
             P.play(std::string(1, c));
         }
         
-        solver.reset(); // clear cache so we test pure solving speed
-        int native_score = solver.solve(P, false);
+        solver->reset(); // clear cache so we test pure solving speed
+        int native_score = solver->solve(P, false);
         if (native_score == expected_score) {
             matches++;
         } else {

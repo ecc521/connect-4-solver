@@ -23,6 +23,7 @@
 #include <string>
 #include <memory>
 #include <atomic>
+#include <cstdint>
 #include "Position.hpp"
 #include "TranspositionTable.hpp"
 #include "OpeningBook.hpp"
@@ -30,61 +31,65 @@
 namespace GameSolver {
 namespace Connect4 {
 
-#ifndef EXACT_TABLE_SIZE
-#define EXACT_TABLE_SIZE 23
-#endif
+template <typename SlotType>
+constexpr size_t getMinimumTableBytes() {
+    constexpr int board_bits = Position::WIDTH * (Position::HEIGHT + 1);
+    constexpr int partial_key_bits = (sizeof(SlotType) * 8) - 8;
+    
+    if (board_bits <= partial_key_bits) return 0; // Exact match fits completely
+    
+    constexpr int index_bits = board_bits - partial_key_bits;
+    if (index_bits >= 64) return SIZE_MAX; // Mathematically impossible
+    
+    return (1ULL << index_bits) * sizeof(SlotType);
+}
 
 class Solver {
- private:
-  // Dynamically reduce table size for massive boards (e.g. 9x7) to offset the uint64_t memory overhead
-  static constexpr int TABLE_SIZE = (Position::WIDTH * Position::HEIGHT >= 56) ? (EXACT_TABLE_SIZE - 1) : EXACT_TABLE_SIZE;
-  TranspositionTable < uint_t < Position::WIDTH*(Position::HEIGHT + 1) - TABLE_SIZE >, Position::position_t, uint8_t, TABLE_SIZE > transTable;
-  std::unique_ptr<OpeningBookBase> book; // opening book
-  std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
-  int columnOrder[Position::WIDTH]; // column exploration order
-
-  /**
-   * Reccursively score connect 4 position using negamax variant of alpha-beta algorithm.
-   * @param: position to evaluate, this function assumes nobody already won and
-   *         current player cannot win next move. This has to be checked before
-   * @param: alpha < beta, a score window within which we are evaluating the position.
-   *
-   * @return the exact score, an upper or lower bound score depending of the case:
-   * - if actual score of position <= alpha then actual score <= return value <= alpha
-   * - if actual score of position >= beta then beta <= return value <= actual score
-   * - if alpha <= actual score <= beta then return value = actual score
-   */
-  int negamax(const Position &P, int alpha, int beta);
-
  public:
   static const int INVALID_MOVE = -1000;
 
-  // Returns the score of a position
-  int solve(const Position &P, bool weak = false);
+  virtual int solve(const Position &P, bool weak = false) = 0;
+  virtual std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1) = 0;
+  virtual unsigned long long getNodeCount() const = 0;
+  virtual void reset() = 0;
+  virtual void loadBook(std::string book_file) = 0;
+  virtual ~Solver() {}
 
-  /**
-   * Evaluate possible winning moves for current player
-   * @param P: position to evaluate
-   * @param weak: boolean indicating if the solver should only compute outcome (win, draw, loss)
-   * @param threads: num WebAssembly std::threads to spawn, defaults to 1 for no multithreading
-   * @return a vector of scores for each column
-   */
-  std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1);
+  static std::unique_ptr<Solver> create(size_t table_bytes);
+};
 
-  unsigned long long getNodeCount() const {
+template <typename SlotType>
+class SolverImpl : public Solver {
+ private:
+  TranspositionTable<SlotType> transTable;
+  std::unique_ptr<OpeningBookBase> book;
+  std::atomic<unsigned long long> nodeCount;
+  int columnOrder[Position::WIDTH];
+
+  int negamax(const Position &P, int alpha, int beta);
+
+ public:
+  SolverImpl(size_t table_bytes) : transTable(table_bytes), nodeCount{0} {
+    for(int i = 0; i < Position::WIDTH; i++) {
+      columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
+    }
+  }
+
+  int solve(const Position &P, bool weak = false) override;
+  std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1) override;
+
+  unsigned long long getNodeCount() const override {
     return nodeCount;
   }
 
-  void reset() {
+  void reset() override {
     nodeCount = 0;
     transTable.reset();
   }
 
-  void loadBook(std::string book_file) {
+  void loadBook(std::string book_file) override {
     book = OpeningBookBase::load(book_file, Position::WIDTH, Position::HEIGHT);
   }
-
-  Solver(); // Constructor
 };
 
 } // namespace Connect4
