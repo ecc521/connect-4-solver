@@ -14,6 +14,8 @@
 #include "Position.hpp"
 #include "TranspositionTable.hpp"
 #include "Cache.hpp"
+#include "NNUEAccumulator.hpp"
+#include "NNUE.hpp"
 
 namespace GameSolver {
 namespace Connect4 {
@@ -43,13 +45,13 @@ class HeuristicSolver {
   /**
    * Heuristic negamax with depth limit.
    */
-  int negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms = 0.0);
+  int negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc);
 
  public:
   static const int INVALID_MOVE = -1000000;
 
   // Returns the heuristic score of a position via iterative deepening
-  std::pair<int, int> solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms = 0.0, bool reset_tt = true);
+  std::pair<int, int> solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms = 0.0, bool reset_tt = true, NNUEAccumulator<WIDTH, HEIGHT>* acc = nullptr);
 
   /**
    * Evaluate possible heuristic moves for current player

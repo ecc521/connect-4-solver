@@ -26,55 +26,67 @@
 #include <algorithm>
 #include <stdexcept>
 #include <memory>
+#include <cmath>
 
 namespace GameSolver {
 namespace Connect4 {
 
 #pragma pack(push, 1)
-template<int N>
+template<int W, int H, int N>
 struct PackedKey {
     uint8_t data[N];
     
-    operator Position::position_t() const {
-        Position::position_t val = 0;
+    using pos_t = typename GenericPosition<W, H>::position_t;
+
+    operator pos_t() const {
+        pos_t val = 0;
         for (int i = 0; i < N; i++) {
-            val |= ((Position::position_t)data[i]) << (i * 8);
+            val |= ((pos_t)data[i]) << (i * 8);
         }
         return val;
     }
     
-    bool operator<(Position::position_t target) const {
-        return static_cast<Position::position_t>(*this) < target;
+    bool operator<(pos_t target) const {
+        return static_cast<pos_t>(*this) < target;
     }
     
-    bool operator==(Position::position_t target) const {
-        return static_cast<Position::position_t>(*this) == target;
+    bool operator==(pos_t target) const {
+        return static_cast<pos_t>(*this) == target;
     }
 };
 
-template<int N>
-bool operator<(Position::position_t target, const PackedKey<N>& key) {
-    return target < static_cast<Position::position_t>(key);
+template<int W, int H, int N>
+bool operator<(typename GenericPosition<W, H>::position_t target, const PackedKey<W, H, N>& key) {
+    return target < static_cast<typename GenericPosition<W, H>::position_t>(key);
 }
 #pragma pack(pop)
 
+template <int W, int H>
 class OpeningBookBase {
 public:
-    virtual int get(const Position& P) const = 0;
+    using pos_t = typename GenericPosition<W, H>::position_t;
+    using EntryList = std::vector<std::pair<pos_t, uint8_t>>;
+
+    virtual int get(const GenericPosition<W, H>& P) const = 0;
     virtual int getDepth() const = 0;
+    virtual EntryList dump() const = 0;
     virtual ~OpeningBookBase() = default;
     
-    static std::unique_ptr<OpeningBookBase> load(std::string filename, int width, int height);
+    static std::unique_ptr<OpeningBookBase<W, H>> load(std::string filename, int width, int height);
+    
+    static void save_dense(const std::string& filename, int depth, EntryList items);
+    static void save_elias_fano(const std::string& filename, int depth, EntryList items);
 };
 
-class EliasFanoBook : public OpeningBookBase {
+template <int W, int H>
+class EliasFanoBook : public OpeningBookBase<W, H> {
   uint64_t num_entries;
   uint8_t L;
   int depth;
   std::vector<uint64_t> upper_bits;
   std::vector<uint64_t> lower_bits;
   std::vector<uint8_t> values;
-  std::vector<uint32_t> block_counts; // Prefix sum of popcounts for upper_bits blocks
+  std::vector<uint32_t> block_counts;
 
   void build_index() {
     block_counts.assign(upper_bits.size() + 1, 0);
@@ -87,14 +99,12 @@ class EliasFanoBook : public OpeningBookBase {
   }
 
   uint64_t select1(uint64_t rank) const {
-    // Binary search on block_counts to find the block containing the rank-th '1'
     auto it = std::upper_bound(block_counts.begin(), block_counts.end(), (uint32_t)rank);
     size_t block_idx = std::distance(block_counts.begin(), it) - 1;
     
     uint64_t val = upper_bits[block_idx];
     uint32_t remaining = rank - block_counts[block_idx];
     
-    // Find the remaining-th set bit in the 64-bit block
     for (int i = 0; i < 64; i++) {
       if ((val >> i) & 1) {
         if (remaining == 0) return block_idx * 64 + i;
@@ -129,7 +139,7 @@ class EliasFanoBook : public OpeningBookBase {
       build_index();
     }
 
-  int get(const Position &P) const override {
+  int get(const GenericPosition<W, H> &P) const override {
     if (num_entries == 0) return 0;
     uint64_t x = P.key3();
     
@@ -144,10 +154,19 @@ class EliasFanoBook : public OpeningBookBase {
     }
     return 0;
   }
+
+  typename OpeningBookBase<W, H>::EntryList dump() const override {
+    typename OpeningBookBase<W, H>::EntryList res;
+    res.reserve(num_entries);
+    for (uint64_t i = 0; i < num_entries; i++) {
+        res.push_back({static_cast<typename GenericPosition<W, H>::position_t>(get_key(i)), values[i]});
+    }
+    return res;
+  }
 };
 
-template<typename KeyT, typename ValT>
-class DenseBook : public OpeningBookBase {
+template<int W, int H, typename KeyT, typename ValT>
+class DenseBook : public OpeningBookBase<W, H> {
   std::vector<KeyT> keys;
   std::vector<ValT> values;
   int depth;
@@ -160,10 +179,10 @@ class DenseBook : public OpeningBookBase {
 
   DenseBook() : depth(-1) {}
   
-  int get(const Position &P) const override {
+  int get(const GenericPosition<W, H> &P) const override {
     if(P.nbMoves() > depth || keys.empty()) return 0;
     
-    Position::position_t target = P.key3();
+    typename GenericPosition<W, H>::position_t target = P.key3();
     auto it = std::lower_bound(keys.begin(), keys.end(), target);
     
     if (it != keys.end() && *it == target) {
@@ -172,12 +191,21 @@ class DenseBook : public OpeningBookBase {
     }
     return 0;
   }
+
+  typename OpeningBookBase<W, H>::EntryList dump() const override {
+    typename OpeningBookBase<W, H>::EntryList res;
+    res.reserve(keys.size());
+    for (size_t i = 0; i < keys.size(); i++) {
+        res.push_back({static_cast<typename GenericPosition<W, H>::position_t>(keys[i]), static_cast<uint8_t>(values[i])});
+    }
+    return res;
+  }
 };
 
-template<int N>
-std::unique_ptr<OpeningBookBase> load_dense_book_n(std::ifstream& ifs, size_t file_size, int depth) {
+template<int W, int H, int N>
+std::unique_ptr<OpeningBookBase<W, H>> load_dense_book_n(std::ifstream& ifs, size_t file_size, int depth) {
     size_t num_entries = (file_size - 6) / (N + 1);
-    std::vector<PackedKey<N>> keys(num_entries);
+    std::vector<PackedKey<W, H, N>> keys(num_entries);
     std::vector<uint8_t> values(num_entries);
 
     if(num_entries > 0) {
@@ -187,10 +215,11 @@ std::unique_ptr<OpeningBookBase> load_dense_book_n(std::ifstream& ifs, size_t fi
         throw std::runtime_error("Failed to read Dense Array data from book file.");
       }
     }
-    return std::unique_ptr<OpeningBookBase>(new DenseBook<PackedKey<N>, uint8_t>(depth, std::move(keys), std::move(values)));
+    return std::unique_ptr<OpeningBookBase<W, H>>(new DenseBook<W, H, PackedKey<W, H, N>, uint8_t>(depth, std::move(keys), std::move(values)));
 }
 
-inline std::unique_ptr<OpeningBookBase> load_elias_fano_book(std::ifstream& ifs, int depth) {
+template<int W, int H>
+std::unique_ptr<OpeningBookBase<W, H>> load_elias_fano_book(std::ifstream& ifs, int depth) {
     uint64_t num_entries, U;
     uint8_t L;
     ifs.read(reinterpret_cast<char*>(&num_entries), 8);
@@ -208,10 +237,11 @@ inline std::unique_ptr<OpeningBookBase> load_elias_fano_book(std::ifstream& ifs,
     ifs.read(reinterpret_cast<char*>(lower_bits.data()), lower_bits_size * 8);
     ifs.read(reinterpret_cast<char*>(values.data()), num_entries);
 
-    return std::unique_ptr<OpeningBookBase>(new EliasFanoBook(num_entries, U, L, depth, std::move(upper_bits), std::move(lower_bits), std::move(values)));
+    return std::unique_ptr<OpeningBookBase<W, H>>(new EliasFanoBook<W, H>(num_entries, U, L, depth, std::move(upper_bits), std::move(lower_bits), std::move(values)));
 }
 
-inline std::unique_ptr<OpeningBookBase> OpeningBookBase::load(std::string filename, int width, int height) {
+template<int W, int H>
+inline std::unique_ptr<OpeningBookBase<W, H>> OpeningBookBase<W, H>::load(std::string filename, int width, int height) {
     std::ifstream ifs(filename, std::ios::binary);
 
     if(ifs.fail()) {
@@ -244,7 +274,7 @@ inline std::unique_ptr<OpeningBookBase> OpeningBookBase::load(std::string filena
     }
 
     if (log_size == (char)0xFF) {
-      return load_elias_fano_book(ifs, _depth);
+      return load_elias_fano_book<W, H>(ifs, _depth);
     }
 
     ifs.seekg(0, std::ios::end);
@@ -252,24 +282,95 @@ inline std::unique_ptr<OpeningBookBase> OpeningBookBase::load(std::string filena
     ifs.seekg(6, std::ios::beg);
 
     switch(partial_key_bytes) {
-        case 1: return load_dense_book_n<1>(ifs, file_size, _depth);
-        case 2: return load_dense_book_n<2>(ifs, file_size, _depth);
-        case 3: return load_dense_book_n<3>(ifs, file_size, _depth);
-        case 4: return load_dense_book_n<4>(ifs, file_size, _depth);
-        case 5: return load_dense_book_n<5>(ifs, file_size, _depth);
-        case 6: return load_dense_book_n<6>(ifs, file_size, _depth);
-        case 7: return load_dense_book_n<7>(ifs, file_size, _depth);
-        case 8: return load_dense_book_n<8>(ifs, file_size, _depth);
-        case 9: return load_dense_book_n<9>(ifs, file_size, _depth);
-        case 10: return load_dense_book_n<10>(ifs, file_size, _depth);
-        case 11: return load_dense_book_n<11>(ifs, file_size, _depth);
-        case 12: return load_dense_book_n<12>(ifs, file_size, _depth);
-        case 13: return load_dense_book_n<13>(ifs, file_size, _depth);
-        case 14: return load_dense_book_n<14>(ifs, file_size, _depth);
-        case 15: return load_dense_book_n<15>(ifs, file_size, _depth);
-        case 16: return load_dense_book_n<16>(ifs, file_size, _depth);
+        case 1: return load_dense_book_n<W, H, 1>(ifs, file_size, _depth);
+        case 2: return load_dense_book_n<W, H, 2>(ifs, file_size, _depth);
+        case 3: return load_dense_book_n<W, H, 3>(ifs, file_size, _depth);
+        case 4: return load_dense_book_n<W, H, 4>(ifs, file_size, _depth);
+        case 5: return load_dense_book_n<W, H, 5>(ifs, file_size, _depth);
+        case 6: return load_dense_book_n<W, H, 6>(ifs, file_size, _depth);
+        case 7: return load_dense_book_n<W, H, 7>(ifs, file_size, _depth);
+        case 8: return load_dense_book_n<W, H, 8>(ifs, file_size, _depth);
+        case 9: return load_dense_book_n<W, H, 9>(ifs, file_size, _depth);
+        case 10: return load_dense_book_n<W, H, 10>(ifs, file_size, _depth);
+        case 11: return load_dense_book_n<W, H, 11>(ifs, file_size, _depth);
+        case 12: return load_dense_book_n<W, H, 12>(ifs, file_size, _depth);
+        case 13: return load_dense_book_n<W, H, 13>(ifs, file_size, _depth);
+        case 14: return load_dense_book_n<W, H, 14>(ifs, file_size, _depth);
+        case 15: return load_dense_book_n<W, H, 15>(ifs, file_size, _depth);
+        case 16: return load_dense_book_n<W, H, 16>(ifs, file_size, _depth);
         default: throw std::runtime_error("Unsupported key_bytes in dense book.");
     }
+}
+
+template<int W, int H>
+inline void OpeningBookBase<W, H>::save_dense(const std::string& filename, int depth, EntryList items) {
+    std::sort(items.begin(), items.end());
+    items.erase(std::unique(items.begin(), items.end(), 
+      [](const auto& a, const auto& b) { return a.first == b.first; }), items.end());
+
+    std::ofstream ofs(filename, std::ios::binary);
+    int key_bytes = std::ceil(((depth + W - 1) * 1.58496250072) / 8.0);
+    if(key_bytes < 1) key_bytes = 1;
+    if(key_bytes > 16) key_bytes = 16;
+
+    char header[6] = {(char)W, (char)H, (char)depth, (char)key_bytes, 1, 0};
+    ofs.write(header, 6);
+
+    for (size_t i = 0; i < items.size(); i++) {
+      pos_t key = items[i].first;
+      for (int b = 0; b < key_bytes; b++) {
+        char tmp = (key >> (b * 8)) & 0xFF;
+        ofs.write(&tmp, 1);
+      }
+    }
+    for (size_t i = 0; i < items.size(); i++) {
+      char tmp = items[i].second;
+      ofs.write(&tmp, 1);
+    }
+    ofs.close();
+}
+
+template<int W, int H>
+inline void OpeningBookBase<W, H>::save_elias_fano(const std::string& filename, int depth, EntryList items) {
+    std::sort(items.begin(), items.end());
+    items.erase(std::unique(items.begin(), items.end(), 
+      [](const auto& a, const auto& b) { return a.first == b.first; }), items.end());
+
+    std::ofstream ofs(filename, std::ios::binary);
+    uint64_t n = items.size();
+    uint64_t max_key = n > 0 ? items.back().first : 0;
+    uint64_t U = max_key + 1;
+    uint8_t L = n > 0 ? (uint8_t)std::max(0, (int)std::floor(std::log2((double)U / n))) : 0;
+
+    char header[6] = {(char)W, (char)H, (char)depth, 0, 1, (char)0xFF};
+    ofs.write(header, 6);
+    ofs.write(reinterpret_cast<char*>(&n), 8);
+    ofs.write(reinterpret_cast<char*>(&U), 8);
+    ofs.write(reinterpret_cast<char*>(&L), 1);
+
+    uint64_t ub_size = (n + (U >> L) + 64) / 64;
+    std::vector<uint64_t> ub(ub_size, 0);
+    for (size_t i = 0; i < n; i++) {
+        uint64_t y = items[i].first >> L;
+        ub[(y + i) / 64] |= (1ULL << ((y + i) % 64));
+    }
+    ofs.write(reinterpret_cast<char*>(ub.data()), ub_size * 8);
+
+    uint64_t lb_size = (n * L + 63) / 64;
+    std::vector<uint64_t> lb(lb_size, 0);
+    for (size_t i = 0; i < n; i++) {
+        if (L == 0) continue;
+        uint64_t val = items[i].first & ((1ULL << L) - 1);
+        uint64_t bit_pos = i * L;
+        uint64_t idx = bit_pos / 64;
+        uint64_t shift = bit_pos % 64;
+        lb[idx] |= (val << shift);
+        if (shift + L > 64) lb[idx + 1] |= (val >> (64 - shift));
+    }
+    ofs.write(reinterpret_cast<char*>(lb.data()), lb_size * 8);
+
+    for (size_t i = 0; i < n; i++) ofs.write(reinterpret_cast<char*>(&items[i].second), 1);
+    ofs.close();
 }
 
 } // namespace Connect4

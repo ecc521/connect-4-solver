@@ -48,7 +48,7 @@ export interface SolverModule {
   _destroySolver: (w: number, h: number, ptr: number, is_heuristic: boolean) => void;
   
   _createBook: (w: number, h: number, pathPtr: number) => number;
-  _destroyBook: (ptr: number) => void;
+  _destroyBook: (w: number, h: number, ptr: number) => void;
   _analyzeExact: (w: number, h: number, solverPtr: number, posPtr: number, threads: number, bookPtr: number) => number;
   _analyzeHeuristic: (w: number, h: number, solverPtr: number, posPtr: number, threads: number, max_depth: number, timeout: number) => number;
   _getNodeCount: (w: number, h: number, solverPtr: number, is_heuristic: boolean) => number;

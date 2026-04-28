@@ -63,14 +63,16 @@ int main(int argc, char** argv) {
   }
   auto cache = Solver::createCache(memory_bytes);
   if (!solver) solver = Solver::createWithCache(cache.get());
-  if (!opening_book.empty()) solver->loadBook(opening_book);
+  std::unique_ptr<OpeningBookBase<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>> book = nullptr;
+  if (!opening_book.empty()) {
+    book = OpeningBookBase<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>::load(opening_book, BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO);
+  }
 
   if (cores > 1) {
     std::mutex io_mutex;
     
     auto worker = [&]() {
       auto local_solver = Solver::createWithCache(cache.get());
-      if (!opening_book.empty()) local_solver->loadBook(opening_book);
 
       while (true) {
         std::string current_line;
@@ -88,10 +90,10 @@ int main(int argc, char** argv) {
         } else {
           std::string result = current_line;
           if(analyze) {
-            std::vector<int> scores = local_solver->analyze(P, weak);
+            std::vector<int> scores = local_solver->analyze(P, weak, 1, book.get());
             for(int i = 0; i < Position::WIDTH; i++) result += " " + std::to_string(scores[i]);
           } else {
-            int score = local_solver->solve(P, weak);
+            int score = local_solver->solve(P, weak, book.get());
             result += " " + std::to_string(score);
           }
           std::lock_guard<std::mutex> lock(io_mutex);
@@ -118,11 +120,11 @@ int main(int argc, char** argv) {
       } else {
         std::cout << line;
         if(analyze) {
-          std::vector<int> scores = solver->analyze(P, weak);
+          std::vector<int> scores = solver->analyze(P, weak, 1, book.get());
           for(int i = 0; i < Position::WIDTH; i++) std::cout << " " << scores[i];
         }
         else {
-          int score = solver->solve(P, weak);
+          int score = solver->solve(P, weak, book.get());
           std::cout << " " << score;
         }
         std::cout << "\n";

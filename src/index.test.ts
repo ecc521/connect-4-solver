@@ -1,16 +1,17 @@
-import { Connect4Solver, Player, Outcome, BOARD_WIDTH, OpeningBook } from "./index";
-import { ThreadedConnect4Solver } from "./threaded";
+import { Connect4Solver, Player, Outcome, OpeningBook } from "./index";
 import * as fs from "fs";
 import * as path from "path";
 
-function runParityTest(
+const BOARD_WIDTH = 7;
+
+async function runParityTest(
   solver: Connect4Solver,
   dataPath: string,
   w: number,
   h: number,
   ignoreEarlyGame = false,
   book?: import("../src/book").OpeningBook
-): void {
+): Promise<void> {
   if (!fs.existsSync(dataPath)) {
     console.warn(`Skipping parity test, ${dataPath} not found.`);
     return;
@@ -31,7 +32,7 @@ function runParityTest(
       continue;
     }
 
-    const result = solver.analyze(pos, { book });
+    const result = await solver.analyze(pos, { book });
 
     const nbMoves = pos.length;
     const isP1Turn = nbMoves % 2 === 0;
@@ -70,15 +71,12 @@ function runParityTest(
   }
 }
 
-describe.each([
-  { name: "Connect4Solver", SolverClass: Connect4Solver },
-  { name: "ThreadedConnect4Solver", SolverClass: ThreadedConnect4Solver },
-])("Testing %s parity structures", ({ SolverClass }) => {
+describe("Connect4Solver Async Parity Test", () => {
   let solver: Connect4Solver;
   let bookLoaded = false;
 
   beforeAll(async (): Promise<void> => {
-    solver = new SolverClass();
+    solver = new Connect4Solver();
     await solver.init();
 
     // Check both legacy root and new data/ directory for the book
@@ -100,57 +98,52 @@ describe.each([
     }
   }, 15000);
 
-  test("should analyze a deep position synchronously", (): void => {
-    const result = solver.analyze("121212333");
+  afterAll(() => {
+    solver.release();
+  });
+
+  test("should analyze a deep position asynchronously", async (): Promise<void> => {
+    const result = await solver.analyze("121212333");
     expect(result.originalPosition).toBe("121212333");
     expect(result.evaluation).not.toBeNull();
     expect(result.moveOptions).toHaveLength(BOARD_WIDTH);
   });
 
-  test("should safely evaluate asynchronously mirroring synchronous hooks", async (): Promise<void> => {
-    const asyncResult = await solver.analyzeAsync("121212333");
-    const syncResult = solver.analyze("121212333");
-    // Ensure the asynchronous UI-deferment wrapper parses mathematical outcomes identically
-    expect(asyncResult.evaluation?.outcome).toBe(
-      syncResult.evaluation?.outcome,
-    );
-    expect(asyncResult.evaluation?.score).toBe(syncResult.evaluation?.score);
-    expect(asyncResult.moveOptions.length).toBe(syncResult.moveOptions.length);
-  });
-
-  test("should detect a winning position", (): void => {
-    const result = solver.analyze("1212121");
+  test("should detect a winning position", async (): Promise<void> => {
+    const result = await solver.analyze("1212121");
     expect(result.evaluation?.outcome).toBe(Outcome.Win);
     expect(result.evaluation?.winner).toBe(Player.P1);
     expect(result.position).toBe("1212121");
   });
 
-  test("should handle invalid moves", (): void => {
-    const result = solver.analyze("1111111");
+  test("should handle invalid moves", async (): Promise<void> => {
+    const result = await solver.analyze("1111111");
     expect(result.position).not.toBe(result.originalPosition);
     expect(result.evaluation).toBeNull();
   });
 
-  test("should correctly analyze 200 positions against expected C++ raw solver output", () => {
+  test("should correctly analyze 200 positions against expected C++ raw solver output", async () => {
     const dataPath = path.join(__dirname, "..", "test-data", "positions.txt");
-    runParityTest(solver, dataPath, 7, 6, !bookLoaded);
+    await runParityTest(solver, dataPath, 7, 6, !bookLoaded);
   });
 
   describe("Generic Board Sizes Support", () => {
     it("should correctly instantiate and evaluate an 8x6 board at depth 34", async () => {
-      const solver = new SolverClass(8, 6);
-      await solver.init();
+      const testSolver = new Connect4Solver(8, 6);
+      await testSolver.init();
       // P1 plays 1, 2, 3, 4. P2 plays 8, 8, 8. P1 Wins on move 7!
-      const result = solver.analyze("1828384");
+      const result = await testSolver.analyze("1828384");
       expect(result.evaluation?.outcome).toBe(Outcome.Win);
+      testSolver.release();
     });
 
     it("should correctly instantiate and evaluate a massive 9x7 board using the 128-bit fallback math", async () => {
-      const solver = new SolverClass(9, 7);
-      await solver.init();
+      const testSolver = new Connect4Solver(9, 7);
+      await testSolver.init();
       // P1 plays 1, 2, 3, 4. P2 plays 9, 9, 9. P1 Wins on move 7!
-      const result = solver.analyze("1929394");
+      const result = await testSolver.analyze("1929394");
       expect(result.evaluation?.outcome).toBe(Outcome.Win);
+      testSolver.release();
     });
 
     const sizes = [
@@ -169,7 +162,7 @@ describe.each([
           "test-data",
           `positions_${w}x${h}.txt`,
         );
-        const testSolver = new SolverClass(w, h);
+        const testSolver = new Connect4Solver(w, h);
         await testSolver.init();
 
         // For generic sizes, we check for a book in the data directory
@@ -182,8 +175,9 @@ describe.each([
           hasBook = true;
         }
 
-        runParityTest(testSolver, dataPath, w, h, !hasBook, testBook);
+        await runParityTest(testSolver, dataPath, w, h, !hasBook, testBook);
         if (testBook) testBook.destroy();
+        testSolver.release();
       });
     }
   });

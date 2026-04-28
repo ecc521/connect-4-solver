@@ -1,18 +1,17 @@
-import { BaseConnect4Solver, PositionAnalysis } from "./core";
+import { PositionAnalysis, Connect4SolverOptions } from "./index";
 
-export class AsyncConnect4Solver extends BaseConnect4Solver {
+export class AsyncConnect4Solver {
   private worker: Worker;
   private messageId = 0;
   private pendingRequests = new Map<number, { resolve: (val: any) => void; reject: (err: any) => void }>();
   private initPromise: Promise<void>;
+  private initialized = false;
 
   constructor(
     worker: Worker,
-    solverType: string = "Connect4Solver",
-    widthOrOpts?: number | { width?: number; height?: number; useSharedCache?: boolean },
+    opts?: Connect4SolverOptions | number,
     heightOpt?: number
   ) {
-    super(widthOrOpts as any, heightOpt);
     this.worker = worker;
     this.worker.onmessage = (e: MessageEvent) => {
       const { id, success, result, error } = e.data;
@@ -24,18 +23,26 @@ export class AsyncConnect4Solver extends BaseConnect4Solver {
       }
     };
 
-    let useSharedCache = false;
-    if (typeof widthOrOpts === "object" && widthOrOpts.useSharedCache) {
-      useSharedCache = true;
+    let width = 7;
+    let height = 6;
+    let cacheSizeMb = 128;
+    let heuristic = false;
+
+    if (typeof opts === "number") {
+      width = opts;
+      if (heightOpt !== undefined) height = heightOpt;
+    } else if (opts && typeof opts === "object") {
+      if (opts.width !== undefined) width = opts.width;
+      if (opts.height !== undefined) height = opts.height;
+      if (opts.cacheSizeMb !== undefined) cacheSizeMb = opts.cacheSizeMb;
+      if (opts.heuristic !== undefined) heuristic = opts.heuristic;
     }
 
-    // We send an init message but we don't wait for it here.
-    // The user must explicitly call `await init()`.
     this.initPromise = this.sendMessage("init", {
-      solverType,
-      width: this.width,
-      height: this.height,
-      useSharedCache,
+      width,
+      height,
+      cacheSizeMb,
+      heuristic,
     });
   }
 
@@ -57,47 +64,11 @@ export class AsyncConnect4Solver extends BaseConnect4Solver {
     await this.sendMessage("loadBook", { data });
   }
 
-  analyze(positionStr: string, opts?: any): PositionAnalysis {
-    throw new Error(
-      "Synchronous analyze() is not available on AsyncConnect4Solver. Use analyzeAsync() instead."
-    );
-  }
-
-  async analyzeAsync(positionStr: string, opts?: any): Promise<PositionAnalysis> {
+  async analyze(positionStr: string, opts?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: any }): Promise<PositionAnalysis> {
     return this.sendMessage("analyze", { position: positionStr, opts });
   }
 
-  unload(): void {
+  release(): void {
     this.sendMessage("unload").catch(() => {});
-  }
-}
-
-export class AsyncThreadedConnect4Solver extends AsyncConnect4Solver {
-  constructor(
-    worker: Worker,
-    widthOrOpts?: number | { width?: number; height?: number; useSharedCache?: boolean },
-    heightOpt?: number
-  ) {
-    super(worker, "ThreadedConnect4Solver", widthOrOpts, heightOpt);
-  }
-}
-
-export class AsyncHeuristicConnect4Solver extends AsyncConnect4Solver {
-  constructor(
-    worker: Worker,
-    widthOrOpts?: number | { width?: number; height?: number; useSharedCache?: boolean },
-    heightOpt?: number
-  ) {
-    super(worker, "HeuristicConnect4Solver", widthOrOpts, heightOpt);
-  }
-}
-
-export class AsyncThreadedHeuristicConnect4Solver extends AsyncConnect4Solver {
-  constructor(
-    worker: Worker,
-    widthOrOpts?: number | { width?: number; height?: number; useSharedCache?: boolean },
-    heightOpt?: number
-  ) {
-    super(worker, "ThreadedHeuristicConnect4Solver", widthOrOpts, heightOpt);
   }
 }

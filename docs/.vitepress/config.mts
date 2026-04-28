@@ -17,6 +17,7 @@ export default defineConfig({
         text: 'Guide',
         items: [
           { text: 'Getting Started', link: '/' },
+          { text: 'Solution Books', link: '/solution-books' },
           { text: 'Memory & Caches', link: '/cache' },
           { text: 'WebWorkers (Async)', link: '/web-workers' },
         ]

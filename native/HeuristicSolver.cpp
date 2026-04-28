@@ -17,7 +17,7 @@ namespace GameSolver {
 namespace Connect4 {
 
 template <int WIDTH, int HEIGHT>
-int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms) {
+int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc) {
   assert(alpha < beta);
   assert(!P.canWinNext());
 
@@ -46,7 +46,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     if (GenericPosition<WIDTH, HEIGHT>::popcount(possible) == 1) {
       depth = 1; // Quiescence extension: Forced move resolves tactical tension
     } else {
-      return P.heuristic_evaluate();
+      return NNUE<WIDTH, HEIGHT>::evaluate_accumulated(acc, P);
     }
   }
 
@@ -135,10 +135,14 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     GenericPosition<WIDTH, HEIGHT> P2(P);
     P2.play(next);  
     
-    int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms);
-    
     int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<position_t>(next);
     int next_col = bit_idx / (HEIGHT + 1);
+    int next_row = bit_idx % (HEIGHT + 1);
+    int player = P.nbMoves() % 2;
+
+    acc.addPiece(player, next_col, next_row);
+    int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, acc);
+    acc.removePiece(player, next_col, next_row);
 
     if(score > best_score) {
       best_score = score;
@@ -178,7 +182,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
 }
 
 template <int WIDTH, int HEIGHT>
-std::pair<int, int> HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool reset_tt) {
+std::pair<int, int> HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool reset_tt, NNUEAccumulator<WIDTH, HEIGHT>* acc) {
   if (reset_tt) {
     reset();
     stopSearch = false;
@@ -189,10 +193,16 @@ std::pair<int, int> HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const Generi
   if(P.canWinNext()) 
     return {(WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000, 0};
   
+  NNUEAccumulator<WIDTH, HEIGHT> local_acc;
+  if (!acc) {
+    local_acc.init(P);
+    acc = &local_acc;
+  }
+
   int best_score = 0;
   int depth_reached = 0;
   for (int d = 1; d <= max_depth; d++) {
-    best_score = negamax_heuristic(P, -1000000, 1000000, d, end_time_ms);
+    best_score = negamax_heuristic(P, -1000000, 1000000, d, end_time_ms, *acc);
     if (stopSearch.load()) break;
     depth_reached = d;
     if (best_score > 10000 || best_score < -10000) {

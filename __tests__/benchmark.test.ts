@@ -1,12 +1,11 @@
-import { HeuristicConnect4Solver as HeuristicSolver } from "../src/index";
-import { Connect4Solver as PerfectSolver } from "../src/index";
+import { Connect4Solver } from "../src/index";
 
 describe("Heuristic vs Perfect Connectivity Benchmark", () => {
   it("heuristically evaluates complex positions without books", async () => {
-    const perfectEngine = new PerfectSolver();
+    const perfectEngine = new Connect4Solver();
     await perfectEngine.init();
 
-    const heuristicEngine = new HeuristicSolver(7, 6);
+    const heuristicEngine = new Connect4Solver({ width: 7, height: 6, heuristic: true });
     await heuristicEngine.init();
 
     // Random non-terminal mid-game positions
@@ -19,13 +18,13 @@ describe("Heuristic vs Perfect Connectivity Benchmark", () => {
 
     for (const pos of positions) {
       // Analyze perfectly using actual book + massive tree
-      const perfect = await perfectEngine.analyzeAsync(pos);
+      const perfect = await perfectEngine.analyze(pos);
       
       // Analyze heuristics up to depth 10 - Single Threaded
-      const heuristicResult = await heuristicEngine.analyzeAsync(pos, { threads: 1 });
+      const heuristicResult = await heuristicEngine.analyze(pos, { threads: 1 });
       
       // Analyze heuristics up to depth 10 - Multi Threaded
-      const heuristicThreaded = await heuristicEngine.analyzeAsync(pos, { threads: 4 });
+      const heuristicThreaded = await heuristicEngine.analyze(pos, { threads: 4 });
 
       console.log(`[Pos: ${pos}] Perfect Score: ${perfect.evaluation?.score} | Heuristic (1T): ${heuristicResult.evaluation?.score} | Heuristic (4T): ${heuristicThreaded.evaluation?.score}`);
       

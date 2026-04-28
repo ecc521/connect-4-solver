@@ -40,6 +40,7 @@
     "connect-4-solver.podspec"
   ],
   "scripts": {
+    "install": "node-gyp rebuild || echo 'Native Addon compilation skipped/failed. Falling back to WASM bundle.'",
     "build": "npm run build:wasm && npm run build:ts",
     "build:wasm": "bash build.sh",
     "build:ts": "tsc",
@@ -81,5 +82,9 @@
     "typescript-eslint": "^8.57.1",
     "vitepress": "^1.6.4"
   },
-  "types": "dist/index.d.ts"
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "bindings": "^1.5.0",
+    "node-addon-api": "^8.7.0"
+  }
 }

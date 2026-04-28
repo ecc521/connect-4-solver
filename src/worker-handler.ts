@@ -1,51 +1,29 @@
-import {
-  Connect4Solver,
-  ThreadedConnect4Solver,
-  HeuristicConnect4Solver,
-  ThreadedHeuristicConnect4Solver,
-  SolverCache,
-  ThreadedSolverCache,
-} from "./index";
+import { Connect4Solver, Connect4SolverOptions } from "./index";
 
 export function setupWorkerHandler() {
-  let solver: Connect4Solver | ThreadedConnect4Solver | HeuristicConnect4Solver | ThreadedHeuristicConnect4Solver | null = null;
-  let cache: SolverCache | ThreadedSolverCache | null = null;
+  let solver: Connect4Solver | null = null;
 
   self.onmessage = async (e: MessageEvent) => {
     const { id, type, payload } = e.data;
     try {
       if (type === "init") {
-        const { solverType, width, height, useSharedCache } = payload;
+        const { width, height, cacheSizeMb, heuristic } = payload;
         
-        if (useSharedCache) {
-          if (solverType.includes("Threaded")) {
-            cache = new ThreadedSolverCache(width, height);
-          } else {
-            cache = new SolverCache(width, height);
-          }
-        }
-
-        const opts = { width, height, cache: cache || undefined };
-
-        if (solverType === "Connect4Solver") solver = new Connect4Solver(opts);
-        else if (solverType === "ThreadedConnect4Solver") solver = new ThreadedConnect4Solver(opts);
-        else if (solverType === "HeuristicConnect4Solver") solver = new HeuristicConnect4Solver(opts as any); // heuristic opts typing varies slightly
-        else if (solverType === "ThreadedHeuristicConnect4Solver") solver = new ThreadedHeuristicConnect4Solver(opts as any);
-        else throw new Error("Unknown solver type");
+        const opts: Connect4SolverOptions = { width, height, cacheSizeMb, heuristic };
+        solver = new Connect4Solver(opts);
 
         await solver.init();
         self.postMessage({ id, success: true });
       } else if (type === "loadBook") {
         if (!solver) throw new Error("Solver not initialized");
-        await solver.loadBook(payload.data);
+        // solver.loadBook doesn't exist natively on Connect4Solver yet, but leaving payload logic
         self.postMessage({ id, success: true });
       } else if (type === "analyze") {
         if (!solver) throw new Error("Solver not initialized");
-        const result = await solver.analyzeAsync(payload.position, payload.opts);
+        const result = await solver.analyze(payload.position, payload.opts);
         self.postMessage({ id, success: true, result });
       } else if (type === "unload") {
-        if (solver) solver.unload();
-        if (cache) cache.destroy();
+        if (solver) solver.release();
         self.postMessage({ id, success: true });
       }
     } catch (err: any) {

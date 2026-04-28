@@ -63,8 +63,8 @@ class Solver {
  public:
   static const int INVALID_MOVE = -1000;
 
-  virtual int solve(const Position &P, bool weak = false, const OpeningBookBase* book = nullptr) = 0;
-  virtual std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase* book = nullptr) = 0;
+  virtual int solve(const Position &P, bool weak = false, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
+  virtual std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
   virtual unsigned long long getNodeCount() const = 0;
   virtual void reset() = 0;
 
@@ -85,7 +85,7 @@ class SolverImpl : public Solver {
   int columnOrder[Position::WIDTH];
   int32_t history[Position::WIDTH * (Position::HEIGHT + 1)];
 
-  int negamax(const Position &P, int alpha, int beta, const OpeningBookBase* book);
+  int negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book);
 
  public:
 
@@ -99,8 +99,8 @@ class SolverImpl : public Solver {
     }
   }
 
-  int solve(const Position &P, bool weak = false, const OpeningBookBase* book = nullptr) override;
-  std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase* book = nullptr) override;
+  int solve(const Position &P, bool weak = false, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
+  std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
 
   unsigned long long getNodeCount() const override {
     return nodeCount;

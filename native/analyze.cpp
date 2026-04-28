@@ -14,7 +14,7 @@
 #include "HeuristicSolver.hpp"
 #include "OpeningBook.hpp"
 
-template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
+template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
 int32_t* runAnalysis(CoreSolver& solver, const char* positionCharArr, int threads, void* book_ptr) {
   std::string positionString(positionCharArr);
   CorePosition P;
@@ -162,37 +162,37 @@ EMSCRIPTEN_KEEPALIVE void destroySolver(int w, int h, void* solver, bool is_heur
 
 EMSCRIPTEN_KEEPALIVE void* createBook(int w, int h, const char* path) {
     std::string p(path);
-    if (w == 6 && h == 5) return C4_6x5::GameSolver::Connect4::OpeningBookBase::load(p, w, h).release();
-    if (w == 6 && h == 6) return C4_6x6::GameSolver::Connect4::OpeningBookBase::load(p, w, h).release();
-    if (w == 7 && h == 6) return C4_7x6::GameSolver::Connect4::OpeningBookBase::load(p, w, h).release();
-    if (w == 7 && h == 7) return C4_7x7::GameSolver::Connect4::OpeningBookBase::load(p, w, h).release();
-    if (w == 8 && h == 6) return C4_8x6::GameSolver::Connect4::OpeningBookBase::load(p, w, h).release();
-    if (w == 9 && h == 7) return C4_9x7::GameSolver::Connect4::OpeningBookBase::load(p, w, h).release();
-    if (w == 9 && h == 6) return C4_9x6::GameSolver::Connect4::OpeningBookBase::load(p, w, h).release();
-    if (w == 11 && h == 4) return C4_11x4::GameSolver::Connect4::OpeningBookBase::load(p, w, h).release();
+    if (w == 6 && h == 5) return C4_6x5::GameSolver::Connect4::OpeningBookBase<6, 5>::load(p, w, h).release();
+    if (w == 6 && h == 6) return C4_6x6::GameSolver::Connect4::OpeningBookBase<6, 6>::load(p, w, h).release();
+    if (w == 7 && h == 6) return C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>::load(p, w, h).release();
+    if (w == 7 && h == 7) return C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>::load(p, w, h).release();
+    if (w == 8 && h == 6) return C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>::load(p, w, h).release();
+    if (w == 9 && h == 7) return C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>::load(p, w, h).release();
+    if (w == 9 && h == 6) return C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>::load(p, w, h).release();
+    if (w == 11 && h == 4) return C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>::load(p, w, h).release();
     return nullptr;
 }
 
 EMSCRIPTEN_KEEPALIVE void destroyBook(int w, int h, void* book_ptr) {
-    if (w == 6 && h == 5) delete static_cast<C4_6x5::GameSolver::Connect4::OpeningBookBase*>(book_ptr);
-    else if (w == 6 && h == 6) delete static_cast<C4_6x6::GameSolver::Connect4::OpeningBookBase*>(book_ptr);
-    else if (w == 7 && h == 6) delete static_cast<C4_7x6::GameSolver::Connect4::OpeningBookBase*>(book_ptr);
-    else if (w == 7 && h == 7) delete static_cast<C4_7x7::GameSolver::Connect4::OpeningBookBase*>(book_ptr);
-    else if (w == 8 && h == 6) delete static_cast<C4_8x6::GameSolver::Connect4::OpeningBookBase*>(book_ptr);
-    else if (w == 9 && h == 7) delete static_cast<C4_9x7::GameSolver::Connect4::OpeningBookBase*>(book_ptr);
-    else if (w == 9 && h == 6) delete static_cast<C4_9x6::GameSolver::Connect4::OpeningBookBase*>(book_ptr);
-    else if (w == 11 && h == 4) delete static_cast<C4_11x4::GameSolver::Connect4::OpeningBookBase*>(book_ptr);
+    if (w == 6 && h == 5) delete static_cast<C4_6x5::GameSolver::Connect4::OpeningBookBase<6, 5>*>(book_ptr);
+    else if (w == 6 && h == 6) delete static_cast<C4_6x6::GameSolver::Connect4::OpeningBookBase<6, 6>*>(book_ptr);
+    else if (w == 7 && h == 6) delete static_cast<C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>*>(book_ptr);
+    else if (w == 7 && h == 7) delete static_cast<C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>*>(book_ptr);
+    else if (w == 8 && h == 6) delete static_cast<C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>*>(book_ptr);
+    else if (w == 9 && h == 7) delete static_cast<C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>*>(book_ptr);
+    else if (w == 9 && h == 6) delete static_cast<C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>*>(book_ptr);
+    else if (w == 11 && h == 4) delete static_cast<C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>*>(book_ptr);
 }
 
 EMSCRIPTEN_KEEPALIVE int32_t* analyzeExact(int w, int h, void* solver, const char* pos, int threads, void* book_ptr) {
-    if (w == 6 && h == 5) return runAnalysis<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6, C4_6x5::GameSolver::Connect4::OpeningBookBase>(*static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-    if (w == 6 && h == 6) return runAnalysis<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6, C4_6x6::GameSolver::Connect4::OpeningBookBase>(*static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-    if (w == 7 && h == 6) return runAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7, C4_7x6::GameSolver::Connect4::OpeningBookBase>(*static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-    if (w == 7 && h == 7) return runAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7, C4_7x7::GameSolver::Connect4::OpeningBookBase>(*static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-    if (w == 8 && h == 6) return runAnalysis<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8, C4_8x6::GameSolver::Connect4::OpeningBookBase>(*static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-    if (w == 9 && h == 7) return runAnalysis<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9, C4_9x7::GameSolver::Connect4::OpeningBookBase>(*static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-    if (w == 9 && h == 6) return runAnalysis<C4_9x6::GameSolver::Connect4::Solver, C4_9x6::GameSolver::Connect4::Position, 9, C4_9x6::GameSolver::Connect4::OpeningBookBase>(*static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-    if (w == 11 && h == 4) return runAnalysis<C4_11x4::GameSolver::Connect4::Solver, C4_11x4::GameSolver::Connect4::Position, 11, C4_11x4::GameSolver::Connect4::OpeningBookBase>(*static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
+    if (w == 6 && h == 5) return runAnalysis<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6, 5, C4_6x5::GameSolver::Connect4::OpeningBookBase<6, 5>>(*static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
+    if (w == 6 && h == 6) return runAnalysis<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6, 6, C4_6x6::GameSolver::Connect4::OpeningBookBase<6, 6>>(*static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
+    if (w == 7 && h == 6) return runAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7, 6, C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>>(*static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
+    if (w == 7 && h == 7) return runAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7, 7, C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>>(*static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
+    if (w == 8 && h == 6) return runAnalysis<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8, 6, C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>>(*static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
+    if (w == 9 && h == 7) return runAnalysis<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9, 7, C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>>(*static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
+    if (w == 9 && h == 6) return runAnalysis<C4_9x6::GameSolver::Connect4::Solver, C4_9x6::GameSolver::Connect4::Position, 9, 6, C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>>(*static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
+    if (w == 11 && h == 4) return runAnalysis<C4_11x4::GameSolver::Connect4::Solver, C4_11x4::GameSolver::Connect4::Position, 11, 4, C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>>(*static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
     return nullptr;
 }
 

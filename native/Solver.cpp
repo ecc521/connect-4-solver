@@ -40,7 +40,7 @@ namespace Connect4 {
  * - if alpha <= actual score <= beta then return value = actual score
  */
 template <typename SlotType>
-int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const OpeningBookBase* book) {
+int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
   assert(alpha < beta);
   assert(!P.canWinNext());
 
@@ -154,7 +154,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
 }
 
 template <typename SlotType>
-int SolverImpl<SlotType>::solve(const Position &P, bool weak, const OpeningBookBase* book) {
+int SolverImpl<SlotType>::solve(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
   if(P.canWinNext()) // check if win in one move as the Negamax function does not support this case.
     return (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
   
@@ -181,7 +181,7 @@ int SolverImpl<SlotType>::solve(const Position &P, bool weak, const OpeningBookB
 }
 
 template <typename SlotType>
-std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads, const OpeningBookBase* book) {
+std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
   (void)threads;
   std::vector<int> scores(Position::WIDTH, -1000);
 

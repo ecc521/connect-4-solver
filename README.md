@@ -19,30 +19,21 @@ npm install connect-4-solver
 
 ```typescript
 import { Connect4Solver, Player, Outcome } from "connect-4-solver";
-import { ThreadedConnect4Solver } from "connect-4-solver/threaded";
 import * as fs from "fs";
 
-  // Initialize the standard single-threaded solver
+  // Initialize the standard solver (defaults to 128MB cache)
   // Supported sizes: 6x5, 6x6, 7x6, 7x7, 8x6, 9x7
-  const solver = new Connect4Solver(7, 6);
+  const solver = new Connect4Solver({ width: 7, height: 6 });
   await solver.init();
-
-  // Or explicitly use the powerful Multithreaded WASM engine (Requires COOP/COEP strict HTTP headers!)
-  // The Emscripten memory isolation automatically bounds to SharedArrayBuffer mechanics natively.
-  const threadedSolver = new ThreadedConnect4Solver(7, 6);
-  await threadedSolver.init();
 
   // Load an opening book for instant performance (Required for evaluating positions with <= 6 moves in a reasonable amount of time)
   // Download book files from: https://github.com/ecc521/connect-4-solver/releases/tag/solutionbooks
   const bookBuffer = fs.readFileSync("path/to/downloaded/7x6_dense12.cbook");
   await solver.loadBook(new Uint8Array(bookBuffer));
-  // await threadedSolver.loadBook(new Uint8Array(bookBuffer)); // The APIs are completely identical
 
   // Analyze a position (column sequence: 1 to board width)
-  const result = solver.analyze("4424");
-
-  // The threaded backend optionally accepts a concurrency argument (Defaults natively to 1 thread)
-  // const threadedResult = threadedSolver.analyze("4424", { threads: 4 });
+  // You can optionally pass `{ threads: X }` to scale the internal C++ thread pool natively
+  const result = await solver.analyze("4424", { threads: 4 });
 
   if (result.evaluation) {
     if (result.evaluation.outcome === Outcome.Win) {
@@ -95,13 +86,13 @@ self.onmessage = async (e) => {
   const { type, position } = e.data;
 
   if (type === "INIT") {
-    solver = new Connect4Solver(7, 6);
+    solver = new Connect4Solver({ width: 7, height: 6 });
     await solver.init();
     // await solver.loadBook(bookBuffer);
     self.postMessage({ type: "READY" });
   } else if (type === "ANALYZE") {
     // The intensive C++ call executes safely out of the Main Thread here!
-    const result = solver.analyze(position);
+    const result = await solver.analyze(position);
     self.postMessage({ type: "RESULT", result });
   }
 };
@@ -184,6 +175,28 @@ If you want to recompile the WASM module and have Emscripten installed:
 npm run build
 ```
 
+### 🚀 Node.js Native Bindings
+
+When running `connect-4-solver` in a server-side Node.js environment or CLI tool, the library automatically falls back to lightning-fast **Native C++ Addons (N-API)** if they are compiled on your machine. This entirely bypasses WebAssembly overhead and V8 memory limits. 
+
+The `Connect4Solver` API automatically detects and prioritizes `connect4.node` without any code changes required on your end!
+
+> [!WARNING]
+> Node.js offloads native asynchronous C++ code (like N-API promises) to its `libuv` thread pool, which is natively limited to **4 parallel threads**. 
+> If you are calling `await solver.analyze(pos)` concurrently on many requests, you **MUST** increase the `UV_THREADPOOL_SIZE` environment variable before your Node.js application starts up, otherwise you will be hard-capped at 4 concurrent evaluations regardless of your CPU capacity.
+> 
+> ```bash
+> export UV_THREADPOOL_SIZE=32 # Set this before running your node app
+> ```
+
+If you want to manually compile the native bindings for your system (e.g., to squeeze out maximum performance for a backend server):
+
+```bash
+# This triggers node-gyp to compile the C++ core natively for your OS
+npm install
+npm run build:native
+```
+
 ### Generating Opening Books Natively
 
 **What is "Depth"?**  
@@ -198,25 +211,17 @@ Depth refers to the exact number of moves (ply) pre-calculated consecutively sta
 - **`8x6`:** Depth `20` to `22`
 - **`8x8`, `9x7`, `10x10`:** _(We do not offer pre-computed mathematical opening books for these sizes due to astronomical branching complexity. Use the `HeuristicSolver` for these sizes instead!)_
 
-Generating opening books for larger board sizes (like `8x6`) can take significant CPU time to compute locally. You can drastically speed this up by building the books natively in C++ across all your CPU cores using GNU Parallel:
+Generating opening books for larger board sizes (like `8x6`) can take significant CPU time to compute locally. You can drastically speed this up by using our included **TypeScript Orchestrator** which directly interfaces with the Native C++ Addon to bypass V8 memory constraints:
 
-1. Navigate to the native directory and compile the solver and generator for your target board size (by updating `WIDTH` and `HEIGHT` in `native/Position.hpp`):
+1. Ensure the native bindings are compiled on your machine:
    ```bash
-   cd native
-   make c4solver generator
+   npm run build:native
    ```
-2. Generate all unique positional configurations up to your desired book depth (e.g. depth 14):
+2. Run the orchestrator script, specifying your board dimensions, target depth, cache size (MB), and CPU thread count:
    ```bash
-   ./generator 14 > positions.txt
+   npx ts-node tools/generate-book.ts --width 7 --height 6 --depth 12 --cache 1024 --threads 12
    ```
-3. Use GNU Parallel to instantly multithread the solver across all CPU cores:
-   ```bash
-   cat positions.txt | parallel --jobs $(nproc) ./c4solver > scored.txt
-   ```
-4. Compress the scored outcomes back into a compact `.book` file (rename it matching `widthxheight_denseXX.book` or `widthxheight_sparseXX-YY.book`):
-   ```bash
-   cat scored.txt | ./generator
-   ```
+3. The script will dynamically generate permutations, stream Alpha-Beta evaluations natively across all your cores, and compress the output directly into a `.book` file in the `data/` directory.
 
 ### Choosing Your Dense Book Format
 
@@ -231,22 +236,6 @@ We offer two mathematically perfect opening book architectures natively. **Both 
 - **Optimal for:** Strict Mobile Bundles unsupporting explicit compression topologies.
 - **Performance:** **Fast** (slight decompression overhead compared to Dense Array).
 - **How it works:** Encodes the monotonically increasing sorted sequence of keys using an Elias-Fano data structure. This splits the keys into `upper_bits` and `lower_bits`, effectively squashing the raw memory footprint natively while still allowing fast random-access `select1` queries.
-
----
-
-### Upgrading Legacy Books
-
-You can convert raw evaluation data into the high-performance Dense or Elias-Fano format losslessly using the included packing scripts (e.g., `pack_dense_book`).
-
-1. Compile the packing script natively:
-   ```bash
-   cd native
-   make pack_dense_book
-   ```
-2. Convert your legacy book or raw data (saving to a new file or overwriting):
-   ```bash
-   ./pack_dense_book < scored.txt > dense.book
-   ```
 
 ### Building with Docker
 
