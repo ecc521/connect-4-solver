@@ -1,4 +1,4 @@
-import { Connect4Solver, Player, Outcome, BOARD_WIDTH } from "./index";
+import { Connect4Solver, Player, Outcome, BOARD_WIDTH, OpeningBook } from "./index";
 import { ThreadedConnect4Solver } from "./threaded";
 import * as fs from "fs";
 import * as path from "path";
@@ -9,6 +9,7 @@ function runParityTest(
   w: number,
   h: number,
   ignoreEarlyGame = false,
+  book?: import("../src/book").OpeningBook
 ): void {
   if (!fs.existsSync(dataPath)) {
     console.warn(`Skipping parity test, ${dataPath} not found.`);
@@ -30,7 +31,7 @@ function runParityTest(
       continue;
     }
 
-    const result = solver.analyze(pos);
+    const result = solver.analyze(pos, { book });
 
     const nbMoves = pos.length;
     const isP1Turn = nbMoves % 2 === 0;
@@ -89,7 +90,10 @@ describe.each([
     for (const bookPath of pathsToTry) {
       if (fs.existsSync(bookPath)) {
         const bookData = new Uint8Array(fs.readFileSync(bookPath));
-        await solver.loadBook(bookData);
+        const book = new OpeningBook(solver.width, solver.height);
+        await book.load(bookData);
+        // Attach it to solver as a mock property for cleanup/testing if needed
+        (solver as any)._testBook = book;
         bookLoaded = true;
         break;
       }
@@ -170,13 +174,16 @@ describe.each([
 
         // For generic sizes, we check for a book in the data directory
         let hasBook = false;
+        let testBook: any = undefined;
         const bookPath = path.join(__dirname, "..", "data", `${w}x${h}.book`);
         if (fs.existsSync(bookPath)) {
-          await testSolver.loadBook(new Uint8Array(fs.readFileSync(bookPath)));
+          testBook = new OpeningBook(testSolver.width, testSolver.height);
+          await testBook.load(new Uint8Array(fs.readFileSync(bookPath)));
           hasBook = true;
         }
 
-        runParityTest(testSolver, dataPath, w, h, !hasBook);
+        runParityTest(testSolver, dataPath, w, h, !hasBook, testBook);
+        if (testBook) testBook.destroy();
       });
     }
   });

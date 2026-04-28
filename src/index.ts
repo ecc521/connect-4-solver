@@ -231,7 +231,7 @@ export class Connect4Solver extends BaseConnect4Solver {
 
   async analyzeAsync(
     positionStr: string,
-    opts?: { threads?: number },
+    opts?: { threads?: number, book?: import("./book").OpeningBook },
   ): Promise<PositionAnalysis> {
     return new Promise((resolve) => {
       // In the future this could be completely detached to an explicit WebWorker pool
