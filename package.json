@@ -19,6 +19,14 @@
     "./core": {
       "types": "./dist/core.d.ts",
       "default": "./dist/core.js"
+    },
+    "./async": {
+      "types": "./dist/async.d.ts",
+      "default": "./dist/async.js"
+    },
+    "./worker-handler": {
+      "types": "./dist/worker-handler.d.ts",
+      "default": "./dist/worker-handler.js"
     }
   },
   "files": [
@@ -42,7 +50,9 @@
     "format:check": "prettier --check .",
     "prepublishOnly": "npm run lint && npm run build:ts && npm run format:check && npm test",
     "example:ios": "cd example && npx react-native run-ios --simulator=\"iPhone 15\"",
-    "example:android": "cd example && npx react-native run-android"
+    "example:android": "cd example && npx react-native run-android",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs"
   },
   "repository": {
     "type": "git",
@@ -68,7 +78,8 @@
     "prettier": "^3.5.2",
     "ts-jest": "^29.4.6",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.1"
+    "typescript-eslint": "^8.57.1",
+    "vitepress": "^1.6.4"
   },
   "types": "dist/index.d.ts"
 }

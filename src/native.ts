@@ -1,5 +1,4 @@
-import { Connect4Solver } from "./index";
-import { Player, Outcome, Evaluation, PositionAnalysis } from "./core";
+import { BaseConnect4Solver, Player, Outcome, Evaluation, PositionAnalysis } from "./core";
 
 interface NativeSolverType {
   analyze(
@@ -12,7 +11,7 @@ interface NativeSolverType {
   releaseSolver(w: number, h: number): Promise<boolean>;
 }
 
-export class ReactNativeConnect4Solver extends Connect4Solver {
+export class ReactNativeConnect4Solver extends BaseConnect4Solver {
   init(): Promise<void> {
     this.initialized = true; // Native layer doesn't require WASM initialization promises
     return Promise.resolve();
@@ -23,6 +22,12 @@ export class ReactNativeConnect4Solver extends Connect4Solver {
       "loadBook is natively bypassed for React Native deployments. The C++ multithreading heuristic is robust enough to not require a book payload.",
     );
     return Promise.resolve();
+  }
+
+  analyze(positionStr: string, opts?: any): PositionAnalysis {
+    throw new Error(
+      "Synchronous analyze() is not supported on React Native because JSI boundary calls are asynchronous. Please use analyzeAsync() instead.",
+    );
   }
 
   async analyzeAsync(

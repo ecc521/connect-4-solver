@@ -218,55 +218,35 @@ Generating opening books for larger board sizes (like `8x6`) can take significan
    cat scored.txt | ./generator
    ```
 
-### Choosing Your Dense Book Format (v2 Architecture)
+### Choosing Your Dense Book Format
 
-The native solver exclusively operates on the **v2 Packed Memory Architecture**. Older `.book` files (generated prior to the v2 update) use a split-array layout that will gracefully fail to load.
+We offer two mathematically perfect opening book architectures natively. **Both formats inherently guarantee 100% collision-free capacities with absolutely zero dropped states**, but they leverage different compression topologies:
 
-We offer two mathematically perfect v2 architectures natively. **Both formats inherently guarantee 100% collision-free capacities with absolutely zero dropped states**, but they leverage different RAM topological layouts to perfectly optimize for your deployment targets (Mobile vs Desktop):
-
-#### 1. Desktop Performance: Linear Probing (`.book`)
+#### 1. Dense Array Format (`.book`)
 - **Optimal for:** Desktops, Servers, Research computation, Web workloads.
-- **Performance:** **Extremely Fast** (`~500 ms` natively across 5 million sequential cache operations).
-- **How it works:** Open Addressing via "Linear Probing" naturally stacks state collisions sequentially into matching generic 64-byte CPU L1 Cache Lines natively. You receive perfectly flawless evaluation hits without triggering any additional independent hardware thread stalls.
-- **Trade-off:** Structural memory mappings demand power-of-two block dimensions natively (e.g., exactly forcing a 4.0 MB size disk-cap for `dense10`). 
-  > *Note: When distributed natively across standard iOS/Android APKs or Node modules, GZIP/ZIP natively squashes this padded structural array to ~2.0MB!*
+- **Performance:** **Extremely Fast**
+- **How it works:** Stores positions as a tightly packed, sorted array of keys and 1-byte values. At runtime, the solver performs a highly-optimized binary search (`std::lower_bound`) to instantly resolve opening positions.
 
-#### 2. Mobile Bundle Constraint: Cuckoo Hashing (`.cbook`)
+#### 2. Elias-Fano Compressed Format (`.efbook`)
 - **Optimal for:** Strict Mobile Bundles unsupporting explicit compression topologies.
-- **Performance:** **Fast** (`~720 ms` natively across 5 million cache ops - universally negligible for UI response).
-- **How it works:** Bucketed Cuckoo Graphs dynamically evaluate the strictly densest physical memory grid mathematical limits. Meaning a typical 4.0 MB data signature can safely squash raw memory natively into **~2.7 MB**. 
-- **Trade-off:** Cuckoo math strictly requires scanning two drastically decoupled memory arrays randomly distributed across physical RAM natively, artificially stalling sequential CPU performance slightly to achieve that aggressive compression point.
+- **Performance:** **Fast** (slight decompression overhead compared to Dense Array).
+- **How it works:** Encodes the monotonically increasing sorted sequence of keys using an Elias-Fano data structure. This splits the keys into `upper_bits` and `lower_bits`, effectively squashing the raw memory footprint natively while still allowing fast random-access `select1` queries.
 
 ---
 
-### Upgrading Legacy Books to v2 (.book)
+### Upgrading Legacy Books
 
-You can instantly convert any legacy v1 `.book` file to the high-performance v2 linear format losslessly using the included `pack_book` converter. (This natively shifts items maintaining 100% flawless compatibility).
+You can convert raw evaluation data into the high-performance Dense or Elias-Fano format losslessly using the included packing scripts (e.g., `pack_dense_book`).
 
 1. Compile the packing script natively:
    ```bash
    cd native
-   g++ --std=c++11 -W -Wall -O3 pack_book.cpp -o pack_book
+   make pack_dense_book
    ```
-2. Convert your legacy book (saving to a new file or overwriting):
+2. Convert your legacy book or raw data (saving to a new file or overwriting):
    ```bash
-   ./pack_book data/7x6_sparse14-16.book data/7x6_sparse14-16_v2.book
+   ./pack_dense_book < scored.txt > dense.book
    ```
-
-### Generation of Collision-Free Cuckoo Books (.cbook)
-
-To natively build a size-constrained Mobile `.cbook` off of raw search data organically, utilize the `cuckoo_pack` offline graph expansion protocol dynamically:
-
-1. Compile the cuckoo packer:
-   ```bash
-   g++ --std=c++11 -W -Wall -O3 cuckoo_pack.cpp -o cuckoo_pack
-   ```
-2. Feed your fully evaluated solver move list explicitly directly to the packer via stdin:
-   ```bash
-   ./cuckoo_pack <max_depth> <num_lines_in_file> < scored.txt
-   ```
-The offline graph builder iteratively expands array constraints seamlessly in 1% increments until all requested states organically bind losslessly.  
-> **Tuning Cuckoo Parameters**: The `.cbook` targets 95% density out of the box, producing mathematical maximum compressions. To trade disk compactness back into raw execution speeds gracefully, simply modify `cuckoo_pack.cpp` natively lowering `num_lines / 0.95` toward `0.60`. Expanding the load array natively forces search paths securely into their 1st immediate bucket choice dynamically.
 
 ### Building with Docker
 

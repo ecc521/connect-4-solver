@@ -8,27 +8,44 @@ import {
   SolverModule,
 } from "./core";
 
-interface HeuristicSolverModule extends SolverModule {
-  _analyzeHeuristicPosition6x5(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
-  _analyzeHeuristicPosition6x6(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
-  _analyzeHeuristicPosition7x6(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
-  _analyzeHeuristicPosition7x7(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
-  _analyzeHeuristicPosition8x6(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
-  _analyzeHeuristicPosition9x7(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
-  _analyzeHeuristicPosition8x8(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
-  _analyzeHeuristicPosition10x7(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
-  _analyzeHeuristicPosition9x6(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
-  _analyzeHeuristicPosition11x4(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
-  _analyzeHeuristicPosition9x9(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
-  _analyzeHeuristicPosition10x10(pointer: number, max_depth: number, threads: number, timeout_ms: number): number;
-}
-
 const STATUS_WIN = 1;
 const STATUS_INVALID = 2;
 const UNPLAYABLE_COLUMN_SCORE = -1000000;
 const INT32_SIZE = 4;
 
 export class HeuristicConnect4Solver extends Connect4Solver {
+  constructor(
+    widthOrOpts?: number | { width?: number; height?: number; cache?: import("./cache").SolverCache },
+    heightOpt?: number
+  ) {
+    super(widthOrOpts as any, heightOpt);
+  }
+
+  protected get isHeuristic(): boolean {
+    return true;
+  }
+
+  /**
+   * Initializes the Heuristic Solver.
+   * 
+   * Overrides the standard init() to explicitly flag `is_heuristic = true` when 
+   * allocating the Transposition Table memory buffer. Heuristic caches use
+   * different structural layouts natively than the exact solvers, so they cannot
+   * be arbitrarily swapped despite sharing the exact same WASM bridge.
+   */
+  async init(): Promise<void> {
+    if (this.initialized) return;
+    const { getModuleInitPromise } = require("./index");
+    await getModuleInitPromise();
+    this.initialized = true;
+    
+    const ptr = (this as any)._instancePtr;
+    if (ptr === 0) {
+      const cachePtr = (this as any)._cache ? (this as any)._cache.ptr : ((this as any)._localCachePtr = this.mod._createCache(this.width, this.height, 1024 * 1024 * 32, true));
+      (this as any)._instancePtr = this.mod._createSolver(this.width, this.height, cachePtr, true);
+    }
+  }
+
   protected createEvaluation(score: number, nbMoves: number): Evaluation {
     const isPlayer1Turn = nbMoves % 2 === 0;
     const currentPlayer = isPlayer1Turn ? Player.P1 : Player.P2;
@@ -71,34 +88,10 @@ export class HeuristicConnect4Solver extends Connect4Solver {
     threads = 1,
     timeoutMs = 0,
   ): Int32Array {
-    const mod = this.mod as unknown as HeuristicSolverModule;
+    const mod = this.mod;
     const allocatedMemory = this.allocateString(positionStr);
 
-    let outputPointer = 0;
-    if (this.width === 6 && this.height === 5)
-      outputPointer = mod._analyzeHeuristicPosition6x5(allocatedMemory, maxDepth, threads, timeoutMs);
-    else if (this.width === 6 && this.height === 6)
-      outputPointer = mod._analyzeHeuristicPosition6x6(allocatedMemory, maxDepth, threads, timeoutMs);
-    else if (this.width === 7 && this.height === 6)
-      outputPointer = mod._analyzeHeuristicPosition7x6(allocatedMemory, maxDepth, threads, timeoutMs);
-    else if (this.width === 7 && this.height === 7)
-      outputPointer = mod._analyzeHeuristicPosition7x7(allocatedMemory, maxDepth, threads, timeoutMs);
-    else if (this.width === 8 && this.height === 6)
-      outputPointer = mod._analyzeHeuristicPosition8x6(allocatedMemory, maxDepth, threads, timeoutMs);
-    else if (this.width === 9 && this.height === 7)
-      outputPointer = mod._analyzeHeuristicPosition9x7(allocatedMemory, maxDepth, threads, timeoutMs);
-    else if (this.width === 8 && this.height === 8)
-      outputPointer = mod._analyzeHeuristicPosition8x8(allocatedMemory, maxDepth, threads, timeoutMs);
-    else if (this.width === 10 && this.height === 7)
-      outputPointer = mod._analyzeHeuristicPosition10x7(allocatedMemory, maxDepth, threads, timeoutMs);
-    else if (this.width === 9 && this.height === 9)
-      outputPointer = mod._analyzeHeuristicPosition9x9(allocatedMemory, maxDepth, threads, timeoutMs);
-    else if (this.width === 9 && this.height === 6)
-      outputPointer = mod._analyzeHeuristicPosition9x6(allocatedMemory, maxDepth, threads, timeoutMs);
-    else if (this.width === 11 && this.height === 4)
-      outputPointer = mod._analyzeHeuristicPosition11x4(allocatedMemory, maxDepth, threads, timeoutMs);
-    else if (this.width === 10 && this.height === 10)
-      outputPointer = mod._analyzeHeuristicPosition10x10(allocatedMemory, maxDepth, threads, timeoutMs);
+    const outputPointer = mod._analyzeHeuristic(this.width, this.height, this._instancePtr, allocatedMemory, threads, maxDepth, timeoutMs);
 
     const dataLength = 3 + this.width;
     const finalData = new Int32Array(dataLength);

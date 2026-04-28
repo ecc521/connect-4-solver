@@ -25,48 +25,32 @@ export interface PositionAnalysis {
   depthReached?: number; // Actual depth reached during search
 }
 
+/**
+ * The core WASM Bridge Interface.
+ * 
+ * WebAssembly does not natively support garbage collection or complex objects.
+ * This interface bridges the TypeScript boundary to the C++ runtime using 
+ * raw integer memory pointers.
+ * 
+ * IMPORTANT: Because memory is allocated in the WASM heap, developers MUST
+ * manually call the respective _destroy* methods to prevent memory leaks.
+ */
 export interface SolverModule {
   stringToNewUTF8(str: string): number;
-  _analyzePosition6x5(pointer: number, threads: number): number;
-  _loadBook6x5(pointer: number): void;
-  _releaseSolver6x5(): void;
-  _analyzePosition6x6(pointer: number, threads: number): number;
-  _loadBook6x6(pointer: number): void;
-  _releaseSolver6x6(): void;
-  _analyzePosition7x6: (pos: number, threads: number) => number;
-  _analyzeHeuristicPosition7x6: (pos: number, depth: number, threads: number, timeout: number) => number;
-  _getNodeCount7x6: () => number;
-  _getNodeCountHeuristic7x6: () => number;
-  _releaseSolver7x6: () => void;
-
-  _createCache7x6: (bytes: number) => number;
-  _destroyCache7x6: (ptr: number) => void;
-  _createSolverWithCache7x6: (cachePtr: number) => number;
-  _destroySolver7x6: (ptr: number) => void;
-  _analyzePositionInstance7x6: (solverPtr: number, pos: number, threads: number) => number;
-  _loadBook7x6: (path: number) => void;
-
-  _analyzePosition7x7: (pointer: number, threads: number) => number;
-  _loadBook7x7: (path: number) => void;
-  _releaseSolver7x7(): void;
-  _analyzePosition8x6(pointer: number, threads: number): number;
-  _loadBook8x6(pointer: number): void;
-  _releaseSolver8x6(): void;
-  _analyzePosition9x7(pointer: number, threads: number): number;
-  _loadBook9x7(pointer: number): void;
-  _releaseSolver9x7(): void;
-  _analyzePosition8x8(pointer: number, threads: number): number;
-  _loadBook8x8(pointer: number): void;
-  _releaseSolver8x8(): void;
-  _analyzePosition10x7(pointer: number, threads: number): number;
-  _loadBook10x7(pointer: number): void;
-  _releaseSolver10x7(): void;
-  _analyzePosition9x9(pointer: number, threads: number): number;
-  _loadBook9x9(pointer: number): void;
-  _releaseSolver9x9(): void;
-  _analyzePosition10x10(pointer: number, threads: number): number;
-  _loadBook10x10(pointer: number): void;
-  _releaseSolver10x10(): void;
+  /** Allocates a Transposition Table in the WASM heap. Returns a raw pointer. */
+  _createCache: (w: number, h: number, bytes: number, is_heuristic: boolean) => number;
+  /** Frees a Transposition Table from the WASM heap. */
+  _destroyCache: (ptr: number) => void;
+  
+  /** Initializes a Solver bound to a specific Cache pointer. */
+  _createSolver: (w: number, h: number, cachePtr: number, is_heuristic: boolean) => number;
+  /** Destroys the Solver instance (but does NOT free the cache). */
+  _destroySolver: (w: number, h: number, ptr: number, is_heuristic: boolean) => void;
+  
+  _loadBook: (w: number, h: number, solverPtr: number, pathPtr: number) => void;
+  _analyzeExact: (w: number, h: number, solverPtr: number, posPtr: number, threads: number) => number;
+  _analyzeHeuristic: (w: number, h: number, solverPtr: number, posPtr: number, threads: number, max_depth: number, timeout: number) => number;
+  _getNodeCount: (w: number, h: number, solverPtr: number, is_heuristic: boolean) => number;
   UTF8ToString(pointer: number): string;
   _malloc(size: number): number;
   _free(pointer: number): void;
@@ -75,4 +59,48 @@ export interface SolverModule {
     writeFile(path: string, data: Uint8Array): void;
   };
   getValue(ptr: number, type: string): number;
+}
+
+/**
+ * Base abstract class for Connect 4 solvers to allow clean structural 
+ * sharing between WASM implementations and Native implementations
+ * without forcing double-bundling of the WASM glue code.
+ */
+export abstract class BaseConnect4Solver {
+  public width: number;
+  public height: number;
+  protected initialized = false;
+
+  constructor(
+    widthOrOpts?: number | { width?: number; height?: number; cache?: any },
+    heightOpt?: number
+  ) {
+    let width = 7;
+    let height = 6;
+
+    if (typeof widthOrOpts === "number") {
+      width = widthOrOpts;
+      if (heightOpt !== undefined) {
+        height = heightOpt;
+      }
+    } else if (widthOrOpts && typeof widthOrOpts === "object") {
+      if (widthOrOpts.width !== undefined) width = widthOrOpts.width;
+      if (widthOrOpts.height !== undefined) height = widthOrOpts.height;
+    }
+
+    const validSizes = ["6x5", "6x6", "7x6", "7x7", "8x6", "9x7", "8x8", "9x6", "11x4"];
+    if (!validSizes.includes(`${width}x${height}`)) {
+      throw new Error(
+        `Board size ${width}x${height} is not supported by the generated WASM bundle.`
+      );
+    }
+    this.width = width;
+    this.height = height;
+  }
+
+  abstract init(): Promise<void>;
+  abstract loadBook(data: Uint8Array): Promise<void>;
+  abstract analyze(positionStr: string, opts?: any): PositionAnalysis;
+  abstract analyzeAsync(positionStr: string, opts?: any): Promise<PositionAnalysis>;
+  abstract unload(): void;
 }

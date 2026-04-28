@@ -38,3 +38,10 @@ example/android/local.properties
 example/android/app/build/
 example/android/.cxx/
 example/.metro-health-check*
+
+# Ignore generated data directory
+data/
+
+# VitePress Generated
+docs/.vitepress/dist
+docs/.vitepress/cache

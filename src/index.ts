@@ -9,6 +9,7 @@ import {
   Evaluation,
   PositionAnalysis,
   SolverModule,
+  BaseConnect4Solver,
 } from "./core";
 
 const STATUS_WIN = 1;
@@ -19,7 +20,7 @@ const INT32_SIZE = 4;
 let Module: SolverModule | null = null;
 let _moduleInitPromise: Promise<void> | null = null;
 
-function getModuleInitPromise() {
+export function getModuleInitPromise() {
   if (!_moduleInitPromise) {
     /* eslint-disable @typescript-eslint/no-require-imports */
     const createModule = require("../build/analyze.js") as unknown as () => Promise<SolverModule>;
@@ -31,55 +32,56 @@ function getModuleInitPromise() {
   return _moduleInitPromise;
 }
 
-export class Connect4Solver {
-  protected initialized = false;
+export function getModule(): SolverModule {
+  if (!Module) {
+    throw new Error("Module not initialized. Call getModuleInitPromise() first.");
+  }
+  return Module;
+}
+
+export class Connect4Solver extends BaseConnect4Solver {
   private bookLoaded = false;
-  public width: number;
-  public height: number;
-  private _instancePtr: number = 0;
-  private _cache: import("./cache").SolverCache | null = null;
+  protected _instancePtr: number = 0;
+  protected _localCachePtr: number = 0;
+  protected _cache: import("./cache").SolverCache | null = null;
 
   constructor(
     widthOrOpts?: number | { width?: number; height?: number; cache?: import("./cache").SolverCache },
     heightOpt?: number
   ) {
-    let width = 7;
-    let height = 6;
-    let cache: import("./cache").SolverCache | undefined;
-
-    if (typeof widthOrOpts === 'object') {
-      width = widthOrOpts.width ?? 7;
-      height = widthOrOpts.height ?? 6;
-      cache = widthOrOpts.cache;
-    } else if (typeof widthOrOpts === 'number') {
-      width = widthOrOpts;
-      if (heightOpt !== undefined) height = heightOpt;
-    }
-
-    const validSizes = ["6x5", "6x6", "7x6", "7x7", "8x6", "9x7", "8x8", "9x6", "11x4"];
-    if (!validSizes.includes(`${width}x${height}`)) {
-      throw new Error(
-        `Board size ${width}x${height} is not supported by the generated WASM bundle.`,
-      );
-    }
-    this.width = width;
-    this.height = height;
+    super(widthOrOpts as any, heightOpt);
     
+    let cache: import("./cache").SolverCache | undefined;
+    if (typeof widthOrOpts === 'object') {
+      cache = widthOrOpts.cache;
+    }
+
     if (cache) {
-      if (width !== 7 || height !== 6) {
-        throw new Error("Shared caching is currently only supported via TypeScript for the 7x6 board size.");
-      }
       this._cache = cache;
     }
   }
 
+  protected get isHeuristic(): boolean {
+    return false;
+  }
+
+  /**
+   * Bootstraps the WASM Module and allocates the Transposition Table.
+   * Uses getModuleInitPromise() to ensure that even if multiple solver
+   * instances are created simultaneously, the WASM bridge only loads once
+   * preventing race conditions.
+   */
   async init(): Promise<void> {
     if (this.initialized) return;
     await getModuleInitPromise();
-    if (this._cache && this._instancePtr === 0) {
-      this._instancePtr = this.mod._createSolverWithCache7x6(this._cache.ptr);
-    }
     this.initialized = true;
+    if (this._instancePtr === 0) {
+      if (this._cache && this._cache.ptr === 0) {
+        throw new Error("Provided cache is not initialized. Call cache.init() first.");
+      }
+      const cachePtr = this._cache ? this._cache.ptr : (this._localCachePtr = this.mod._createCache(this.width, this.height, 1024 * 1024 * 64, false));
+      this._instancePtr = this.mod._createSolver(this.width, this.height, cachePtr, false);
+    }
   }
 
   protected get mod(): SolverModule {
@@ -98,19 +100,7 @@ export class Connect4Solver {
 
     const allocatedMemory = mod.stringToNewUTF8(bookFilePath);
 
-    if (this.width === 6 && this.height === 5)
-      mod._loadBook6x5(allocatedMemory);
-    else if (this.width === 6 && this.height === 6)
-      mod._loadBook6x6(allocatedMemory);
-    else if (this.width === 7 && this.height === 6)
-      mod._loadBook7x6(allocatedMemory);
-    else if (this.width === 7 && this.height === 7)
-      mod._loadBook7x7(allocatedMemory);
-    else if (this.width === 8 && this.height === 6)
-      mod._loadBook8x6(allocatedMemory);
-    else if (this.width === 9 && this.height === 7)
-      mod._loadBook9x7(allocatedMemory);
-
+    mod._loadBook(this.width, this.height, this._instancePtr, allocatedMemory);
     mod._free(allocatedMemory);
     this.bookLoaded = true;
   }
@@ -123,21 +113,7 @@ export class Connect4Solver {
     const mod = this.mod;
     const allocatedMemory = this.allocateString(positionStr);
 
-    let outputPointer = 0;
-    if (this._instancePtr !== 0) {
-      outputPointer = mod._analyzePositionInstance7x6(this._instancePtr, allocatedMemory, threads);
-    } else if (this.width === 6 && this.height === 5)
-      outputPointer = mod._analyzePosition6x5(allocatedMemory, threads);
-    else if (this.width === 6 && this.height === 6)
-      outputPointer = mod._analyzePosition6x6(allocatedMemory, threads);
-    else if (this.width === 7 && this.height === 6)
-      outputPointer = mod._analyzePosition7x6(allocatedMemory, threads);
-    else if (this.width === 7 && this.height === 7)
-      outputPointer = mod._analyzePosition7x7(allocatedMemory, threads);
-    else if (this.width === 8 && this.height === 6)
-      outputPointer = mod._analyzePosition8x6(allocatedMemory, threads);
-    else if (this.width === 9 && this.height === 7)
-      outputPointer = mod._analyzePosition9x7(allocatedMemory, threads);
+    let outputPointer = mod._analyzeExact(this.width, this.height, this._instancePtr, allocatedMemory, threads);
 
     const dataLength = 2 + this.width;
     const finalData = new Int32Array(dataLength);
@@ -279,28 +255,26 @@ export class Connect4Solver {
   }
 
   /**
-   * Instantly releases the native WASM memory caches allocated for this specific board size back to the OS.
-   * Useful when navigating away from a game screen to prevent memory stacking.
+   * Destroys the explicitly allocated WASM pointer instances (including the implicit cache, if applicable).
+   * 
+   * **Note:** This does NOT destroy a shared cache if one was explicitly passed to the constructor.
+   * You must manually call `sharedCache.destroy()` on your shared cache instance when your app terminates.
+   * 
+   * IMPORTANT: WebAssembly does not support automated Garbage Collection
+   * for native pointers. You must call this function when the solver is 
+   * no longer needed to prevent memory leaks in your web/Node application.
    */
   unload(): void {
     if (!this.initialized) return;
     const mod = this.mod;
     if (this._instancePtr !== 0) {
-      mod._destroySolver7x6(this._instancePtr);
+      mod._destroySolver(this.width, this.height, this._instancePtr, this.isHeuristic);
       this._instancePtr = 0;
-      return;
     }
-    
-    if (this.width === 6 && this.height === 5) mod._releaseSolver6x5();
-    else if (this.width === 6 && this.height === 6) mod._releaseSolver6x6();
-    else if (this.width === 7 && this.height === 6) mod._releaseSolver7x6();
-    else if (this.width === 7 && this.height === 7) mod._releaseSolver7x7();
-    else if (this.width === 8 && this.height === 6) mod._releaseSolver8x6();
-    else if (this.width === 9 && this.height === 7) mod._releaseSolver9x7();
-    else if (this.width === 8 && this.height === 8) mod._releaseSolver8x8();
-    else if (this.width === 10 && this.height === 7) mod._releaseSolver10x7();
-    else if (this.width === 9 && this.height === 9) mod._releaseSolver9x9();
-    else if (this.width === 10 && this.height === 10) mod._releaseSolver10x10();
+    if (this._localCachePtr !== 0) {
+      mod._destroyCache(this._localCachePtr);
+      this._localCachePtr = 0;
+    }
   }
 }
 

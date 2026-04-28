@@ -18,7 +18,7 @@ This repository provides an extremely fast, high-performance, and "perfect" Conn
   Stores `.txt` files containing tens of thousands of pre-evaluated Connect 4 positions across various board sizes. These are used extensively by Jest to run continuous parity tests to ensure the TS wrapper outputs match the pure C++ expectations.
 
 * **`data/`**
-  Houses the highly-optimized `.cbook` (Cuckoo Table) opening books. These files are securely read and loaded by the solver to instantiate zero-latency early-game positional caches.
+  Houses the highly-optimized `.cbook` (Compressed Book) and `.book` (Dense Book) opening books. These files are securely read and loaded by the solver to instantiate zero-latency early-game positional caches.
 
 * **`build.sh`**
   The script responsible for running `emcc` (Emscripten) against the `native/` C++ files. It generates the `build/analyze.js` and `build/analyze_threaded.js` WASM bundles.
