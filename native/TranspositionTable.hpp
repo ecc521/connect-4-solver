@@ -124,6 +124,8 @@ class TranspositionTable {
     
     return 0;
   }
+
+
 };
 
 } // namespace Connect4

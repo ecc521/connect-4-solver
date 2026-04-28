@@ -40,11 +40,11 @@ export class ThreadedConnect4Solver extends Connect4Solver {
     }
     return ThreadedModule as unknown as SolverModule;
   }
-  analyze(positionStr: string, opts?: { threads?: number }): import("./index").PositionAnalysis {
+  analyze(positionStr: string, opts?: { threads?: number, book?: import("./book").OpeningBook }): import("./index").PositionAnalysis {
     return super.analyze(positionStr, opts);
   }
 
-  async analyzeAsync(positionStr: string, opts?: { threads?: number }): Promise<import("./index").PositionAnalysis> {
+  async analyzeAsync(positionStr: string, opts?: { threads?: number, book?: import("./book").OpeningBook }): Promise<import("./index").PositionAnalysis> {
     return super.analyzeAsync(positionStr, opts);
   }
 }

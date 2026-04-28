@@ -91,29 +91,17 @@ export class Connect4Solver extends BaseConnect4Solver {
     return Module as unknown as SolverModule;
   }
 
-  async loadBook(data: Uint8Array): Promise<void> {
-    if (!this.initialized) await this.init();
-    const mod = this.mod;
 
-    const bookFilePath = `book_${this.width}x${this.height}.book`;
-    mod.FS.writeFile(bookFilePath, data);
-
-    const allocatedMemory = mod.stringToNewUTF8(bookFilePath);
-
-    mod._loadBook(this.width, this.height, this._instancePtr, allocatedMemory);
-    mod._free(allocatedMemory);
-    this.bookLoaded = true;
-  }
 
   protected allocateString(str: string): number {
     return this.mod.stringToNewUTF8(str);
   }
 
-  protected rawAnalyze(positionStr: string, threads = 1): Int32Array {
+  protected rawAnalyze(positionStr: string, threads = 1, bookPtr = 0): Int32Array {
     const mod = this.mod;
     const allocatedMemory = this.allocateString(positionStr);
 
-    let outputPointer = mod._analyzeExact(this.width, this.height, this._instancePtr, allocatedMemory, threads);
+    let outputPointer = mod._analyzeExact(this.width, this.height, this._instancePtr, allocatedMemory, threads, bookPtr);
 
     const dataLength = 2 + this.width;
     const finalData = new Int32Array(dataLength);
@@ -163,8 +151,8 @@ export class Connect4Solver extends BaseConnect4Solver {
     }
   }
 
-  analyze(positionStr: string, opts?: { threads?: number }): PositionAnalysis {
-    const resArr = this.rawAnalyze(positionStr, opts?.threads ?? 1);
+  analyze(positionStr: string, opts?: { threads?: number, book?: import("./book").OpeningBook }): PositionAnalysis {
+    const resArr = this.rawAnalyze(positionStr, opts?.threads ?? 1, opts?.book ? opts.book.ptr : 0);
 
     const originalPosition = positionStr;
     const status = resArr[0];
@@ -281,3 +269,4 @@ export class Connect4Solver extends BaseConnect4Solver {
 export * from "./cache";
 export * from "./threaded";
 export * from "./heuristic";
+export * from "./book";

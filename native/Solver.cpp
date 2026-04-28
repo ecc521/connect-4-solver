@@ -40,7 +40,7 @@ namespace Connect4 {
  * - if alpha <= actual score <= beta then return value = actual score
  */
 template <typename SlotType>
-int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
+int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const OpeningBookBase* book) {
   assert(alpha < beta);
   assert(!P.canWinNext());
 
@@ -120,7 +120,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
   while(Position::position_t next = moves.getNext()) {
     Position P2(P);
     P2.play(next);  // It's opponent turn in P2 position after current player plays x column.
-    int score = -negamax(P2, -beta, -alpha); // explore opponent's score within [-beta;-alpha] windows:
+    int score = -negamax(P2, -beta, -alpha, book); // explore opponent's score within [-beta;-alpha] windows:
     if(score >= beta) {
       if constexpr (Position::WIDTH >= 8) {
 #if BOARD_WIDTH_MACRO >= 8
@@ -154,9 +154,14 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta) {
 }
 
 template <typename SlotType>
-int SolverImpl<SlotType>::solve(const Position &P, bool weak) {
+int SolverImpl<SlotType>::solve(const Position &P, bool weak, const OpeningBookBase* book) {
   if(P.canWinNext()) // check if win in one move as the Negamax function does not support this case.
     return (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
+  
+  if(book) {
+    if(int val = book->get(P)) return val + Position::MIN_SCORE - 1; // look for solutions stored in opening book
+  }
+  
   int min = -(Position::WIDTH * Position::HEIGHT - P.nbMoves()) / 2;
   int max = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
   if(weak) {
@@ -168,7 +173,7 @@ int SolverImpl<SlotType>::solve(const Position &P, bool weak) {
     int med = min + (max - min) / 2;
     if(med <= 0 && min / 2 < med) med = min / 2;
     else if(med >= 0 && max / 2 > med) med = max / 2;
-    int r = negamax(P, med, med + 1);   // use a null depth window to know if the actual score is greater or smaller than med
+    int r = negamax(P, med, med + 1, book);   // use a null depth window to know if the actual score is greater or smaller than med
     if(r <= med) max = r;
     else min = r;
   }
@@ -176,7 +181,7 @@ int SolverImpl<SlotType>::solve(const Position &P, bool weak) {
 }
 
 template <typename SlotType>
-std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads) {
+std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads, const OpeningBookBase* book) {
   (void)threads;
   std::vector<int> scores(Position::WIDTH, -1000);
 
@@ -190,7 +195,7 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
         } else {
           Position P2(P);
           P2.playCol(col);
-          scores[col] = -solve(P2, weak);
+          scores[col] = -solve(P2, weak, book);
         }
       }
     }
@@ -211,7 +216,7 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
         } else {
           Position P2(P);
           P2.playCol(col);
-          scores[col] = -solve(P2, weak);
+          scores[col] = -solve(P2, weak, book);
         }
       }
     }
@@ -241,7 +246,7 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
       else {
         Position P2(P);
         P2.playCol(col);
-        scores[col] = -solve(P2, weak);
+        scores[col] = -solve(P2, weak, book);
       }
     }
   }

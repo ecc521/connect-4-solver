@@ -63,11 +63,10 @@ class Solver {
  public:
   static const int INVALID_MOVE = -1000;
 
-  virtual int solve(const Position &P, bool weak = false) = 0;
-  virtual std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1) = 0;
+  virtual int solve(const Position &P, bool weak = false, const OpeningBookBase* book = nullptr) = 0;
+  virtual std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase* book = nullptr) = 0;
   virtual unsigned long long getNodeCount() const = 0;
   virtual void reset() = 0;
-  virtual void loadBook(std::string book_file) = 0;
 
   virtual ~Solver() {}
 
@@ -77,15 +76,16 @@ class Solver {
 
 template <typename SlotType>
 class SolverImpl : public Solver {
- private:
+ public:
   static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
   std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
-  std::unique_ptr<OpeningBookBase> book;
   std::atomic<unsigned long long> nodeCount;
+
+ private:
   int columnOrder[Position::WIDTH];
   int32_t history[Position::WIDTH * (Position::HEIGHT + 1)];
 
-  int negamax(const Position &P, int alpha, int beta);
+  int negamax(const Position &P, int alpha, int beta, const OpeningBookBase* book);
 
  public:
 
@@ -99,8 +99,8 @@ class SolverImpl : public Solver {
     }
   }
 
-  int solve(const Position &P, bool weak = false) override;
-  std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1) override;
+  int solve(const Position &P, bool weak = false, const OpeningBookBase* book = nullptr) override;
+  std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase* book = nullptr) override;
 
   unsigned long long getNodeCount() const override {
     return nodeCount;
@@ -113,12 +113,6 @@ class SolverImpl : public Solver {
       history[i] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[i];
     }
   }
-
-  void loadBook(std::string book_file) override {
-    book = OpeningBookBase::load(book_file, Position::WIDTH, Position::HEIGHT);
-  }
-
-
 };
 
 } // namespace Connect4

@@ -47,8 +47,9 @@ export interface SolverModule {
   /** Destroys the Solver instance (but does NOT free the cache). */
   _destroySolver: (w: number, h: number, ptr: number, is_heuristic: boolean) => void;
   
-  _loadBook: (w: number, h: number, solverPtr: number, pathPtr: number) => void;
-  _analyzeExact: (w: number, h: number, solverPtr: number, posPtr: number, threads: number) => number;
+  _createBook: (w: number, h: number, pathPtr: number) => number;
+  _destroyBook: (ptr: number) => void;
+  _analyzeExact: (w: number, h: number, solverPtr: number, posPtr: number, threads: number, bookPtr: number) => number;
   _analyzeHeuristic: (w: number, h: number, solverPtr: number, posPtr: number, threads: number, max_depth: number, timeout: number) => number;
   _getNodeCount: (w: number, h: number, solverPtr: number, is_heuristic: boolean) => number;
   UTF8ToString(pointer: number): string;
@@ -99,7 +100,6 @@ export abstract class BaseConnect4Solver {
   }
 
   abstract init(): Promise<void>;
-  abstract loadBook(data: Uint8Array): Promise<void>;
   abstract analyze(positionStr: string, opts?: any): PositionAnalysis;
   abstract analyzeAsync(positionStr: string, opts?: any): Promise<PositionAnalysis>;
   abstract unload(): void;

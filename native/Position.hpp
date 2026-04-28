@@ -378,6 +378,32 @@ class GenericPosition {
   bool isWinningMove(int col) const {
     return winning_position() & possible() & column_mask(col);
   }
+  static GenericPosition fromKey(position_t key) {
+    GenericPosition P;
+    P.current_position = 0;
+    P.mask = 0;
+    P.moves = 0;
+    for (int col = 0; col < WIDTH; col++) {
+      position_t col_shift = col * (HEIGHT + 1);
+      position_t col_mask = (1ULL << (HEIGHT + 1)) - 1;
+      position_t k_col = (key >> col_shift) & col_mask;
+      
+      if (k_col == 0) continue; // invalid key without bottom mask
+      
+      int highest_bit = 63 - __builtin_clzll(k_col);
+      position_t pos_col = k_col - (1ULL << highest_bit);
+      position_t m_col = (1ULL << highest_bit) - 1;
+      
+      P.current_position |= (pos_col << col_shift);
+      P.mask |= (m_col << col_shift);
+      P.moves += highest_bit;
+    }
+    return P;
+  }
+
+  position_t getCurrentPosition() const { return current_position; }
+  position_t getMask() const { return mask; }
+
 
  private:
   position_t current_position; // bitmap of the current_player stones
