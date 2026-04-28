@@ -35,10 +35,10 @@ describe("Polymorphic Dense Book Packing", () => {
     ];
     fs.writeFileSync(mockTxt, positions.join("\n") + "\n");
 
-    execSync('cd tools && make clean && make pack_dense_book CXXFLAGS="--std=c++14 -W -Wall -O3 -DNDEBUG -I../native -march=native -DBOARD_WIDTH_MACRO=7 -DBOARD_HEIGHT_MACRO=6"', { stdio: "ignore" });
+    execSync('cd tools && make clean && make pack_dense_book CXXFLAGS="--std=c++14 -W -Wall -O3 -DNDEBUG -I../native -march=native -DBOARD_WIDTH_MACRO=7 -DBOARD_HEIGHT_MACRO=6"', { stdio: "inherit" });
 
-    execSync(`cd tools && ./pack_dense_book 5 < ../__tests__/mock_scored.txt`, { stdio: "ignore" });
-    execSync(`cd tools && ./pack_dense_book 14 < ../__tests__/mock_scored.txt`, { stdio: "ignore" });
+    execSync(`cd tools && ./pack_dense_book 5 < ../__tests__/mock_scored.txt`, { stdio: "inherit" });
+    execSync(`cd tools && ./pack_dense_book 14 < ../__tests__/mock_scored.txt`, { stdio: "inherit" });
     execSync(`cd tools && ./pack_dense_book 20 < ../__tests__/mock_scored.txt`, { stdio: "ignore" });
   });
 

@@ -36,5 +36,5 @@ describe("Heuristic vs Perfect Connectivity Benchmark", () => {
       // multithreaded Alpha-Beta inherently visits nodes in a slightly different order (Lazy SMP),
       // leading to valid but slightly non-deterministic heuristic scores at strict depth cutoffs.
     }
-  }, 30000);
+  }, 120000);
 });

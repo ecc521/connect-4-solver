@@ -305,7 +305,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 }
 
 template <int WIDTH, int HEIGHT>
-HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache) : transTable(cache), nodeCount{0} {
+HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, CACHE_BUCKET_SIZE, uint32_t, 32>> cache) : transTable(cache), nodeCount{0} {
   for(int i = 0; i < WIDTH; i++) // initialize the column exploration order, starting with center columns
     columnOrder[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; // example for WIDTH=7: columnOrder = {3, 4, 2, 5, 1, 6, 0}
   for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {

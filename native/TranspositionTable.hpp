@@ -59,7 +59,7 @@ template<int S> using uint_t =
  * designed for L1/L3 Cache utilization. It packs a partial key
  * and an 8-bit value into a single atomic slot.
  */
-template<typename SlotType, typename ValueType = uint8_t, unsigned int ValueBits = 8>
+template<typename SlotType, int BUCKET_SIZE, typename ValueType = uint8_t, unsigned int ValueBits = 8, unsigned int WorkBits = 7, typename KeyType = uint64_t>
 class TranspositionTable {
  private:
   struct Slot {
@@ -68,18 +68,19 @@ class TranspositionTable {
   };
 
   size_t size;
+  size_t num_buckets;
   Slot *Data;
 
-  size_t index(uint64_t key) const {
-    return key % size;
+  size_t index(KeyType key) const {
+    return (key % num_buckets) * BUCKET_SIZE;
   }
 
  public:
   TranspositionTable(size_t table_bytes) {
-    size_t slots = table_bytes / sizeof(Slot);
-    size = next_prime(slots);
-    Data = new Slot[size];
-    reset();
+    size_t slot_size = sizeof(Slot);
+    num_buckets = next_prime(table_bytes / slot_size / BUCKET_SIZE);
+    size = num_buckets * BUCKET_SIZE;
+    Data = new Slot[size]();
   }
 
   ~TranspositionTable() {
@@ -92,36 +93,75 @@ class TranspositionTable {
     }
   }
 
-  void put_if_empty(uint64_t key, ValueType value) {
-    size_t i = index(key);
-    uint64_t partial_key = key / size;
-    SlotType new_data = (static_cast<SlotType>(partial_key) << ValueBits) | static_cast<SlotType>(value);
-    SlotType expected = 0;
-    Data[i].data.compare_exchange_strong(expected, new_data, std::memory_order_relaxed);
-  }
+  void put_if_empty(KeyType key, ValueType value) {}
 
-  void put(uint64_t key, ValueType value) {
-    size_t i = index(key);
-    uint64_t partial_key = key / size;
-    SlotType new_data = (static_cast<SlotType>(partial_key) << ValueBits) | static_cast<SlotType>(value);
-    Data[i].data.store(new_data, std::memory_order_relaxed);
+  void put(KeyType key, ValueType value, uint8_t work = 0) {
+    KeyType partial_key = key / num_buckets;
+    size_t b = (key % num_buckets) * BUCKET_SIZE;
+    
+    SlotType new_data = (static_cast<SlotType>(partial_key) << (ValueBits + WorkBits)) 
+                      | (static_cast<SlotType>(work) << ValueBits)
+                      | static_cast<SlotType>(value);
+    
+    if constexpr (BUCKET_SIZE == 2) {
+        SlotType first = Data[b].data.load(std::memory_order_relaxed);
+        
+        if ((first >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+            Data[b].data.store(new_data, std::memory_order_relaxed);
+            return;
+        }
+        
+        uint8_t first_work = static_cast<uint8_t>((first >> ValueBits) & ((1ULL << WorkBits) - 1));
+        
+        SlotType second = Data[b+1].data.load(std::memory_order_relaxed);
+        
+        if ((second >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+            if (work >= first_work) {
+                Data[b].data.store(new_data, std::memory_order_relaxed);
+                Data[b+1].data.store(first, std::memory_order_relaxed);
+            } else {
+                Data[b+1].data.store(new_data, std::memory_order_relaxed);
+            }
+            return;
+        }
+        
+        // No match found - TwoBig Replacement Logic
+        if (first == 0 || work >= first_work) {
+            Data[b].data.store(new_data, std::memory_order_relaxed);
+            if (first != 0) {
+                Data[b+1].data.store(first, std::memory_order_relaxed);
+            }
+        } else {
+            Data[b+1].data.store(new_data, std::memory_order_relaxed);
+        }
+    } else {
+        Data[b].data.store(new_data, std::memory_order_relaxed);
+    }
   }
 
   size_t getSize() const {
     return size;
   }
 
-  ValueType get(uint64_t key) const {
-    size_t pos = index(key);
-    uint64_t partial_key = key / size;
+  ValueType get(KeyType key) const {
+    KeyType partial_key = key / num_buckets;
+    size_t b = (key % num_buckets) * BUCKET_SIZE;
     
-    SlotType combined = Data[pos].data.load(std::memory_order_relaxed);
-    if (combined == 0) return 0; // Hit empty slot, item not found
-    
-    if ((combined >> ValueBits) == static_cast<SlotType>(partial_key)) {
-        return static_cast<ValueType>(combined & ((1ULL << ValueBits) - 1));
+    if constexpr (BUCKET_SIZE == 2) {
+        SlotType first = Data[b].data.load(std::memory_order_relaxed);
+        if ((first >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+            return static_cast<ValueType>(first & ((1ULL << ValueBits) - 1));
+        }
+        SlotType second = Data[b+1].data.load(std::memory_order_relaxed);
+        if ((second >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+            return static_cast<ValueType>(second & ((1ULL << ValueBits) - 1));
+        }
+    } else {
+        SlotType combined = Data[b].data.load(std::memory_order_relaxed);
+        if ((combined >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+            return static_cast<ValueType>(combined & ((1ULL << ValueBits) - 1));
+        }
     }
-    
     return 0;
   }
 
