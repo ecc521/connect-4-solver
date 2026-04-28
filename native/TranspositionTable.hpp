@@ -68,16 +68,17 @@ class TranspositionTable {
   };
 
   size_t size;
+  size_t num_buckets;
   Slot *Data;
 
   size_t index(KeyType key) const {
-    return (key % (size / BUCKET_SIZE)) * BUCKET_SIZE;
+    return (key % num_buckets) * BUCKET_SIZE;
   }
 
  public:
   TranspositionTable(size_t table_bytes) {
     size_t slot_size = sizeof(Slot);
-    size_t num_buckets = next_prime(table_bytes / slot_size / BUCKET_SIZE);
+    num_buckets = next_prime(table_bytes / slot_size / BUCKET_SIZE);
     size = num_buckets * BUCKET_SIZE;
     Data = new Slot[size]();
   }
@@ -96,7 +97,7 @@ class TranspositionTable {
 
   void put(KeyType key, ValueType value, uint8_t work = 0) {
     size_t b = index(key);
-    KeyType partial_key = key / (size / BUCKET_SIZE);
+    KeyType partial_key = key / num_buckets;
     
     SlotType new_data = (static_cast<SlotType>(partial_key) << (ValueBits + WorkBits)) 
                       | (static_cast<SlotType>(work) << ValueBits)
@@ -106,11 +107,8 @@ class TranspositionTable {
         SlotType first = Data[b].data.load(std::memory_order_relaxed);
         SlotType second = Data[b+1].data.load(std::memory_order_relaxed);
         
-        SlotType partial_shifted = static_cast<SlotType>(partial_key) << (ValueBits + WorkBits);
-        SlotType mask = static_cast<SlotType>(~((1ULL << (ValueBits + WorkBits)) - 1));
-        
-        bool match0 = (first != 0 && (first & mask) == partial_shifted);
-        bool match1 = (second != 0 && (second & mask) == partial_shifted);
+        bool match0 = ((first >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key));
+        bool match1 = ((second >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key));
         
         uint8_t first_work = static_cast<uint8_t>((first >> ValueBits) & ((1ULL << WorkBits) - 1));
         
@@ -153,14 +151,20 @@ class TranspositionTable {
 
   ValueType get(KeyType key) const {
     size_t b = index(key);
-    KeyType partial_key = key / (size / BUCKET_SIZE);
-    SlotType partial_shifted = static_cast<SlotType>(partial_key) << (ValueBits + WorkBits);
-    SlotType mask = static_cast<SlotType>(~((1ULL << (ValueBits + WorkBits)) - 1));
+    KeyType partial_key = key / num_buckets;
     
-    for (unsigned int i = 0; i < BUCKET_SIZE; i++) {
-        SlotType combined = Data[b + i].data.load(std::memory_order_relaxed);
-        if (combined == 0) continue;
-        if ((combined & mask) == partial_shifted) {
+    if constexpr (BUCKET_SIZE == 2) {
+        SlotType first = Data[b].data.load(std::memory_order_relaxed);
+        if ((first >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+            return static_cast<ValueType>(first & ((1ULL << ValueBits) - 1));
+        }
+        SlotType second = Data[b+1].data.load(std::memory_order_relaxed);
+        if ((second >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+            return static_cast<ValueType>(second & ((1ULL << ValueBits) - 1));
+        }
+    } else {
+        SlotType combined = Data[b].data.load(std::memory_order_relaxed);
+        if ((combined >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
             return static_cast<ValueType>(combined & ((1ULL << ValueBits) - 1));
         }
     }
