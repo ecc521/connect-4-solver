@@ -16,7 +16,7 @@ export default defineConfig({
       {
         text: 'Guide',
         items: [
-          { text: 'Getting Started', link: '/' },
+          { text: 'Getting Started', link: '/getting-started' },
           { text: 'Solution Books', link: '/solution-books' },
           { text: 'Memory & Caches', link: '/cache' },
           { text: 'WebWorkers (Async)', link: '/web-workers' },
@@ -25,9 +25,8 @@ export default defineConfig({
       {
         text: 'Solvers API',
         items: [
-          { text: 'Connect4Solver', link: '/api/standard' },
-          { text: 'ThreadedConnect4Solver', link: '/api/threaded' },
-          { text: 'HeuristicConnect4Solver', link: '/api/heuristic' },
+          { text: 'Connect4Solver', link: '/api/connect4solver' },
+          { text: 'AsyncConnect4Solver', link: '/api/async-connect4solver' },
           { text: 'ReactNativeConnect4Solver', link: '/api/react-native' },
         ]
       }

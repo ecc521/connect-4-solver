@@ -59,7 +59,7 @@ template<int S> using uint_t =
  * designed for L1/L3 Cache utilization. It packs a partial key
  * and an 8-bit value into a single atomic slot.
  */
-template<typename SlotType, int BUCKET_SIZE, typename ValueType = uint8_t, unsigned int ValueBits = 8, unsigned int WorkBits = 7, typename KeyType = uint64_t>
+template<typename SlotType, typename ValueType = uint8_t, unsigned int ValueBits = 8, unsigned int WorkBits = 7, typename KeyType = uint64_t>
 class TranspositionTable {
  private:
   struct Slot {
@@ -67,20 +67,24 @@ class TranspositionTable {
     Slot() : data(0) {}
   };
 
+  struct alignas(sizeof(SlotType) * 2) Bucket {
+    Slot slots[2];
+  };
+
   size_t size;
   size_t num_buckets;
-  Slot *Data;
+  Bucket *Data;
 
   size_t index(KeyType key) const {
-    return (key % num_buckets) * BUCKET_SIZE;
+    return (key % num_buckets);
   }
 
  public:
   TranspositionTable(size_t table_bytes) {
-    size_t slot_size = sizeof(Slot);
-    num_buckets = next_prime(table_bytes / slot_size / BUCKET_SIZE);
-    size = num_buckets * BUCKET_SIZE;
-    Data = new Slot[size]();
+    size_t bucket_size = sizeof(Bucket);
+    num_buckets = next_prime(table_bytes / bucket_size);
+    size = num_buckets * 2;
+    Data = new Bucket[num_buckets]();
   }
 
   ~TranspositionTable() {
@@ -88,8 +92,9 @@ class TranspositionTable {
   }
 
   void reset() {
-    for (size_t i = 0; i < size; i++) {
-      Data[i].data.store(0, std::memory_order_relaxed);
+    for (size_t i = 0; i < num_buckets; i++) {
+      Data[i].slots[0].data.store(0, std::memory_order_relaxed);
+      Data[i].slots[1].data.store(0, std::memory_order_relaxed);
     }
   }
 
@@ -97,45 +102,41 @@ class TranspositionTable {
 
   void put(KeyType key, ValueType value, uint8_t work = 0) {
     KeyType partial_key = key / num_buckets;
-    size_t b = (key % num_buckets) * BUCKET_SIZE;
+    size_t b = index(key);
     
     SlotType new_data = (static_cast<SlotType>(partial_key) << (ValueBits + WorkBits)) 
                       | (static_cast<SlotType>(work) << ValueBits)
                       | static_cast<SlotType>(value);
     
-    if constexpr (BUCKET_SIZE == 2) {
-        SlotType first = Data[b].data.load(std::memory_order_relaxed);
-        
-        if ((first >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
-            Data[b].data.store(new_data, std::memory_order_relaxed);
-            return;
-        }
-        
-        uint8_t first_work = static_cast<uint8_t>((first >> ValueBits) & ((1ULL << WorkBits) - 1));
-        
-        SlotType second = Data[b+1].data.load(std::memory_order_relaxed);
-        
-        if ((second >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
-            if (work >= first_work) {
-                Data[b].data.store(new_data, std::memory_order_relaxed);
-                Data[b+1].data.store(first, std::memory_order_relaxed);
-            } else {
-                Data[b+1].data.store(new_data, std::memory_order_relaxed);
-            }
-            return;
-        }
-        
-        // No match found - TwoBig Replacement Logic
-        if (first == 0 || work >= first_work) {
-            Data[b].data.store(new_data, std::memory_order_relaxed);
-            if (first != 0) {
-                Data[b+1].data.store(first, std::memory_order_relaxed);
-            }
+    SlotType first = Data[b].slots[0].data.load(std::memory_order_relaxed);
+    
+    if ((first >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+        Data[b].slots[0].data.store(new_data, std::memory_order_relaxed);
+        return;
+    }
+    
+    uint8_t first_work = static_cast<uint8_t>((first >> ValueBits) & ((1ULL << WorkBits) - 1));
+    
+    SlotType second = Data[b].slots[1].data.load(std::memory_order_relaxed);
+    
+    if ((second >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+        if (work >= first_work) {
+            Data[b].slots[0].data.store(new_data, std::memory_order_relaxed);
+            Data[b].slots[1].data.store(first, std::memory_order_relaxed);
         } else {
-            Data[b+1].data.store(new_data, std::memory_order_relaxed);
+            Data[b].slots[1].data.store(new_data, std::memory_order_relaxed);
+        }
+        return;
+    }
+    
+    // No match found - TwoBig Replacement Logic
+    if (first == 0 || work >= first_work) {
+        Data[b].slots[0].data.store(new_data, std::memory_order_relaxed);
+        if (first != 0) {
+            Data[b].slots[1].data.store(first, std::memory_order_relaxed);
         }
     } else {
-        Data[b].data.store(new_data, std::memory_order_relaxed);
+        Data[b].slots[1].data.store(new_data, std::memory_order_relaxed);
     }
   }
 
@@ -145,27 +146,18 @@ class TranspositionTable {
 
   ValueType get(KeyType key) const {
     KeyType partial_key = key / num_buckets;
-    size_t b = (key % num_buckets) * BUCKET_SIZE;
+    size_t b = index(key);
     
-    if constexpr (BUCKET_SIZE == 2) {
-        SlotType first = Data[b].data.load(std::memory_order_relaxed);
-        if ((first >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
-            return static_cast<ValueType>(first & ((1ULL << ValueBits) - 1));
-        }
-        SlotType second = Data[b+1].data.load(std::memory_order_relaxed);
-        if ((second >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
-            return static_cast<ValueType>(second & ((1ULL << ValueBits) - 1));
-        }
-    } else {
-        SlotType combined = Data[b].data.load(std::memory_order_relaxed);
-        if ((combined >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
-            return static_cast<ValueType>(combined & ((1ULL << ValueBits) - 1));
-        }
+    SlotType first = Data[b].slots[0].data.load(std::memory_order_relaxed);
+    if ((first >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+        return static_cast<ValueType>(first & ((1ULL << ValueBits) - 1));
+    }
+    SlotType second = Data[b].slots[1].data.load(std::memory_order_relaxed);
+    if ((second >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+        return static_cast<ValueType>(second & ((1ULL << ValueBits) - 1));
     }
     return 0;
   }
-
-
 };
 
 } // namespace Connect4

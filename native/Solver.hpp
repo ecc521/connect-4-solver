@@ -23,15 +23,11 @@
 #include <string>
 #include <memory>
 #include <atomic>
-
-#ifndef CACHE_BUCKET_SIZE
-#define CACHE_BUCKET_SIZE 2
-#endif
 #include <cstdint>
+#include "Cache.hpp"
 #include "Position.hpp"
 #include "TranspositionTable.hpp"
 #include "OpeningBook.hpp"
-#include "Cache.hpp"
 
 namespace GameSolver {
 namespace Connect4 {
@@ -47,25 +43,6 @@ constexpr int getRequiredValueBits() {
     return 8;
 }
 
-/**
- * Calculates the absolute minimum transposition table size (in bytes) required to safely 
- * use a specific SlotType (e.g. uint32_t vs uint64_t) without risking silent cache collisions.
- *
- * Mathematical Silent Replacement Protection (CRT):
- * The engine packs an alpha-beta score and a "partial key" into a single atomic integer (SlotType).
- * The full 64-bit board key is mathematically reconstructed using the Chinese Remainder Theorem:
- *   full_key = partial_key * (table_slots) + (bucket_index)
- * 
- * For this math to hold, the partial_key MUST fit exactly within the remaining bits of the SlotType
- * after the value bits are reserved. If the table is too small, `table_slots` is small, meaning
- * `key / table_slots` (the partial_key) becomes very large. If partial_key exceeds the available 
- * bits in SlotType, it truncates. Truncation causes two completely different board states to 
- * generate the exact same partial_key AND bucket_index, leading to catastrophic false positives
- * during the search.
- *
- * To prevent this, the table must be large enough so that the modulus (table_slots) shrinks 
- * the partial_key to a size that safely fits within the SlotType's available bits.
- */
 template <typename SlotType>
 constexpr uint64_t getMinimumTableBytes() {
     constexpr int board_bits = Position::WIDTH * (Position::HEIGHT + 1);
@@ -78,10 +55,8 @@ constexpr uint64_t getMinimumTableBytes() {
     constexpr int index_bits = board_bits - partial_key_bits;
     if (index_bits >= 64) return UINT64_MAX; // Mathematically impossible
     
-    return (1ULL << index_bits) * CACHE_BUCKET_SIZE * sizeof(SlotType);
+    return (1ULL << index_bits) * 2 * sizeof(SlotType);
 }
-
-#include "Cache.hpp"
 
 class Solver {
  public:
@@ -102,7 +77,7 @@ template <typename SlotType>
 class SolverImpl : public Solver {
  public:
   static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
-  std::shared_ptr<TranspositionTable<SlotType, CACHE_BUCKET_SIZE, uint8_t, VALUE_BITS>> transTable;
+  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
   std::atomic<unsigned long long> nodeCount;
 
  private:
@@ -114,7 +89,7 @@ class SolverImpl : public Solver {
  public:
 
   SolverImpl(size_t table_bytes) 
-    : transTable(std::make_shared<TranspositionTable<SlotType, CACHE_BUCKET_SIZE, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0} {
+    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0} {
     for(int i = 0; i < Position::WIDTH; i++) {
       columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
     }
@@ -123,7 +98,7 @@ class SolverImpl : public Solver {
     }
   }
 
-  SolverImpl(std::shared_ptr<TranspositionTable<SlotType, CACHE_BUCKET_SIZE, uint8_t, VALUE_BITS>> cache)
+  SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> cache)
     : transTable(cache), nodeCount{0} {
     for(int i = 0; i < Position::WIDTH; i++) {
       columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;

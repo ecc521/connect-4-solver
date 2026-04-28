@@ -260,18 +260,14 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
 
 
 
-#ifndef CACHE_BUCKET_SIZE
-#define CACHE_BUCKET_SIZE 1
-#endif
-
 template <typename SlotType>
 class TypedCache : public Cache {
  public:
   static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
-  std::shared_ptr<TranspositionTable<SlotType, CACHE_BUCKET_SIZE, uint8_t, VALUE_BITS>> transTable;
+  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
 
   TypedCache(size_t table_bytes) 
-    : transTable(std::make_shared<TranspositionTable<SlotType, CACHE_BUCKET_SIZE, uint8_t, VALUE_BITS>>(table_bytes)) {}
+    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)) {}
     
   void reset() override {
     transTable->reset();
@@ -279,10 +275,7 @@ class TypedCache : public Cache {
 };
 
 std::unique_ptr<Cache> Solver::createCache(size_t table_bytes) {
-  uint64_t min_32 = getMinimumTableBytes<uint32_t>();
-  uint64_t min_64 = getMinimumTableBytes<uint64_t>();
-
-  if (table_bytes >= min_32 && min_32 != UINT64_MAX) {
+  if (table_bytes >= getMinimumTableBytes<uint32_t>() && getMinimumTableBytes<uint32_t>() != UINT64_MAX) {
       return std::make_unique<TypedCache<uint32_t>>(table_bytes);
   } else {
       return std::make_unique<TypedCache<uint64_t>>(table_bytes);
