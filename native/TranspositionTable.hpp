@@ -96,8 +96,8 @@ class TranspositionTable {
   void put_if_empty(KeyType key, ValueType value) {}
 
   void put(KeyType key, ValueType value, uint8_t work = 0) {
-    size_t b = index(key);
     KeyType partial_key = key / num_buckets;
+    size_t b = (key % num_buckets) * BUCKET_SIZE;
     
     SlotType new_data = (static_cast<SlotType>(partial_key) << (ValueBits + WorkBits)) 
                       | (static_cast<SlotType>(work) << ValueBits)
@@ -105,24 +105,21 @@ class TranspositionTable {
     
     if constexpr (BUCKET_SIZE == 2) {
         SlotType first = Data[b].data.load(std::memory_order_relaxed);
-        SlotType second = Data[b+1].data.load(std::memory_order_relaxed);
         
-        bool match0 = ((first >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key));
-        bool match1 = ((second >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key));
-        
-        uint8_t first_work = static_cast<uint8_t>((first >> ValueBits) & ((1ULL << WorkBits) - 1));
-        
-        if (match0) {
+        if ((first >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
             Data[b].data.store(new_data, std::memory_order_relaxed);
             return;
         }
-        if (match1) {
+        
+        uint8_t first_work = static_cast<uint8_t>((first >> ValueBits) & ((1ULL << WorkBits) - 1));
+        
+        SlotType second = Data[b+1].data.load(std::memory_order_relaxed);
+        
+        if ((second >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
             if (work >= first_work) {
-                // Promote to Slot 0, push old Slot 0 to Slot 1
                 Data[b].data.store(new_data, std::memory_order_relaxed);
                 Data[b+1].data.store(first, std::memory_order_relaxed);
             } else {
-                // Keep in Slot 1
                 Data[b+1].data.store(new_data, std::memory_order_relaxed);
             }
             return;
@@ -130,14 +127,11 @@ class TranspositionTable {
         
         // No match found - TwoBig Replacement Logic
         if (first == 0 || work >= first_work) {
-            // New node has more or equal work, put it in the Big Slot (0)
             Data[b].data.store(new_data, std::memory_order_relaxed);
-            // Push the old Big Slot into the Always-Replace Slot (1)
             if (first != 0) {
                 Data[b+1].data.store(first, std::memory_order_relaxed);
             }
         } else {
-            // New node has less work, put it in the Always-Replace Slot (1)
             Data[b+1].data.store(new_data, std::memory_order_relaxed);
         }
     } else {
@@ -150,8 +144,8 @@ class TranspositionTable {
   }
 
   ValueType get(KeyType key) const {
-    size_t b = index(key);
     KeyType partial_key = key / num_buckets;
+    size_t b = (key % num_buckets) * BUCKET_SIZE;
     
     if constexpr (BUCKET_SIZE == 2) {
         SlotType first = Data[b].data.load(std::memory_order_relaxed);
