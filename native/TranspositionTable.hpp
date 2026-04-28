@@ -77,7 +77,8 @@ class TranspositionTable {
  public:
   TranspositionTable(size_t table_bytes) {
     size_t slot_size = sizeof(Slot);
-    size = table_bytes / slot_size;
+    size_t num_buckets = next_prime(table_bytes / slot_size / BUCKET_SIZE);
+    size = num_buckets * BUCKET_SIZE;
     Data = new Slot[size]();
   }
 
