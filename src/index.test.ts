@@ -1,5 +1,5 @@
-import { Connect4Solver, Player, Outcome, BOARD_WIDTH } from "./index";
-import { ThreadedConnect4Solver } from "./threaded";
+import { Connect4Solver, Player, Outcome, BOARD_WIDTH, SolverCache } from "./index";
+import { ThreadedConnect4Solver, ThreadedSolverCache } from "./threaded";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -70,9 +70,9 @@ function runParityTest(
 }
 
 describe.each([
-  { name: "Connect4Solver", SolverClass: Connect4Solver },
-  { name: "ThreadedConnect4Solver", SolverClass: ThreadedConnect4Solver },
-])("Testing %s parity structures", ({ SolverClass }) => {
+  { name: "Connect4Solver", SolverClass: Connect4Solver, CacheClass: SolverCache },
+  { name: "ThreadedConnect4Solver", SolverClass: ThreadedConnect4Solver, CacheClass: ThreadedSolverCache },
+])("Testing %s parity structures", ({ name, SolverClass, CacheClass }) => {
   let solver: Connect4Solver;
   let bookLoaded = false;
 
@@ -134,7 +134,9 @@ describe.each([
 
   describe("Generic Board Sizes Support", () => {
     it("should correctly instantiate and evaluate an 8x6 board at depth 34", async () => {
-      const solver = new SolverClass(8, 6);
+      const testCache = new CacheClass(8, 6, 16 * 1024 * 1024);
+      await testCache.init();
+      const solver = new SolverClass({ width: 8, height: 6, cache: testCache });
       await solver.init();
       // P1 plays 1, 2, 3, 4. P2 plays 8, 8, 8. P1 Wins on move 7!
       const result = solver.analyze("1828384");
@@ -142,7 +144,9 @@ describe.each([
     });
 
     it("should correctly instantiate and evaluate a massive 9x7 board using the 128-bit fallback math", async () => {
-      const solver = new SolverClass(9, 7);
+      const testCache = new CacheClass(9, 7, 16 * 1024 * 1024);
+      await testCache.init();
+      const solver = new SolverClass({ width: 9, height: 7, cache: testCache });
       await solver.init();
       // P1 plays 1, 2, 3, 4. P2 plays 9, 9, 9. P1 Wins on move 7!
       const result = solver.analyze("1929394");
@@ -165,7 +169,9 @@ describe.each([
           "test-data",
           `positions_${w}x${h}.txt`,
         );
-        const testSolver = new SolverClass(w, h);
+        const testCache = new CacheClass(w, h, 16 * 1024 * 1024);
+        await testCache.init();
+        const testSolver = new SolverClass({ width: w, height: h, cache: testCache });
         await testSolver.init();
 
         // For generic sizes, we check for a book in the data directory

@@ -79,7 +79,7 @@ export class Connect4Solver extends BaseConnect4Solver {
       if (this._cache && this._cache.ptr === 0) {
         throw new Error("Provided cache is not initialized. Call cache.init() first.");
       }
-      const cachePtr = this._cache ? this._cache.ptr : (this._localCachePtr = this.mod._createCache(this.width, this.height, 1024 * 1024 * 64, false));
+      const cachePtr = this._cache ? this._cache.ptr : (this._localCachePtr = this.mod._createCache(this.width, this.height, 1024 * 1024 * 128, false));
       this._instancePtr = this.mod._createSolver(this.width, this.height, cachePtr, false);
     }
   }

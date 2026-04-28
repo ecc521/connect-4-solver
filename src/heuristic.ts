@@ -41,7 +41,7 @@ export class HeuristicConnect4Solver extends Connect4Solver {
     
     const ptr = (this as any)._instancePtr;
     if (ptr === 0) {
-      const cachePtr = (this as any)._cache ? (this as any)._cache.ptr : ((this as any)._localCachePtr = this.mod._createCache(this.width, this.height, 1024 * 1024 * 32, true));
+      const cachePtr = (this as any)._cache ? (this as any)._cache.ptr : ((this as any)._localCachePtr = this.mod._createCache(this.width, this.height, 1024 * 1024 * 128, true));
       (this as any)._instancePtr = this.mod._createSolver(this.width, this.height, cachePtr, true);
     }
   }

@@ -12,7 +12,7 @@ export class SolverCache {
   constructor(
     w: number,
     h: number,
-    sizeBytes: number = 1024 * 1024 * 64,
+    sizeBytes: number = 1024 * 1024 * 128,
     is_heuristic: boolean = false
   ) {
     this.width = w;
@@ -46,7 +46,7 @@ export class SolverCache {
 }
 
 export class HeuristicSolverCache extends SolverCache {
-  constructor(w: number, h: number, sizeBytes: number = 1024 * 1024 * 64) {
+  constructor(w: number, h: number, sizeBytes: number = 1024 * 1024 * 128) {
     super(w, h, sizeBytes, true);
   }
 }

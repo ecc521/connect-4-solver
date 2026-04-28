@@ -1,11 +1,14 @@
 import { HeuristicConnect4Solver } from "./heuristic";
+import { HeuristicSolverCache } from "./cache";
 import { Outcome } from "./core";
 
 describe("HeuristicConnect4Solver", () => {
   let solver: HeuristicConnect4Solver;
 
   beforeAll(async (): Promise<void> => {
-    solver = new HeuristicConnect4Solver(7, 6);
+    const testCache = new HeuristicSolverCache(7, 6, 16 * 1024 * 1024);
+    await testCache.init();
+    solver = new HeuristicConnect4Solver({ width: 7, height: 6, cache: testCache });
     await solver.init();
   });
 
@@ -32,7 +35,9 @@ describe("HeuristicConnect4Solver", () => {
   });
 
   test("should evaluate a complex 9x7 board instantly using iterative deepening", async (): Promise<void> => {
-    const massiveSolver = new HeuristicConnect4Solver(9, 7);
+    const testCache = new HeuristicSolverCache(9, 7, 16 * 1024 * 1024);
+    await testCache.init();
+    const massiveSolver = new HeuristicConnect4Solver({ width: 9, height: 7, cache: testCache });
     await massiveSolver.init();
 
     const start = Date.now();
@@ -47,7 +52,9 @@ describe("HeuristicConnect4Solver", () => {
   });
 
   test("should gracefully abort dense searches when maxTime threshold hits", async (): Promise<void> => {
-    const massiveSolver = new HeuristicConnect4Solver(9, 7);
+    const testCache = new HeuristicSolverCache(9, 7, 16 * 1024 * 1024);
+    await testCache.init();
+    const massiveSolver = new HeuristicConnect4Solver({ width: 9, height: 7, cache: testCache });
     await massiveSolver.init();
 
     const start = Date.now();

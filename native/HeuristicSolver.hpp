@@ -20,8 +20,8 @@ namespace Connect4 {
 
 class HeuristicCache : public Cache {
  public:
-  std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> transTable;
-  HeuristicCache(size_t table_bytes) : transTable(std::make_shared<TranspositionTable<uint64_t, uint32_t, 32>>(table_bytes)) {}
+  std::shared_ptr<TranspositionTable<uint64_t, CACHE_BUCKET_SIZE, uint32_t, 32>> transTable;
+  HeuristicCache(size_t table_bytes) : transTable(std::make_shared<TranspositionTable<uint64_t, CACHE_BUCKET_SIZE, uint32_t, 32>>(table_bytes)) {}
   void reset() override { transTable->reset(); }
 };
 
@@ -34,7 +34,7 @@ class HeuristicSolver {
  private:
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
   
-  std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> transTable;
+  std::shared_ptr<TranspositionTable<uint64_t, CACHE_BUCKET_SIZE, uint32_t, 32>> transTable;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
   std::atomic<bool> stopSearch;
   int columnOrder[WIDTH]; // column exploration order
@@ -70,7 +70,7 @@ class HeuristicSolver {
     }
   }
 
-  HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache); // Constructor
+  HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, CACHE_BUCKET_SIZE, uint32_t, 32>> cache); // Constructor
 
   static std::unique_ptr<Cache> createCache(size_t table_bytes) {
     return std::make_unique<HeuristicCache>(table_bytes);
