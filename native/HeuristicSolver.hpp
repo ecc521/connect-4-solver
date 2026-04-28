@@ -13,9 +13,17 @@
 #include <memory>
 #include "Position.hpp"
 #include "TranspositionTable.hpp"
+#include "Cache.hpp"
 
 namespace GameSolver {
 namespace Connect4 {
+
+class HeuristicCache : public Cache {
+ public:
+  std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> transTable;
+  HeuristicCache(size_t table_bytes) : transTable(std::make_shared<TranspositionTable<uint64_t, uint32_t, 32>>(table_bytes)) {}
+  void reset() override { transTable->reset(); }
+};
 
 #ifndef HEURISTIC_TABLE_SIZE
 #define HEURISTIC_TABLE_SIZE 22
@@ -26,7 +34,7 @@ class HeuristicSolver {
  private:
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
   
-  std::unique_ptr<TranspositionTable<uint64_t, uint32_t, 32>> transTable;
+  std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> transTable;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
   std::atomic<bool> stopSearch;
   int columnOrder[WIDTH]; // column exploration order
@@ -62,7 +70,18 @@ class HeuristicSolver {
     }
   }
 
-  HeuristicSolver(); // Constructor
+  HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache); // Constructor
+
+  static std::unique_ptr<Cache> createCache(size_t table_bytes) {
+    return std::make_unique<HeuristicCache>(table_bytes);
+  }
+
+  static std::unique_ptr<HeuristicSolver<WIDTH, HEIGHT>> createWithCache(Cache* cache) {
+    if (auto c = dynamic_cast<HeuristicCache*>(cache)) {
+      return std::make_unique<HeuristicSolver<WIDTH, HEIGHT>>(c->transTable);
+    }
+    return nullptr;
+  }
 };
 
 } // namespace Connect4

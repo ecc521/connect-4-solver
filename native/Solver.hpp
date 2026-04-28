@@ -27,6 +27,7 @@
 #include "Position.hpp"
 #include "TranspositionTable.hpp"
 #include "OpeningBook.hpp"
+#include "Cache.hpp"
 
 namespace GameSolver {
 namespace Connect4 {
@@ -56,11 +57,7 @@ constexpr uint64_t getMinimumTableBytes() {
     return (1ULL << index_bits) * sizeof(SlotType);
 }
 
-class Cache {
- public:
-  virtual ~Cache() = default;
-  virtual void reset() = 0;
-};
+#include "Cache.hpp"
 
 class Solver {
  public:
@@ -71,9 +68,9 @@ class Solver {
   virtual unsigned long long getNodeCount() const = 0;
   virtual void reset() = 0;
   virtual void loadBook(std::string book_file) = 0;
+
   virtual ~Solver() {}
 
-  static std::unique_ptr<Solver> create(size_t table_bytes);
   static std::unique_ptr<Cache> createCache(size_t table_bytes);
   static std::unique_ptr<Solver> createWithCache(Cache* cache);
 };
@@ -91,15 +88,6 @@ class SolverImpl : public Solver {
   int negamax(const Position &P, int alpha, int beta);
 
  public:
-  SolverImpl(size_t table_bytes) 
-    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0} {
-    for(int i = 0; i < Position::WIDTH; i++) {
-      columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
-    }
-    for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
-      history[i] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[i];
-    }
-  }
 
   SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> cache)
     : transTable(cache), nodeCount{0} {
@@ -129,6 +117,8 @@ class SolverImpl : public Solver {
   void loadBook(std::string book_file) override {
     book = OpeningBookBase::load(book_file, Position::WIDTH, Position::HEIGHT);
   }
+
+
 };
 
 } // namespace Connect4

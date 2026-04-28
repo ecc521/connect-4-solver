@@ -262,7 +262,12 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
   unsigned int num_threads = std::min((unsigned int)WIDTH, (unsigned int)threads);
   std::vector<std::thread> thread_pool;
   for (unsigned int i = 0; i < num_threads - 1; i++) {
-    thread_pool.emplace_back(worker);
+    try {
+      thread_pool.emplace_back(worker);
+    } catch (const std::system_error& e) {
+      std::cerr << "Connect4Solver Warning: Thread pool exhausted while spawning " << num_threads << " threads. Clamping to " << (i + 1) << " threads." << std::endl;
+      break;
+    }
   }
   worker();
 
@@ -289,11 +294,8 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
   return {scores, max_depth_reached};
 }
 
-// Constructor
 template <int WIDTH, int HEIGHT>
-HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver() : nodeCount{0} {
-  size_t table_bytes = (WIDTH * HEIGHT >= 56) ? 16777216 : 33554432; // Default heuristic table size 16MB or 32MB
-  transTable = std::make_unique<TranspositionTable<uint64_t, uint32_t, 32>>(table_bytes);
+HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache) : transTable(cache), nodeCount{0} {
   for(int i = 0; i < WIDTH; i++) // initialize the column exploration order, starting with center columns
     columnOrder[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; // example for WIDTH=7: columnOrder = {3, 4, 2, 5, 1, 6, 0}
   for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
