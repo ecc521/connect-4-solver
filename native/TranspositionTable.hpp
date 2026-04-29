@@ -61,6 +61,8 @@ template<int S> using uint_t =
  */
 template<typename SlotType, typename ValueType = uint8_t, unsigned int ValueBits = 8, unsigned int WorkBits = 7, typename KeyType = uint64_t>
 class TranspositionTable {
+ public:
+  static constexpr unsigned int MoveBits = 4;
  private:
   struct Slot {
     std::atomic<SlotType> data;
@@ -98,19 +100,28 @@ class TranspositionTable {
     }
   }
 
+  SlotType getPartialKey(KeyType key) const {
+      KeyType partial = key / num_buckets;
+      int shift_amount = ValueBits + WorkBits + MoveBits;
+      int available_bits = sizeof(SlotType) * 8 - shift_amount;
+      if (available_bits >= 64) return static_cast<SlotType>(partial);
+      return static_cast<SlotType>(partial) & ((1ULL << available_bits) - 1);
+  }
+
   void put_if_empty(KeyType key, ValueType value) {}
 
-  void put(KeyType key, ValueType value, uint8_t work = 0) {
-    KeyType partial_key = key / num_buckets;
+  void put(KeyType key, ValueType value, uint8_t work = 0, uint8_t best_move = Position::WIDTH) {
+    SlotType partial_key = getPartialKey(key);
     size_t b = index(key);
     
-    SlotType new_data = (static_cast<SlotType>(partial_key) << (ValueBits + WorkBits)) 
+    SlotType new_data = (partial_key << (ValueBits + WorkBits + MoveBits)) 
+                      | (static_cast<SlotType>(best_move) << (ValueBits + WorkBits))
                       | (static_cast<SlotType>(work) << ValueBits)
                       | static_cast<SlotType>(value);
     
     SlotType first = Data[b].slots[0].data.load(std::memory_order_relaxed);
     
-    if ((first >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+    if ((first >> (ValueBits + WorkBits + MoveBits)) == partial_key) {
         Data[b].slots[0].data.store(new_data, std::memory_order_relaxed);
         return;
     }
@@ -119,7 +130,7 @@ class TranspositionTable {
     
     SlotType second = Data[b].slots[1].data.load(std::memory_order_relaxed);
     
-    if ((second >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
+    if ((second >> (ValueBits + WorkBits + MoveBits)) == partial_key) {
         if (work >= first_work) {
             Data[b].slots[0].data.store(new_data, std::memory_order_relaxed);
             Data[b].slots[1].data.store(first, std::memory_order_relaxed);
@@ -144,19 +155,32 @@ class TranspositionTable {
     return size;
   }
 
-  ValueType get(KeyType key) const {
-    KeyType partial_key = key / num_buckets;
+  struct PackedResult {
+    uint8_t best_move;
+    ValueType value;
+  };
+
+  PackedResult getPacked(KeyType key) const {
+    SlotType partial_key = getPartialKey(key);
     size_t b = index(key);
     
     SlotType first = Data[b].slots[0].data.load(std::memory_order_relaxed);
-    if ((first >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
-        return static_cast<ValueType>(first & ((1ULL << ValueBits) - 1));
+    if ((first >> (ValueBits + WorkBits + MoveBits)) == partial_key) {
+        ValueType val = static_cast<ValueType>(first & ((1ULL << ValueBits) - 1));
+        uint8_t move = static_cast<uint8_t>((first >> (ValueBits + WorkBits)) & ((1ULL << MoveBits) - 1));
+        return {move, val};
     }
     SlotType second = Data[b].slots[1].data.load(std::memory_order_relaxed);
-    if ((second >> (ValueBits + WorkBits)) == static_cast<SlotType>(partial_key)) {
-        return static_cast<ValueType>(second & ((1ULL << ValueBits) - 1));
+    if ((second >> (ValueBits + WorkBits + MoveBits)) == partial_key) {
+        ValueType val = static_cast<ValueType>(second & ((1ULL << ValueBits) - 1));
+        uint8_t move = static_cast<uint8_t>((second >> (ValueBits + WorkBits)) & ((1ULL << MoveBits) - 1));
+        return {move, val};
     }
-    return 0;
+    return {0, 0};
+  }
+
+  ValueType get(KeyType key) const {
+    return getPacked(key).value;
   }
 };
 

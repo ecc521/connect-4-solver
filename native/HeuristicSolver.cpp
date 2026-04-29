@@ -64,6 +64,26 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     }
   }
 
+  if ((possible & (possible - 1)) == 0) {
+    GenericPosition<WIDTH, HEIGHT> P2(P);
+    P2.play(possible);
+    if (heuristicTlNodeCount > 0) {
+      heuristicTlNodeCount--;
+    } else {
+      nodeCount.fetch_sub(1, std::memory_order_relaxed);
+    }
+    
+    int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<position_t>(possible);
+    int next_col = bit_idx / (HEIGHT + 1);
+    int next_row = bit_idx % (HEIGHT + 1);
+    int player = P.nbMoves() % 2;
+
+    acc.addPiece(player, next_col, next_row);
+    int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, acc);
+    acc.removePiece(player, next_col, next_row);
+    return score;
+  }
+
   int min = -(WIDTH * HEIGHT - 2 - P.nbMoves()) / 2 * 1000;
   if(alpha < min) {
     alpha = min;                     
@@ -79,9 +99,10 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   if constexpr (HEIGHT % 2 == 0) {
     if (P.nbMoves() % 2 == 0) {
       int evens = P.computeEvensStrategy();
-      if (evens == 1) { // Forced Loss
-        if (beta > -1000) {
-          beta = -1000;
+      if (evens < 0) { // Forced Loss with calculated upper bound
+        int evens_scaled = evens * 1000;
+        if (beta > evens_scaled) {
+          beta = evens_scaled;
           if (alpha >= beta) return beta;
         }
       } else if (evens == 0) { // Forced Draw
@@ -160,6 +181,14 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     if(score > alpha) alpha = score;
 
     if(alpha >= beta) {
+      // Decay history slightly to prevent overflow and prioritize recent cutoffs
+      if (history[bit_idx] > 100000) {
+        for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
+          history[i] /= 2;
+        }
+      }
+      history[bit_idx] += depth * depth; // standard history heuristic scale
+
       uint32_t extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
       transTable->put(key, (extra_key << 28) | ((uint32_t)(next_col + 1) << 24) | (2 << 22) | ((uint32_t)depth << 16) | (uint32_t)(score + 32768)); 
       return score;  

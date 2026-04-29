@@ -253,7 +253,7 @@ class GenericPosition {
    * the current player has after playing the move.
    */
   int moveScore(position_t move) const {
-    return popcount(compute_winning_position(current_position | move, mask));
+    return popcount_impl(compute_winning_position(current_position | move, mask));
   }
 
   /**
@@ -425,6 +425,7 @@ class GenericPosition {
   /**
    * Return a bitmask of the possible winning positions for the current player
    */
+ public:
   position_t winning_position() const {
     return compute_winning_position(current_position, mask);
   }
@@ -545,11 +546,11 @@ class GenericPosition {
    * Computes whether the second player can mathematically force a Draw or Win 
    * using the Evens Strategy (pairing odd/even rows).
    * 
-   * @return 1 if 2nd player forces a Win, 0 if 2nd player forces a Draw, -1 otherwise.
+   * @return The score upper bound (e.g. -1, -2, -3) if 2nd player forces a Win, 0 if 2nd player forces a Draw, 1000 otherwise.
    */
   int computeEvensStrategy() const {
-    if constexpr (HEIGHT % 2 != 0) return -1;
-    if (moves % 2 != 0) return -1; // Strategy evaluates the second player's forced bounds, so only evaluate when P1 is to move
+    if constexpr (HEIGHT % 2 != 0) return 1000;
+    if (moves % 2 != 0) return 1000; // Strategy evaluates the second player's forced bounds, so only evaluate when P1 is to move
 
     position_t color0 = current_position;
     position_t color1 = current_position ^ mask;
@@ -557,7 +558,7 @@ class GenericPosition {
     position_t xe = color1 | (ALTX & ~(2 * color0 + color1 + bottom_mask));
     position_t oe = board_mask - xe;
 
-    if (haswond(oe, 1)) return -1;
+    if (haswond(oe, 1)) return 1000;
 
     position_t xeh = haswond(xe, HEIGHT + 1);
     position_t xed1 = haswond(xe, HEIGHT);
@@ -568,11 +569,39 @@ class GenericPosition {
     position_t oed1 = haswond(oe, HEIGHT);
     position_t oed2 = haswond(oe, HEIGHT + 2);
 
-    if (oeh & (xeany - TOP_PLUS_1)) return -1;
-    if (oed1 && ((oeh | oed1) & ((xeh | xed1) - TOP_PLUS_1))) return -1;
-    if (oed2 && ((oeh | oed2) & ((xeh | xed2) - TOP_PLUS_1))) return -1;
+    if (oeh & (xeany - TOP_PLUS_1)) return 1000;
+    if (oed1 && ((oeh | oed1) & ((xeh | xed1) - TOP_PLUS_1))) return 1000;
+    if (oed2 && ((oeh | oed2) & ((xeh | xed2) - TOP_PLUS_1))) return 1000;
 
-    return xeany ? 1 : 0;
+    if (xeany) {
+      if (xeh) {
+        for (int r = HEIGHT / 2; r > 1; r--) {
+          // Wait, c4 checks COLUMN_HEADERS >> (2 * r - 1). 
+          // COLUMN_HEADERS is row 6. 6 - (2*r-1). 
+          // For r=3, 6-5 = 1. So r=3 checks row 1!
+          // So in 0-indexed, we check row 1, then row 3.
+          int check_row = HEIGHT - (2 * r - 1); // r=3 -> 1, r=2 -> 3
+          if (xeh & (bottom_mask << check_row)) {
+            return -r;
+          }
+        }
+      } else {
+        position_t diag_cells = 0;
+        if (xed1) diag_cells |= xed1 | (xed1 << HEIGHT) | (xed1 << (2*HEIGHT)) | (xed1 << (3*HEIGHT));
+        if (xed2) diag_cells |= xed2 | (xed2 << (HEIGHT + 2)) | (xed2 << (2*(HEIGHT + 2))) | (xed2 << (3*(HEIGHT + 2)));
+        
+        position_t empty_cells = diag_cells & ~(color0 | color1);
+        for (int r = 1; r <= HEIGHT / 2; r++) {
+          int check_row = HEIGHT - (2 * r - 1); // r=1 -> 5, r=2 -> 3, r=3 -> 1
+          if (empty_cells & (bottom_mask << check_row)) {
+            return -r;
+          }
+        }
+      }
+      return -1;
+    }
+
+    return 0;
   }
 
   // return a bitmask containing a single 1 corresponding to the top cell of a given column

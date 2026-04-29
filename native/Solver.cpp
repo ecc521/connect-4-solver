@@ -95,7 +95,12 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   }
 
   const Position::position_t key = P.key();
-  if(uint8_t val = transTable->get(key)) {
+  uint8_t table_move = Position::WIDTH;
+  
+  if(auto packed = transTable->getPacked(key); packed.value) {
+    uint8_t val = packed.value;
+    table_move = packed.best_move;
+    
     if(val > Position::MAX_SCORE - Position::MIN_SCORE + 1) { // we have an lower bound
       min = val + 2 * Position::MIN_SCORE - Position::MAX_SCORE - 2;
       if(alpha < min) {
@@ -116,61 +121,42 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   }
 
   MoveSorter moves;
+
   for(int i = Position::WIDTH; i--;) {
     if(Position::position_t move = possible & Position::column_mask(columnOrder[i])) {
-      int bit_idx = Position::ctz_impl(move);
-      int score = P.moveScore(move) * 1000000 + history[bit_idx];
+      int score = P.moveScore(move) * 1000000;
+      if (columnOrder[i] == table_move) {
+        score += 100000000; // Heavily prioritize table move
+      }
       moves.add(move, score);
     }
   }
 
 #if BOARD_WIDTH_MACRO >= 8
-  int searched[Position::WIDTH];
-  int searched_cnt = 0;
 #endif
 
   int best_score = -Position::MAX_SCORE;
+  uint8_t best_move = Position::WIDTH;
 
   while(Position::position_t next = moves.getNext()) {
     Position P2(P);
     P2.play(next);  
     int score = -negamax(P2, -beta, -alpha, book);
 
-    if(score > best_score) best_score = score;
+    if(score > best_score) {
+      best_score = score;
+      best_move = Position::ctz_impl(next) / (Position::HEIGHT + 1);
+    }
 
     if(best_score >= beta) {
-      if constexpr (Position::WIDTH >= 8) {
-#if BOARD_WIDTH_MACRO >= 8
-        if (searched_cnt > 0) {
-          for (int i = 0; i < searched_cnt; i++) {
-            if (history[searched[i]] > -500000) history[searched[i]]--;
-          }
-        }
-#endif
-      }
-
-      int bit_idx = Position::ctz_impl(next);
-      // Decay history slightly to prevent overflow and prioritize recent cutoffs
-      if (history[bit_idx] > 100000) {
-        for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
-          history[i] /= 2;
-        }
-      }
-      history[bit_idx] += 100;
-      
-      transTable->put(key, best_score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves())); 
+      transTable->put(key, best_score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves()), best_move);  
       return best_score;  
     }
-#if BOARD_WIDTH_MACRO >= 8
-    if constexpr (Position::WIDTH >= 8) {
-      searched[searched_cnt++] = Position::ctz_impl(next);
-    }
-#endif
     if(best_score > alpha) alpha = best_score; 
   }
 
   uint8_t work = std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves());
-  transTable->put(key, best_score - Position::MIN_SCORE + 1, work); 
+  transTable->put(key, best_score - Position::MIN_SCORE + 1, work, best_move); 
   return best_score;
 }
 

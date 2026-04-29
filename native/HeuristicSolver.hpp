@@ -44,7 +44,9 @@ class HeuristicSolver {
   std::atomic<bool> isSearching{false};
   std::atomic<bool> stopSearch;
   int columnOrder[WIDTH]; // column exploration order
-  int32_t history[WIDTH * (HEIGHT + 1)];
+
+  // Dynamic history heuristic table
+  mutable uint32_t history[WIDTH * (HEIGHT + 1)];
 
   /**
    * Heuristic negamax with depth limit.

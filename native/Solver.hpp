@@ -54,7 +54,8 @@ constexpr uint64_t getMinimumTableBytes() {
     constexpr int board_bits = Position::WIDTH * (Position::HEIGHT + 1);
     constexpr int value_bits = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
     constexpr int work_bits = 7;
-    constexpr int partial_key_bits = (sizeof(SlotType) * 8) - value_bits - work_bits;
+    constexpr int move_bits = 4;
+    constexpr int partial_key_bits = (sizeof(SlotType) * 8) - value_bits - work_bits - move_bits;
     
     if (board_bits <= partial_key_bits) return 0; // Exact match fits completely
     

@@ -24,7 +24,7 @@ Initializes the native solver and allocates the transposition table cache. Must 
 
 ### `analyze(position: string, opts?: AnalyzeOptions): Promise<PositionAnalysis>`
 
-Executes an asynchronous evaluation of a position. 
+Executes an asynchronous evaluation of a position.
 
 In Node.js, this method uses a **persistent native C++ thread pool** that bypasses the standard libuv limitations. This means you can scale to your full CPU core count (e.g., 12, 16, or 32 threads) without any extra configuration.
 
