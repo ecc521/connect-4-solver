@@ -49,23 +49,6 @@ constexpr int getRequiredValueBits() {
     return 8;
 }
 
-template <typename SlotType>
-constexpr uint64_t getMinimumTableBytes() {
-    constexpr int board_bits = Position::WIDTH * (Position::HEIGHT + 1);
-    constexpr int value_bits = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
-    constexpr int work_bits = 7;
-    constexpr int move_bits = 4;
-    constexpr int partial_key_bits = (sizeof(SlotType) * 8) - value_bits - work_bits - move_bits;
-    
-    if (board_bits <= partial_key_bits) return 0; // Exact match fits completely
-    
-    constexpr int index_bits = board_bits - partial_key_bits;
-    if (index_bits >= 64) return UINT64_MAX; // Mathematically impossible
-    
-    return (1ULL << index_bits) * 2 * sizeof(SlotType);
-}
-
-
 class Solver {
  public:
   static const int INVALID_MOVE = -1000;
@@ -136,12 +119,12 @@ class SolverImplBase {
   };
 };
 
-template <typename SlotType>
 class SolverImpl : public Solver {
   using ThreadPool = SolverImplBase::ThreadPool;
  public:
   static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
-  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
+  using SlotType = uint64_t;
+  std::shared_ptr<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>> transTable;
   std::atomic<unsigned long long> nodeCount;
   std::atomic<bool> isSearching{false};
 
@@ -154,7 +137,7 @@ class SolverImpl : public Solver {
  public:
 
   SolverImpl(size_t table_bytes) 
-    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0}, pool(std::make_unique<ThreadPool>()) {
+    : transTable(std::make_shared<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0}, pool(std::make_unique<ThreadPool>()) {
     for(int i = 0; i < Position::WIDTH; i++) {
       columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
     }
@@ -163,7 +146,7 @@ class SolverImpl : public Solver {
     }
   }
 
-  SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> cache)
+  SolverImpl(std::shared_ptr<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>> cache)
     : transTable(cache), nodeCount{0}, pool(std::make_unique<ThreadPool>()) {
     for(int i = 0; i < Position::WIDTH; i++) {
       columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;

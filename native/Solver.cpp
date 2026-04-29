@@ -37,8 +37,7 @@ namespace {
 /**
  * Reccursively score connect 4 position using negamax variant of alpha-beta algorithm.
  */
-template <typename SlotType>
-int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+int SolverImpl::negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
   assert(alpha < beta);
   assert(!P.canWinNext());
 
@@ -160,8 +159,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   return best_score;
 }
 
-template <typename SlotType>
-SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+SolverResult SolverImpl::solve(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
   if(P.canWinNext()) {
     int score = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
     for (int i = 0; i < Position::WIDTH; i++) {
@@ -176,23 +174,57 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const Ope
   
   int min = -(Position::WIDTH * Position::HEIGHT - P.nbMoves()) / 2;
   int max = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
-  if(weak) {
+  int score = 0;
+  if (weak) {
     min = -1;
     max = 1;
-  }
-
-  while(min < max) {                    
-    int med = min + (max - min) / 2;
-    if(med <= 0 && min / 2 < med) med = min / 2;
-    else if(med >= 0 && max / 2 > med) med = max / 2;
-    int r = negamax(P, med, med + 1, book);   
-    if(r <= med) max = r;
-    else min = r;
+    while(min < max) {                    
+      int med = min + (max - min) / 2;
+      if(med <= 0 && min / 2 < med) med = min / 2;
+      else if(med >= 0 && max / 2 > med) med = max / 2;
+      int r = negamax(P, med, med + 1, book);   
+      if(r <= med) max = r;
+      else min = r;
+    }
+    score = min;
+  } else {
+    int r = negamax(P, -1, 0, book);
+    if (r <= -1) {
+      max = -1;
+      for (int i = -2; i >= min; i--) {
+        if (negamax(P, i, i + 1, book) > i) {
+          min = max = i + 1;
+          break;
+        }
+        if (i == min) {
+          max = min;
+          break;
+        }
+      }
+      score = max;
+    } else {
+      r = negamax(P, 0, 1, book);
+      if (r <= 0) {
+        score = 0;
+      } else {
+        min = 1;
+        for (int i = 1; i < max; i++) {
+          if (negamax(P, i, i + 1, book) <= i) {
+            min = max = i;
+            break;
+          }
+          if (i == max - 1) {
+            min = max;
+            break;
+          }
+        }
+        score = min;
+      }
+    }
   }
   nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
   solverTlNodeCount = 0;
 
-  int score = min;
   int bestMove = -1;
 
   // Quick pass to find best move using the hot TT
@@ -211,8 +243,7 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const Ope
   return {score, bestMove, (int)P.nbMoves(), getNodeCount()};
 }
 
-template <typename SlotType>
-std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+std::vector<int> SolverImpl::analyze(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
   std::vector<int> scores(Position::WIDTH, -1000);
 
 #ifdef USE_PTHREADS
@@ -279,14 +310,13 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
   return scores;
 }
 
-template <typename SlotType>
 class TypedCache : public Cache {
  public:
   static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
-  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
+  std::shared_ptr<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>> transTable;
 
   TypedCache(size_t table_bytes) 
-    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)) {}
+    : transTable(std::make_shared<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>>(table_bytes)) {}
     
   void reset() override {
     transTable->reset();
@@ -294,18 +324,12 @@ class TypedCache : public Cache {
 };
 
 std::unique_ptr<Cache> Solver::createCache(size_t table_bytes) {
-  if (table_bytes >= getMinimumTableBytes<uint32_t>() && getMinimumTableBytes<uint32_t>() != UINT64_MAX) {
-      return std::make_unique<TypedCache<uint32_t>>(table_bytes);
-  } else {
-      return std::make_unique<TypedCache<uint64_t>>(table_bytes);
-  }
+  return std::make_unique<TypedCache>(table_bytes);
 }
 
 std::unique_ptr<Solver> Solver::createWithCache(Cache* cache) {
-  if (auto c32 = dynamic_cast<TypedCache<uint32_t>*>(cache)) {
-    return std::make_unique<SolverImpl<uint32_t>>(c32->transTable);
-  } else if (auto c64 = dynamic_cast<TypedCache<uint64_t>*>(cache)) {
-    return std::make_unique<SolverImpl<uint64_t>>(c64->transTable);
+  if (auto c = dynamic_cast<TypedCache*>(cache)) {
+    return std::make_unique<SolverImpl>(c->transTable);
   } else {
     throw std::invalid_argument("Unsupported cache type");
   }
@@ -315,10 +339,6 @@ std::unique_ptr<Solver> Solver::create(size_t table_bytes) {
   auto cache = createCache(table_bytes);
   return createWithCache(cache.get());
 }
-
-// Explicit template instantiations
-template class SolverImpl<uint32_t>;
-template class SolverImpl<uint64_t>;
 
 } // namespace Connect4
 } // namespace GameSolver
