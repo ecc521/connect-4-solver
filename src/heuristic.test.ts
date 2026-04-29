@@ -1,10 +1,10 @@
-import { Connect4Solver, Outcome } from "./index";
+import { NodeConnect4Solver, Outcome } from "./index";
 
-describe("HeuristicConnect4Solver", () => {
-  let solver: Connect4Solver;
+describe("HeuristicNodeConnect4Solver", () => {
+  let solver: NodeConnect4Solver;
 
   beforeAll(async (): Promise<void> => {
-    solver = new Connect4Solver({ width: 7, height: 6, heuristic: true });
+    solver = new NodeConnect4Solver({ width: 7, height: 6, heuristic: true });
     await solver.init();
   });
 
@@ -35,7 +35,7 @@ describe("HeuristicConnect4Solver", () => {
   });
 
   test("should evaluate a complex 9x7 board instantly using iterative deepening", async (): Promise<void> => {
-    const massiveSolver = new Connect4Solver({ width: 9, height: 7, heuristic: true });
+    const massiveSolver = new NodeConnect4Solver({ width: 9, height: 7, heuristic: true });
     await massiveSolver.init();
 
     const start = Date.now();
@@ -51,7 +51,7 @@ describe("HeuristicConnect4Solver", () => {
   });
 
   test("should gracefully abort dense searches when maxTime threshold hits", async (): Promise<void> => {
-    const massiveSolver = new Connect4Solver({ width: 9, height: 7, heuristic: true });
+    const massiveSolver = new NodeConnect4Solver({ width: 9, height: 7, heuristic: true });
     await massiveSolver.init();
 
     const start = Date.now();

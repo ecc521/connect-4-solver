@@ -9,8 +9,8 @@ import java.util.concurrent.Executors
 
 class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
-    // Utilizing a cached fixed thread pool ensures we execute safely off the React Native UI thread
-    private val executor = Executors.newFixedThreadPool(4)
+    // Utilizing an unbounded cached thread pool allows developers to manage their own concurrency
+    private val executor = Executors.newCachedThreadPool()
 
     override fun getName(): String {
         return "Connect4Solver"

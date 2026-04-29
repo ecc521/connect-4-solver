@@ -1,6 +1,6 @@
 # Getting Started
 
-Welcome to the **Connect 4 Solver** documentation! This guide will help you install the package and run your first perfect evaluation.
+This guide covers installation and basic usage.
 
 ## Installation
 
@@ -10,22 +10,38 @@ Install the package via npm:
 npm install connect-4-solver
 ```
 
+## Supported Environments
+
+The library exports explicit solver classes so you always know what engine architecture you are executing. All solvers implement [`BaseConnect4Solver`](/api/base-solver), ensuring consistent functionality across platforms, however there may be additional configuration options in the explicit solver classes:
+
+* **`NodeConnect4Solver`**: (Node.js) Native N-API. Asynchronous.
+* **`ReactNativeConnect4Solver`**: (iOS/Android) Native JSI. Asynchronous. (Import from `"connect-4-solver/native"`).
+* **`WebWorkerWasmConnect4Solver`**: (Browser) WebWorker wrapper for WASM. Asynchronous.
+* **`SyncWasmConnect4Solver`**: Standard WASM execution. Blocks the current thread.
+
 ## Quick Start
 
-The core class is `Connect4Solver`. It automatically detects the best environment available (Native N-API for Node.js, or WebAssembly for browsers) and manages memory safely.
+::: warning ⚠️ Use Solution Books or Heuristic Solver for 7x6+ Early Game Positions
+On the standard 7x6 board and larger, the **exact solver** can take minutes or hours on early-game positions without an Opening Book. For practical exact solving, load a pre-computed [Solution Book](/solution-books). The **heuristic solver** (`heuristic: true`) does not require books at any size.
+:::
 
-```typescript
-import { Connect4Solver, Player, Outcome } from "connect-4-solver";
+::: code-group
+
+```typescript [Node.js]
+import { NodeConnect4Solver, OpeningBook, Outcome } from "connect-4-solver";
+import fs from "fs";
 
 async function run() {
-  // Initialize the standard solver (e.g. 7x6 board)
-  // By default, this provisions a 128MB cache.
-  const solver = new Connect4Solver({ width: 7, height: 6 });
+  // Load a pre-computed opening book (required for practical exact solving on 7x6+)
+  const bookData = fs.readFileSync("7x6.book");
+  const book = await OpeningBook.fromBuffer(bookData);
+
+  // Initialize the solver matching the book's board size
+  const solver = new NodeConnect4Solver({ width: book.width, height: book.height });
   await solver.init();
 
   // Analyze a position (column sequence: 1 to board width)
-  // The solver evaluates asynchronously via native threads/libuv!
-  const result = await solver.analyze("4424");
+  const result = await solver.analyze("4424", { book });
 
   if (result.evaluation) {
     if (result.evaluation.outcome === Outcome.Win) {
@@ -35,32 +51,117 @@ async function run() {
     }
   }
 
-  // ⚠️ IMPORTANT: To prevent memory leaks, always release the solver when finished!
-  solver.release();
+  // Always free native memory when finished
+  book.unload();
+  solver.unload();
 }
 
 run();
 ```
 
-## Multithreading
+```typescript [Browser (Async)]
+// App.tsx
+import { WebWorkerWasmConnect4Solver, OpeningBook, Outcome } from "connect-4-solver/async";
 
-By default, the solver utilizes a single thread. For extremely deep calculations (e.g., empty or nearly empty boards), you can dramatically speed up the evaluation by allocating more threads. 
+async function run() {
+  // Fetch the binary opening book
+  const res = await fetch("/books/7x6.book");
+  const bookBuffer = new Uint8Array(await res.arrayBuffer());
+  const book = await OpeningBook.fromBuffer(bookBuffer);
 
-```typescript
-// Scale up to 4 threads natively!
-const result = await solver.analyze("4424", { threads: 4 });
+  // 1. Instantiate the Worker (Syntax may vary based on your bundler, e.g. Vite)
+  const worker = new Worker(new URL('./c4-worker.ts', import.meta.url), { type: 'module' });
+
+  // 2. Wrap it with the Async Solver matching the book's size
+  const solver = new WebWorkerWasmConnect4Solver(worker, { width: book.width, height: book.height });
+  await solver.init();
+
+  const result = await solver.analyze("4424", { book }); // Non-blocking
+  
+  if (result.evaluation) {
+    if (result.evaluation.outcome === Outcome.Win) {
+      console.log(`${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`);
+    } else if (result.evaluation.outcome === Outcome.Draw) {
+      console.log("The game is a draw");
+    }
+  }
+
+  // Always free native memory
+  book.unload();
+  solver.unload();
+}
+
+run();
 ```
 
-::: warning ⚠️ Node.js Concurrent Evaluations
-When running `connect-4-solver` in Node.js, asynchronous tasks are offloaded to Node's `libuv` thread pool, which defaults to **4 parallel threads**. If you are evaluating multiple positions concurrently using `Promise.all` across multiple `Connect4Solver` instances, you **must** increase your thread pool size before your application starts:
+```typescript [React Native]
+import { ReactNativeConnect4Solver, OpeningBook, Outcome } from "connect-4-solver/native";
 
-```bash
-export UV_THREADPOOL_SIZE=32
+async function run() {
+  // Read the binary opening book
+  const res = await fetch("https://your-domain.com/7x6.book");
+  const bookBuffer = new Uint8Array(await res.arrayBuffer());
+  const book = await OpeningBook.fromBuffer(bookBuffer);
+
+  // Uses the C++ JSI bridge (no WASM overhead)
+  const solver = new ReactNativeConnect4Solver({ width: book.width, height: book.height });
+  await solver.init();
+
+  const result = await solver.analyze("4424", { book });
+
+  if (result.evaluation) {
+    if (result.evaluation.outcome === Outcome.Win) {
+      console.log(`${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`);
+    } else if (result.evaluation.outcome === Outcome.Draw) {
+      console.log("The game is a draw");
+    }
+  }
+
+  // Always free native memory
+  book.unload();
+  solver.unload();
+}
+
+run();
 ```
+
+```typescript [Browser (Sync)]
+import { SyncWasmNoSABConnect4Solver, OpeningBook, Outcome } from "connect-4-solver";
+
+async function run() {
+  // Fetch the binary opening book
+  const res = await fetch("/books/7x6.book");
+  const bookBuffer = new Uint8Array(await res.arrayBuffer());
+  const book = await OpeningBook.fromBuffer(bookBuffer);
+
+  // No WebWorker setup required, but blocks the main thread
+  const solver = new SyncWasmNoSABConnect4Solver({ width: book.width, height: book.height });
+  await solver.init();
+
+  // ⚠️ Blocks the main thread until it finishes resolving!
+  const result = solver.analyze("4424", { book });
+
+  if (result.evaluation) {
+    if (result.evaluation.outcome === Outcome.Win) {
+      console.log(`${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`);
+    } else if (result.evaluation.outcome === Outcome.Draw) {
+      console.log("The game is a draw");
+    }
+  }
+
+  // Always free native memory
+  book.unload();
+  solver.unload();
+}
+
+run();
+```
+
 :::
 
 ## Next Steps
 
-- Explore the [API Reference](/api/connect4solver) for advanced configuration.
-- Read about [Opening Books](/solution-books) to get instant evaluations for the first 14+ moves.
-- Deploying to the browser? Read the [WebWorkers Guide](/web-workers) for best practices.
+- **[Solution Books](/solution-books)** — Required for practical exact solving on 7x6 and larger boards.
+- **[Memory & Threading](/cache)** — Cache sizing, multithreading, and `unload()` lifecycle.
+- **[WebWorker Solvers](/api/webworker-solvers)** — Non-blocking browser integration.
+- **[API Reference](/api/base-solver)** — Full method signatures and return types.

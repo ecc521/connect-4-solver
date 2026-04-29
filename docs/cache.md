@@ -1,17 +1,17 @@
-# Memory & Caching
+# Memory & Threading
 
-Because the Connect 4 engine uses a highly optimized C++ core compiled to WebAssembly (WASM), it relies on manual memory management. **WebAssembly does not have a Garbage Collector for native pointers**, so developers must explicitly understand how caching works to avoid crashing the browser tab with memory leaks.
+The Connect 4 engine uses a C++ core, and WebAssembly/Native pointers are not garbage collected. You must manually free memory to prevent leaks.
 
-## The Transposition Table (Cache)
+## Cache Allocation
 
-When a solver evaluates a position, it must evaluate millions of potential future board states. To prevent redundant calculations, the solver stores previously evaluated states in a high-density L1-optimized **Transposition Table** (the "Cache").
-
-By default, every time you instantiate a `Connect4Solver`, it automatically creates an implicit, private cache for itself in the WASM heap:
+Every time you instantiate a solver (e.g. `NodeConnect4Solver`, `SyncWasmConnect4Solver`), it automatically creates a Transposition Table cache on the heap. You can control the size of this cache using the `cacheSizeMb` option.
 
 ```typescript
-// Implicit Memory Allocation
-const solver = new Connect4Solver(7, 6);
-await solver.init(); // Allocates ~64MB of WASM Memory automatically
+import { NodeConnect4Solver } from "connect-4-solver";
+
+// Implicit Memory Allocation (defaults to 128MB)
+const solver = new NodeConnect4Solver({ width: 7, height: 6, cacheSizeMb: 128 });
+await solver.init(); // Allocates ~128MB of Memory automatically
 
 // ... run operations ...
 
@@ -20,49 +20,39 @@ solver.unload();
 ```
 
 ::: warning ⚠️ MANDATORY DEALLOCATION
-Failing to call `solver.unload()` when you are done with the solver will result in a permanent memory leak. The browser cannot automatically clean up the C++ pointers.
+Failing to call `solver.unload()` when you are done with the solver will result in a permanent memory leak. Node.js and the Browser cannot automatically clean up the C++ pointers.
 :::
 
-## Cache Sharing
+## Multithreading
 
-If you are spinning up multiple instances of the solver (for example, in a WebWorker pool to handle concurrent requests), you can explicitly instantiate a `SolverCache` and share it across multiple solvers:
-
-```typescript
-import { Connect4Solver, SolverCache } from "connect-4-solver";
-
-// 1. Create a single 64MB Cache
-const sharedCache = new SolverCache(7, 6, 1024 * 1024 * 64, false);
-await sharedCache.init();
-
-// 2. Pass the explicitly managed cache to multiple solvers
-const solver1 = new Connect4Solver({ width: 7, height: 6, cache: sharedCache });
-const solver2 = new Connect4Solver({ width: 7, height: 6, cache: sharedCache });
-
-await solver1.init();
-await solver2.init();
-
-// ... run operations ...
-
-// 3. Unload the solvers
-solver1.unload();
-solver2.unload();
-
-// 4. Finally, explicitly destroy the shared cache when the app closes
-sharedCache.destroy();
-```
-
-### Benefits of Shared Caches
-1. **Algorithmic Efficiency:** One large shared cache pool is superior to multiple isolated caches. By aggregating the pool, solvers experience far fewer hash collisions.
-2. **Knowledge Sharing:** Because solvers are reading and writing to the exact same pointer memory space, if `solver1` evaluates a complex sub-branch, `solver2` can instantly pull the result from the shared cache instead of recalculating it from scratch!
-
-## Heuristic vs Exact Caches
-
-The memory architecture natively utilizes different physical structs for heuristic scoring compared to exact terminal-depth scoring. **You cannot mix caches.**
-If you are initializing a Heuristic solver, you must explicitly flag `isHeuristic = true` when creating the cache:
+By default, the solver uses a single thread. For deep calculations (e.g., empty or nearly empty boards), you can speed up evaluation by allocating more threads:
 
 ```typescript
-import { HeuristicSolverCache } from "connect-4-solver";
-
-const heuristicCache = new HeuristicSolverCache(8, 8, 1024 * 1024 * 32); 
-await heuristicCache.init();
+const result = await solver.analyze("4424", { threads: 4 });
 ```
+
+### Browser Requirements
+
+Multithreaded WASM requires `SharedArrayBuffer`, which is only available when your server sends Cross-Origin Isolation headers (`COOP`/`COEP`). Use `SyncWasmConnect4Solver` or `WebWorkerWasmConnect4Solver` for multithreading; the `NoSAB` variants are single-threaded only.
+
+### WebAssembly Thread Pool
+
+The distributed multithreaded WASM binary (`analyze_threaded.js`) is pre-compiled using Emscripten with a strict `PTHREAD_POOL_SIZE=4` to optimize memory and startup latency. This means that requesting more than 4 threads will automatically be capped by the engine. To increase this limit, you must recompile the C++ source code using `emcc` and explicitly raise the `PTHREAD_POOL_SIZE` flag in `build.sh` and/or enable dynamic worker creation (`-s PTHREAD_POOL_SIZE_STRICT=0`).
+
+### Node.js Thread Pool
+
+When running in Node.js, asynchronous tasks are offloaded to Node's `libuv` thread pool, which defaults to **4 threads**. If you're running concurrent evaluations, increase the pool size before your application starts:
+
+```bash
+export UV_THREADPOOL_SIZE=32
+```
+
+
+### Mobile Thread Pools (React Native)
+
+When using `ReactNativeConnect4Solver`, asynchronous tasks are offloaded to native background thread pools to prevent blocking the JS UI thread. 
+
+If you trigger concurrent evaluations across **multiple solver instances** at the exact same time, the bridge handles execution as follows:
+* **Android:** The Kotlin module uses an unbounded cached thread pool. It will attempt to execute as many concurrent solvers as you request. It is entirely your responsibility not to overwhelm the device's CPU.
+* **iOS:** The Objective-C++ module utilizes Grand Central Dispatch (`dispatch_get_global_queue`), which dynamically executes or queues concurrent evaluations based on the device's available CPU cores and thermal state.
+

@@ -2,14 +2,14 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   title: "Connect 4 Solver",
-  description: "Perfect Connect 4 solver in C++ with a high-performance WebAssembly binary bridge and an object-oriented TypeScript wrapper.",
+  description: "Perfect Connect 4 solver in C++ with WebAssembly and TypeScript bindings for Node.js, browser, and React Native.",
   base: '/connect-4-solver/',
   
   themeConfig: {
     nav: [
-      { text: 'Home', link: '/' },
-      { text: 'Memory & Cache', link: '/cache' },
-      { text: 'API Reference', link: '/api/standard' }
+      { text: 'Getting Started', link: '/getting-started' },
+      { text: 'Solution Books', link: '/solution-books' },
+      { text: 'API Reference', link: '/api/base-solver' }
     ],
 
     sidebar: [
@@ -18,15 +18,16 @@ export default defineConfig({
         items: [
           { text: 'Getting Started', link: '/getting-started' },
           { text: 'Solution Books', link: '/solution-books' },
-          { text: 'Memory & Caches', link: '/cache' },
-          { text: 'WebWorkers (Async)', link: '/web-workers' },
+          { text: 'Memory & Threading', link: '/cache' },
         ]
       },
       {
         text: 'Solvers API',
         items: [
-          { text: 'Connect4Solver', link: '/api/connect4solver' },
-          { text: 'AsyncConnect4Solver', link: '/api/async-connect4solver' },
+          { text: 'BaseConnect4Solver', link: '/api/base-solver' },
+          { text: 'NodeConnect4Solver', link: '/api/nodeconnect4solver' },
+          { text: 'SyncWasmConnect4Solver', link: '/api/syncwasmconnect4solver' },
+          { text: 'WebWorker Solvers', link: '/api/webworker-solvers' },
           { text: 'ReactNativeConnect4Solver', link: '/api/react-native' },
         ]
       }

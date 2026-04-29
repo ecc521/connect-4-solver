@@ -1,11 +1,11 @@
-import { Connect4Solver } from "../src/index";
+import { NodeConnect4Solver } from "../src/index";
 
 describe("Heuristic vs Perfect Connectivity Benchmark", () => {
   it("heuristically evaluates complex positions without books", async () => {
-    const perfectEngine = new Connect4Solver();
+    const perfectEngine = new NodeConnect4Solver();
     await perfectEngine.init();
 
-    const heuristicEngine = new Connect4Solver({ width: 7, height: 6, heuristic: true });
+    const heuristicEngine = new NodeConnect4Solver({ width: 7, height: 6, heuristic: true });
     await heuristicEngine.init();
 
     // Random non-terminal mid-game positions

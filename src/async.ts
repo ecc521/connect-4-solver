@@ -1,6 +1,6 @@
 import { PositionAnalysis, Connect4SolverOptions } from "./index";
 
-export class AsyncConnect4Solver {
+export abstract class AbstractAsyncWebWorkerSolver {
   private worker: Worker;
   private messageId = 0;
   private pendingRequests = new Map<number, { resolve: (val: any) => void; reject: (err: any) => void }>();
@@ -9,6 +9,7 @@ export class AsyncConnect4Solver {
 
   constructor(
     worker: Worker,
+    initType: string,
     opts?: Connect4SolverOptions | number,
     heightOpt?: number
   ) {
@@ -38,7 +39,7 @@ export class AsyncConnect4Solver {
       if (opts.heuristic !== undefined) heuristic = opts.heuristic;
     }
 
-    this.initPromise = this.sendMessage("init", {
+    this.initPromise = this.sendMessage(initType, {
       width,
       height,
       cacheSizeMb,
@@ -71,4 +72,16 @@ export class AsyncConnect4Solver {
   release(): void {
     this.sendMessage("unload").catch(() => {});
   }
+}
+
+export class WebWorkerWasmConnect4Solver extends AbstractAsyncWebWorkerSolver {
+    constructor(worker: Worker, opts?: Connect4SolverOptions | number, heightOpt?: number) {
+        super(worker, "init-threaded", opts, heightOpt);
+    }
+}
+
+export class WebWorkerWasmNoSABConnect4Solver extends AbstractAsyncWebWorkerSolver {
+    constructor(worker: Worker, opts?: Connect4SolverOptions | number, heightOpt?: number) {
+        super(worker, "init-nosab", opts, heightOpt);
+    }
 }

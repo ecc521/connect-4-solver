@@ -24,13 +24,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     return Promise.resolve();
   }
 
-  analyze(positionStr: string, opts?: any): PositionAnalysis {
-    throw new Error(
-      "Synchronous analyze() is not supported on React Native because JSI boundary calls are asynchronous. Please use analyzeAsync() instead.",
-    );
-  }
-
-  async analyzeAsync(
+  async analyze(
     positionStr: string,
     opts?: { threads?: number },
   ): Promise<PositionAnalysis> {
@@ -156,6 +150,10 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       evaluation,
       moveOptions,
     };
+  }
+
+  async analyzeAsync(positionStr: string, opts?: any): Promise<PositionAnalysis> {
+    return this.analyze(positionStr, opts);
   }
 
   /**

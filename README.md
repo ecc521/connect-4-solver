@@ -15,157 +15,12 @@ npm install connect-4-solver
 - **TypeScript Ready**: Full type definitions included.
 - **Opening Book Support**: Fast analysis even from move 0.
 
-## Usage
+## Usage & Documentation
 
-```typescript
-import { Connect4Solver, Player, Outcome } from "connect-4-solver";
-import * as fs from "fs";
+We have comprehensive documentation covering API usage, WebWorkers, Solution Books, and Memory Management.
 
-  // Initialize the standard solver (defaults to 128MB cache)
-  // Supported sizes: 6x5, 6x6, 7x6, 7x7, 8x6, 9x7
-  const solver = new Connect4Solver({ width: 7, height: 6 });
-  await solver.init();
-
-  // Load an opening book for instant performance (Required for evaluating positions with <= 6 moves in a reasonable amount of time)
-  // Download book files from: https://github.com/ecc521/connect-4-solver/releases/tag/solutionbooks
-  const bookBuffer = fs.readFileSync("path/to/downloaded/7x6_dense12.cbook");
-  await solver.loadBook(new Uint8Array(bookBuffer));
-
-  // Analyze a position (column sequence: 1 to board width)
-  // You can optionally pass `{ threads: X }` to scale the internal C++ thread pool natively
-  const result = await solver.analyze("4424", { threads: 4 });
-
-  if (result.evaluation) {
-    if (result.evaluation.outcome === Outcome.Win) {
-      console.log(
-        `${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`,
-      );
-    } else if (result.evaluation.outcome === Outcome.Draw) {
-      console.log("The game is a draw");
-    }
-  }
-
-  // Iterate over move options (index 0-6 maps to columns 1-7)
-  result.moveOptions.forEach((ev, index) => {
-    if (ev) {
-      console.log(`Column ${index + 1}: ${ev.outcome} (${ev.score})`);
-    } else {
-      console.log(`Column ${index + 1}: Full`);
-    }
-  });
-}
-
-run();
-```
-
-### Multithreading Scaling Expectations
-
-The threaded solver uses a "Root Splitting" architecture alongside a global lock-free sequence-locked Transposition Table (inspired by strict chess engines like Stockfish). Because Alpha-Beta search relies heavily on sequential tree cutoffs, multithreading scaling is logarithmic, not linear.
-
-- **2 Threads:** Executes in **~60-65%** of the baseline time.
-- **4 Threads:** Executes in **~40-45%** of the baseline time.
-- **8 Threads:** Executes in **~25-35%** of the baseline time.
-
-The threads dynamically share their evaluated tree hashes with each other across the WebWorker memory pool in real-time, allowing sister-threads to instantly prune millions of branches the fraction of a second a branch refutation is discovered.
-
-### ⚠️ Web Browsers & Node.js (Web Workers)
-
-WebAssembly execution is fundamentally **synchronous and blocking**. Calling `solver.analyze()` directly on your main UI thread will instantly freeze your browser tab until the C++ algorithm formally completes its evaluation.
-
-To achieve non-blocking execution safely on Web/Node environments, you **must** instantiate the solver natively inside your own application's Web Worker.
-
-Here is a standard WebWorker architecture (`worker.ts`) you should securely deploy inside your app:
-
-```typescript
-// worker.ts (Inside your application codebase)
-import { Connect4Solver } from "connect-4-solver";
-
-let solver: Connect4Solver;
-
-self.onmessage = async (e) => {
-  const { type, position } = e.data;
-
-  if (type === "INIT") {
-    solver = new Connect4Solver({ width: 7, height: 6 });
-    await solver.init();
-    // await solver.loadBook(bookBuffer);
-    self.postMessage({ type: "READY" });
-  } else if (type === "ANALYZE") {
-    // The intensive C++ call executes safely out of the Main Thread here!
-    const result = await solver.analyze(position);
-    self.postMessage({ type: "RESULT", result });
-  }
-};
-```
-
-_(Note: The React Native `"connect-4-solver/native"` plugins circumvent this entirely! They are exclusively engineered to run 100% asynchronously on true background CPU hooks natively!)_
-
-### 📱 React Native (iOS & Android)
-
-For mobile development, `connect-4-solver` includes true native C++ bindings for React Native via JSI/JNI. This entirely bypasses the WebAssembly engine and executes the solver directly on the device's native CPU architecture for maximum performance.
-
-```typescript
-import { ReactNativeConnect4Solver } from "connect-4-solver/native";
-
-const runMobile = async () => {
-  const solver = new ReactNativeConnect4Solver(7, 6);
-  await solver.init();
-
-  // The React Native bindings execute fully asynchronously off the main JS thread automatically
-  const result = await solver.analyzeAsync("121212");
-  
-  if (result.evaluation?.outcome === "Win") {
-    console.log("Win detected via Native C++ execution!");
-  }
-};
-```
-
-#### Testing with the Example App
-
-This repository includes a bare-bones React Native `example` application configured to build and test the local `connect-4-solver` library natively.
-
-To test the native bindings on your machine:
-1. Ensure you have the Android SDK (for Android) or Xcode/CocoaPods (for iOS) installed.
-2. From the root directory, run:
-   ```bash
-   npm run example:ios
-   # or
-   npm run example:android
-   ```
-
-### Analysis Result Structure
-
-The `analyze` method returns a `PositionAnalysis` object:
-
-```typescript
-export enum Player {
-  P1 = "P1", // Moves first
-  P2 = "P2", // Moves second
-}
-
-export enum Outcome {
-  Win = "Win",
-  Loss = "Loss",
-  Draw = "Draw",
-}
-
-export interface Evaluation {
-  outcome: Outcome;
-  winner: Player | null; // null when Draw
-  movesToEnd: number | null; // null when Draw
-  score: number; // raw score (positive = current player winning)
-}
-
-export interface PositionAnalysis {
-  position: string; // Validated position (may differ if input was invalid)
-  originalPosition: string; // Raw input string
-  currentPlayer: Player; // Whose turn it is at the analyzed position
-  evaluation: Evaluation | null; // Overall evaluation of the position
-  moveOptions: (Evaluation | null)[]; // Evaluation for playing in each column (1 to board width)
-}
-```
-
-## Advanced
+**[📚 Read the Official Documentation](https://ecc521.github.io/connect-4-solver/)**
+*(If the link is dead, run `npm run docs:dev` locally to view the full Vitepress site!)*
 
 ### Building from source
 
@@ -175,20 +30,6 @@ If you want to recompile the WASM module and have Emscripten installed:
 npm run build
 ```
 
-### 🚀 Node.js Native Bindings
-
-When running `connect-4-solver` in a server-side Node.js environment or CLI tool, the library automatically falls back to lightning-fast **Native C++ Addons (N-API)** if they are compiled on your machine. This entirely bypasses WebAssembly overhead and V8 memory limits. 
-
-The `Connect4Solver` API automatically detects and prioritizes `connect4.node` without any code changes required on your end!
-
-> [!WARNING]
-> Node.js offloads native asynchronous C++ code (like N-API promises) to its `libuv` thread pool, which is natively limited to **4 parallel threads**. 
-> If you are calling `await solver.analyze(pos)` concurrently on many requests, you **MUST** increase the `UV_THREADPOOL_SIZE` environment variable before your Node.js application starts up, otherwise you will be hard-capped at 4 concurrent evaluations regardless of your CPU capacity.
-> 
-> ```bash
-> export UV_THREADPOOL_SIZE=32 # Set this before running your node app
-> ```
-
 If you want to manually compile the native bindings for your system (e.g., to squeeze out maximum performance for a backend server):
 
 ```bash
@@ -197,48 +38,7 @@ npm install
 npm run build:native
 ```
 
-### Generating Opening Books Natively
-
-**What is "Depth"?**  
-Depth refers to the exact number of moves (ply) pre-calculated consecutively starting from a completely empty board. Connect 4 branching logic scales _exponentially_ based on the remaining unplayed mathematical volume. By generating an opening book up to an explicit Depth (e.g. `14`), you are securely caching the perfect evaluations for every single valid board permutation that can possibly occur within the first 14 turns. The upstream user's device instantly fetches this cached scenario directly from the `.book` memory buffer without burning their processor cycle.
-
-**Depth Recommendations (Targeting `<1s` UI Response Times):**
-
-- **`6x5`:** Depth `0` _(No book required; executes instantly)_
-- **`6x6`:** Depth `6` or `8`
-- **`7x6` (Standard):** Depth `12` or `14` _(Standard 14-depth book is ~4MB)_
-- **`7x7`:** Depth `16` to `18` _(Requires ~6.5MB dense book)_
-- **`8x6`:** Depth `20` to `22`
-- **`8x8`, `9x7`, `10x10`:** _(We do not offer pre-computed mathematical opening books for these sizes due to astronomical branching complexity. Use the `HeuristicSolver` for these sizes instead!)_
-
-Generating opening books for larger board sizes (like `8x6`) can take significant CPU time to compute locally. You can drastically speed this up by using our included **TypeScript Orchestrator** which directly interfaces with the Native C++ Addon to bypass V8 memory constraints:
-
-1. Ensure the native bindings are compiled on your machine:
-   ```bash
-   npm run build:native
-   ```
-2. Run the orchestrator script, specifying your board dimensions, target depth, cache size (MB), and CPU thread count:
-   ```bash
-   npx ts-node tools/generate-book.ts --width 7 --height 6 --depth 12 --cache 1024 --threads 12
-   ```
-3. The script will dynamically generate permutations, stream Alpha-Beta evaluations natively across all your cores, and compress the output directly into a `.book` file in the `data/` directory.
-
-### Choosing Your Dense Book Format
-
-We offer two mathematically perfect opening book architectures natively. **Both formats inherently guarantee 100% collision-free capacities with absolutely zero dropped states**, but they leverage different compression topologies:
-
-#### 1. Dense Array Format (`.book`)
-- **Optimal for:** Desktops, Servers, Research computation, Web workloads.
-- **Performance:** **Extremely Fast**
-- **How it works:** Stores positions as a tightly packed, sorted array of keys and 1-byte values. At runtime, the solver performs a highly-optimized binary search (`std::lower_bound`) to instantly resolve opening positions.
-
-#### 2. Elias-Fano Compressed Format (`.efbook`)
-- **Optimal for:** Strict Mobile Bundles unsupporting explicit compression topologies.
-- **Performance:** **Fast** (slight decompression overhead compared to Dense Array).
-- **How it works:** Encodes the monotonically increasing sorted sequence of keys using an Elias-Fano data structure. This splits the keys into `upper_bits` and `lower_bits`, effectively squashing the raw memory footprint natively while still allowing fast random-access `select1` queries.
-
 ### Building with Docker
-
 
 If you don't want to install Emscripten locally, you can use the provided Dockerfile. This creates a complete environment for building both the WASM bridge and the TypeScript wrapper:
 

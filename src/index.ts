@@ -17,8 +17,11 @@ const STATUS_INVALID = 2;
 const UNPLAYABLE_COLUMN_SCORE = -1000;
 const INT32_SIZE = 4;
 
-let Module: SolverModule | null = null;
-let _moduleInitPromise: Promise<void> | null = null;
+let NoSABModule: SolverModule | null = null;
+let _noSABInitPromise: Promise<void> | null = null;
+
+let ThreadedModule: SolverModule | null = null;
+let _threadedInitPromise: Promise<void> | null = null;
 
 let NativeModule: any = null;
 let nativeModuleAttempted = false;
@@ -34,25 +37,44 @@ export function getNativeModule() {
         NativeModule = req(nodePath);
       }
     } catch (e) {
-      if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-        console.error(e);
-        console.warn("Connect 4 Solver: Native addon 'connect4.node' not found. Falling back to WASM build.");
-      }
+      // Fail silently
     }
   }
   return NativeModule;
 }
 
-export function getModuleInitPromise() {
-  if (!_moduleInitPromise) {
+export function getNoSABModuleInitPromise() {
+  if (!_noSABInitPromise) {
     /* eslint-disable @typescript-eslint/no-require-imports */
     const createModule = require("../build/analyze.js") as unknown as () => Promise<SolverModule>;
     /* eslint-enable @typescript-eslint/no-require-imports */
-    _moduleInitPromise = createModule().then((mod: SolverModule) => {
-      Module = mod;
+    _noSABInitPromise = createModule().then((mod: SolverModule) => {
+      NoSABModule = mod;
     });
   }
-  return _moduleInitPromise;
+  return _noSABInitPromise;
+}
+
+export function getThreadedModuleInitPromise() {
+  if (!_threadedInitPromise) {
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    const createModule = require("../build/analyze_threaded.js") as unknown as () => Promise<SolverModule>;
+    /* eslint-enable @typescript-eslint/no-require-imports */
+    _threadedInitPromise = createModule().then((mod: SolverModule) => {
+      ThreadedModule = mod;
+    });
+  }
+  return _threadedInitPromise;
+}
+
+export function getNoSABModule(): SolverModule {
+  if (!NoSABModule) throw new Error("Module not initialized. Call getNoSABModuleInitPromise() first.");
+  return NoSABModule;
+}
+
+export function getThreadedModule(): SolverModule {
+  if (!ThreadedModule) throw new Error("Module not initialized. Call getThreadedModuleInitPromise() first.");
+  return ThreadedModule;
 }
 
 export interface Connect4SolverOptions {
@@ -62,82 +84,25 @@ export interface Connect4SolverOptions {
   heuristic?: boolean;
 }
 
-export function getModule(): SolverModule {
-  if (!Module) {
-    throw new Error("Module not initialized. Call getModuleInitPromise() first.");
-  }
-  return Module;
-}
-
-export class Connect4Solver {
-  public width: number;
-  public height: number;
+export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   protected isHeuristic: boolean;
   protected cacheSizeMb: number;
-  protected initialized = false;
 
   protected _solverPtr: any = 0;
   protected _cachePtr: any = 0;
-  private bookLoaded = false;
 
   constructor(opts?: Connect4SolverOptions | number, heightOpt?: number) {
-    let width = 7;
-    let height = 6;
+    super(opts as any, heightOpt);
     let cacheSizeMb = 128;
     let heuristic = false;
 
-    if (typeof opts === "number") {
-      width = opts;
-      if (heightOpt !== undefined) height = heightOpt;
-    } else if (opts && typeof opts === "object") {
-      if (opts.width !== undefined) width = opts.width;
-      if (opts.height !== undefined) height = opts.height;
+    if (opts && typeof opts === "object") {
       if (opts.cacheSizeMb !== undefined) cacheSizeMb = opts.cacheSizeMb;
       if (opts.heuristic !== undefined) heuristic = opts.heuristic;
     }
 
-    const validSizes = ["6x5", "6x6", "7x6", "7x7", "8x6", "9x7", "8x8", "9x6", "11x4"];
-    if (!validSizes.includes(`${width}x${height}`)) {
-      throw new Error(`Board size ${width}x${height} is not supported.`);
-    }
-
-    this.width = width;
-    this.height = height;
     this.cacheSizeMb = cacheSizeMb;
     this.isHeuristic = heuristic;
-  }
-
-  async init(): Promise<void> {
-    if (this.initialized) return;
-
-    // React Native Bridge
-    const rnModule = typeof global !== 'undefined' && (global as any).nativeConnect4Solver;
-    if (rnModule) {
-      this._cachePtr = rnModule.createCache(this.width, this.height, this.cacheSizeMb * 1024 * 1024, this.isHeuristic);
-      this._solverPtr = rnModule.createSolver(this.width, this.height, this._cachePtr, this.isHeuristic);
-      this.initialized = true;
-      return;
-    }
-
-    // Node.js N-API Native
-    const native = getNativeModule();
-    if (native) {
-      this._cachePtr = native._createCache(this.width, this.height, this.cacheSizeMb * 1024 * 1024, this.isHeuristic);
-      this._solverPtr = native._createSolver(this.width, this.height, this._cachePtr, this.isHeuristic);
-      this.initialized = true;
-      return;
-    }
-
-    // WASM Fallback
-    await getModuleInitPromise();
-    const mod = getModule();
-    this._cachePtr = mod._createCache(this.width, this.height, this.cacheSizeMb * 1024 * 1024, this.isHeuristic);
-    this._solverPtr = mod._createSolver(this.width, this.height, this._cachePtr, this.isHeuristic);
-    this.initialized = true;
-  }
-
-  protected allocateString(str: string): number {
-    return getModule().stringToNewUTF8(str);
   }
 
   protected getPlayerAt(nbMoves: number): Player {
@@ -172,43 +137,7 @@ export class Connect4Solver {
     }
   }
 
-  async analyze(positionStr: string, opts?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: any }): Promise<PositionAnalysis> {
-    if (!this.initialized) throw new Error("Call init() first.");
-    const threads = opts?.threads ?? 1;
-    const maxDepth = opts?.maxDepth ?? 20;
-    const timeoutMs = opts?.timeoutMs ?? 25;
-    const bookPtr = opts?.book ? opts.book.ptr : 0;
-
-    let resArr: Int32Array | number[];
-
-    const rnModule = typeof global !== 'undefined' && (global as any).nativeConnect4Solver;
-    if (rnModule) {
-      if (this.isHeuristic) resArr = await rnModule.analyzeHeuristic(this._solverPtr, positionStr, maxDepth, threads, timeoutMs, this.width, this.height);
-      else resArr = await rnModule.analyze(this._solverPtr, positionStr, threads, this.width, this.height, false);
-    } else {
-      const native = getNativeModule();
-      if (native) {
-        if (this.isHeuristic) resArr = await native._analyzeHeuristic(this.width, this.height, this._solverPtr, positionStr, threads, maxDepth, timeoutMs);
-        else resArr = await native._analyzeExact(this.width, this.height, this._solverPtr, positionStr, threads, bookPtr === 0 ? null : bookPtr);
-      } else {
-        // WASM Fallback Sync
-        const mod = getModule();
-        const allocatedMemory = this.allocateString(positionStr);
-        let outputPointer = 0;
-        if (this.isHeuristic) outputPointer = mod._analyzeHeuristic(this.width, this.height, this._solverPtr, allocatedMemory, threads, maxDepth, timeoutMs);
-        else outputPointer = mod._analyzeExact(this.width, this.height, this._solverPtr, allocatedMemory, threads, bookPtr);
-
-        const dataLength = (this.isHeuristic ? 3 : 2) + this.width;
-        const finalData = new Int32Array(dataLength);
-        for (let i = 0; i < dataLength; i++) {
-          finalData[i] = mod.getValue(outputPointer + i * INT32_SIZE, "i32");
-        }
-        mod._free(allocatedMemory);
-        mod._free(outputPointer);
-        resArr = finalData;
-      }
-    }
-
+  protected parseResArr(resArr: Int32Array | number[], positionStr: string): PositionAnalysis {
     const originalPosition = positionStr;
     const status = resArr[0];
     const nbMoves = resArr[1];
@@ -252,25 +181,140 @@ export class Connect4Solver {
     return { position: currentPosition, originalPosition, currentPlayer, evaluation, moveOptions, depthReached };
   }
 
+  // Not strictly used by child classes unless they are WASM based
+  protected executeWasmAnalyze(mod: SolverModule, positionStr: string, opts?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: any }): Int32Array {
+    const threads = opts?.threads ?? 1;
+    const maxDepth = opts?.maxDepth ?? 20;
+    const timeoutMs = opts?.timeoutMs ?? 25;
+    const bookPtr = opts?.book ? opts.book.ptr : 0;
+
+    const allocatedMemory = mod.stringToNewUTF8(positionStr);
+    let outputPointer = 0;
+    if (this.isHeuristic) outputPointer = mod._analyzeHeuristic(this.width, this.height, this._solverPtr, allocatedMemory, threads, maxDepth, timeoutMs);
+    else outputPointer = mod._analyzeExact(this.width, this.height, this._solverPtr, allocatedMemory, threads, bookPtr);
+
+    const dataLength = (this.isHeuristic ? 3 : 2) + this.width;
+    const finalData = new Int32Array(dataLength);
+    for (let i = 0; i < dataLength; i++) {
+      finalData[i] = mod.getValue(outputPointer + i * INT32_SIZE, "i32");
+    }
+    mod._free(allocatedMemory);
+    mod._free(outputPointer);
+    return finalData;
+  }
+
+  abstract init(): Promise<void>;
+  abstract analyze(positionStr: string, opts?: any): PositionAnalysis | Promise<PositionAnalysis>;
+  abstract release(): void;
+  unload(): void {
+    this.release();
+  }
+  async analyzeAsync(positionStr: string, opts?: any): Promise<PositionAnalysis> {
+    return this.analyze(positionStr, opts);
+  }
+}
+
+export class NodeConnect4Solver extends AbstractSyncSolver {
+  private _analysisQueue: Promise<void> = Promise.resolve();
+
+  async init(): Promise<void> {
+    if (this.initialized) return;
+    const native = getNativeModule();
+    if (!native) {
+      throw new Error("NodeConnect4Solver can only be executed in a Node.js environment where 'connect4.node' successfully compiled.");
+    }
+    this._cachePtr = native._createCache(this.width, this.height, this.cacheSizeMb * 1024 * 1024, this.isHeuristic);
+    this._solverPtr = native._createSolver(this.width, this.height, this._cachePtr, this.isHeuristic);
+    this.initialized = true;
+  }
+
+  async analyze(positionStr: string, opts?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: any }): Promise<PositionAnalysis> {
+    if (!this.initialized) throw new Error("Call init() first.");
+    
+    return new Promise<PositionAnalysis>((resolve, reject) => {
+      this._analysisQueue = this._analysisQueue.catch(() => {}).then(async () => {
+        try {
+          const native = getNativeModule();
+          const threads = opts?.threads ?? 1;
+          const maxDepth = opts?.maxDepth ?? 20;
+          const timeoutMs = opts?.timeoutMs ?? 25;
+          const bookPtr = opts?.book ? opts.book.ptr : 0;
+
+          let resArr: number[];
+          if (this.isHeuristic) resArr = await native._analyzeHeuristic(this.width, this.height, this._solverPtr, positionStr, threads, maxDepth, timeoutMs);
+          else resArr = await native._analyzeExact(this.width, this.height, this._solverPtr, positionStr, threads, bookPtr === 0 ? null : bookPtr);
+
+          resolve(this.parseResArr(resArr, positionStr));
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+  }
+
   release(): void {
     if (!this.initialized) return;
-    
-    const rnModule = typeof global !== 'undefined' && (global as any).nativeConnect4Solver;
-    if (rnModule) {
-      if (this._solverPtr !== 0) rnModule.destroySolver(this._solverPtr, this.width, this.height, this.isHeuristic);
-      if (this._cachePtr !== 0) rnModule.destroyCache(this._cachePtr);
-    } else {
-      const native = getNativeModule();
-      if (native) {
-        if (this._solverPtr !== 0) native._destroySolver(this.width, this.height, this._solverPtr, this.isHeuristic);
-        if (this._cachePtr !== 0) native._destroyCache(this._cachePtr);
-      } else {
-        const mod = getModule();
-        if (this._solverPtr !== 0) mod._destroySolver(this.width, this.height, this._solverPtr, this.isHeuristic);
-        if (this._cachePtr !== 0) mod._destroyCache(this._cachePtr);
-      }
-    }
-    
+    const native = getNativeModule();
+    if (this._solverPtr !== 0) native._destroySolver(this.width, this.height, this._solverPtr, this.isHeuristic);
+    if (this._cachePtr !== 0) native._destroyCache(this._cachePtr);
+    this._solverPtr = 0;
+    this._cachePtr = 0;
+    this.initialized = false;
+  }
+}
+
+export class SyncWasmConnect4Solver extends AbstractSyncSolver {
+  async init(): Promise<void> {
+    if (this.initialized) return;
+    await getThreadedModuleInitPromise();
+    const mod = getThreadedModule();
+    this._cachePtr = mod._createCache(this.width, this.height, this.cacheSizeMb * 1024 * 1024, this.isHeuristic);
+    this._solverPtr = mod._createSolver(this.width, this.height, this._cachePtr, this.isHeuristic);
+    this.initialized = true;
+  }
+
+  analyze(positionStr: string, opts?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: any }): PositionAnalysis {
+    if (!this.initialized) throw new Error("Call init() first.");
+    const mod = getThreadedModule();
+    const resArr = this.executeWasmAnalyze(mod, positionStr, opts);
+    return this.parseResArr(resArr, positionStr);
+  }
+
+  release(): void {
+    if (!this.initialized) return;
+    const mod = getThreadedModule();
+    if (this._solverPtr !== 0) mod._destroySolver(this.width, this.height, this._solverPtr, this.isHeuristic);
+    if (this._cachePtr !== 0) mod._destroyCache(this._cachePtr);
+    this._solverPtr = 0;
+    this._cachePtr = 0;
+    this.initialized = false;
+  }
+}
+
+export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
+  async init(): Promise<void> {
+    if (this.initialized) return;
+    await getNoSABModuleInitPromise();
+    const mod = getNoSABModule();
+    this._cachePtr = mod._createCache(this.width, this.height, this.cacheSizeMb * 1024 * 1024, this.isHeuristic);
+    this._solverPtr = mod._createSolver(this.width, this.height, this._cachePtr, this.isHeuristic);
+    this.initialized = true;
+  }
+
+  analyze(positionStr: string, opts?: { maxDepth?: number, timeoutMs?: number, book?: any }): PositionAnalysis {
+    if (!this.initialized) throw new Error("Call init() first.");
+    const mod = getNoSABModule();
+    // Force 1 thread since it's NoSAB
+    const finalOpts = { ...opts, threads: 1 };
+    const resArr = this.executeWasmAnalyze(mod, positionStr, finalOpts);
+    return this.parseResArr(resArr, positionStr);
+  }
+
+  release(): void {
+    if (!this.initialized) return;
+    const mod = getNoSABModule();
+    if (this._solverPtr !== 0) mod._destroySolver(this.width, this.height, this._solverPtr, this.isHeuristic);
+    if (this._cachePtr !== 0) mod._destroyCache(this._cachePtr);
     this._solverPtr = 0;
     this._cachePtr = 0;
     this.initialized = false;

@@ -1,11 +1,11 @@
-import { Connect4Solver, Player, Outcome, OpeningBook } from "./index";
+import { NodeConnect4Solver, Player, Outcome, OpeningBook } from "./index";
 import * as fs from "fs";
 import * as path from "path";
 
 const BOARD_WIDTH = 7;
 
 async function runParityTest(
-  solver: Connect4Solver,
+  solver: NodeConnect4Solver,
   dataPath: string,
   w: number,
   h: number,
@@ -71,12 +71,12 @@ async function runParityTest(
   }
 }
 
-describe("Connect4Solver Async Parity Test", () => {
-  let solver: Connect4Solver;
+describe("NodeConnect4Solver Async Parity Test", () => {
+  let solver: NodeConnect4Solver;
   let bookLoaded = false;
 
   beforeAll(async (): Promise<void> => {
-    solver = new Connect4Solver();
+    solver = new NodeConnect4Solver();
     await solver.init();
 
     // Check both legacy root and new data/ directory for the book
@@ -129,7 +129,7 @@ describe("Connect4Solver Async Parity Test", () => {
 
   describe("Generic Board Sizes Support", () => {
     it("should correctly instantiate and evaluate an 8x6 board at depth 34", async () => {
-      const testSolver = new Connect4Solver(8, 6);
+      const testSolver = new NodeConnect4Solver(8, 6);
       await testSolver.init();
       // P1 plays 1, 2, 3, 4. P2 plays 8, 8, 8. P1 Wins on move 7!
       const result = await testSolver.analyze("1828384");
@@ -138,7 +138,7 @@ describe("Connect4Solver Async Parity Test", () => {
     });
 
     it("should correctly instantiate and evaluate a massive 9x7 board using the 128-bit fallback math", async () => {
-      const testSolver = new Connect4Solver(9, 7);
+      const testSolver = new NodeConnect4Solver(9, 7);
       await testSolver.init();
       // P1 plays 1, 2, 3, 4. P2 plays 9, 9, 9. P1 Wins on move 7!
       const result = await testSolver.analyze("1929394");
@@ -162,7 +162,7 @@ describe("Connect4Solver Async Parity Test", () => {
           "test-data",
           `positions_${w}x${h}.txt`,
         );
-        const testSolver = new Connect4Solver(w, h);
+        const testSolver = new NodeConnect4Solver(w, h);
         await testSolver.init();
 
         // For generic sizes, we check for a book in the data directory

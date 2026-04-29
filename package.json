@@ -1,7 +1,7 @@
 {
   "name": "connect-4-solver",
   "version": "3.0.0",
-  "description": "Solver for 7x6 Connect 4 Games",
+  "description": "High-performance Connect 4 solver for multiple board sizes",
   "main": "dist/index.js",
   "exports": {
     ".": {

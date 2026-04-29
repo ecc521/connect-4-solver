@@ -100,7 +100,7 @@ export abstract class BaseConnect4Solver {
   }
 
   abstract init(): Promise<void>;
-  abstract analyze(positionStr: string, opts?: any): PositionAnalysis;
+  abstract analyze(positionStr: string, opts?: any): PositionAnalysis | Promise<PositionAnalysis>;
   abstract analyzeAsync(positionStr: string, opts?: any): Promise<PositionAnalysis>;
   abstract unload(): void;
 }

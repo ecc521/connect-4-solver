@@ -1,5 +1,6 @@
-import { Connect4Solver } from "../src/index";
+import { NodeConnect4Solver } from "../src/index";
 import { getNativeModule } from "../src/index";
+import { OpeningBook } from "../src/index";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -23,7 +24,7 @@ function getRawScore(resArr: Int32Array | number[], width: number, height: numbe
 
 async function run() {
     const args = process.argv.slice(2);
-    let width = 7, height = 6, depth = 10, cacheSizeMb = 128, threads = 12;
+    let width = 7, height = 6, depth = 10, cacheSizeMb = 128, threads = 12, useEf = false, bootstrap = "";
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--width') width = parseInt(args[++i]);
@@ -31,6 +32,8 @@ async function run() {
         if (args[i] === '--depth') depth = parseInt(args[++i]);
         if (args[i] === '--cacheMB') cacheSizeMb = parseInt(args[++i]);
         if (args[i] === '--threads') threads = parseInt(args[++i]);
+        if (args[i] === '--ef') useEf = true;
+        if (args[i] === '--bootstrap') bootstrap = args[++i];
     }
 
     console.log("=========================================================");
@@ -45,7 +48,15 @@ async function run() {
 
     const minScore = -Math.floor((width * height) / 2) + 3;
 
-    const solver = new Connect4Solver({ width, height, cacheSizeMb });
+    let bootstrapBook: OpeningBook | null = null;
+    if (bootstrap) {
+        console.log(`[!] Loading bootstrap book from ${bootstrap}...`);
+        const bookData = fs.readFileSync(bootstrap);
+        bootstrapBook = await OpeningBook.fromBuffer(bookData);
+        console.log(`[+] Bootstrap book loaded (${bootstrapBook.width}x${bootstrapBook.height}).`);
+    }
+
+    const solver = new NodeConnect4Solver({ width, height, cacheSizeMb });
     await solver.init();
 
     console.log(`[!] Generating raw permutations up to depth ${depth}...`);
@@ -53,15 +64,44 @@ async function run() {
     console.log(`[+] Generated ${positions.length.toLocaleString()} unique evaluation points.`);
 
     const builder = new native.BookBuilder(width, height, depth);
+    let processed = 0;
+
+    const outputDir = path.join(__dirname, "../data");
+    if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+    }
+    const fileExt = useEf ? ".efbook" : ".book";
+    const outputFile = path.join(outputDir, `${width}x${height}_${useEf ? 'elias' : 'dense'}${depth}${fileExt}`);
+
+    const saveAndExit = () => {
+        console.log(`\n[!] Caught exit signal. Saving ${processed} accumulated positions to ${useEf ? 'Elias-Fano' : 'Dense'} book natively to preserve progress...`);
+        try {
+            if (useEf) {
+                builder.saveEliasFano(outputFile);
+            } else {
+                builder.saveDense(outputFile);
+            }
+            console.log(`[+] Partial book successfully saved to ${outputFile}`);
+        } catch (e) {
+            console.error(`[-] Failed to save book:`, e);
+        }
+        process.exit(0);
+    };
+
+    process.on('SIGINT', saveAndExit);
+    process.on('SIGTERM', saveAndExit);
 
     console.log(`[+] Crunching Alpha-Beta evaluations...`);
     
-    let processed = 0;
     const start = Date.now();
     for (const pos of positions) {
         // We can just use native._analyzeExact directly to get the raw Int32Array and parse it
-        const resArr = await native._analyzeExact(width, height, (solver as any)._solverPtr, pos, threads, null);
+        const bookPtr = bootstrapBook ? (bootstrapBook as any)._bookPtr : null;
+        const resArr = await native._analyzeExact(width, height, (solver as any)._solverPtr, pos, threads, bookPtr);
         const score = getRawScore(resArr, width, height);
+
+        // Accumulate into the builder using the 1-indexed uint8_t byte format
+        builder.addPosition(pos, score - minScore + 1);
 
         processed++;
         const elapsed = (Date.now() - start) / 1000;
@@ -72,17 +112,15 @@ async function run() {
     const elapsed = (Date.now() - start) / 1000;
     console.log(`\n[+] Finished evaluation in ${elapsed.toFixed(1)}s.`);
 
-    console.log(`[+] Packing transitive sequence cache into dense .book natively...`);
-    
-    const outputDir = path.join(__dirname, "../data");
-    if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
+    console.log(`[+] Packing transitive sequence cache into ${useEf ? 'Elias-Fano' : 'Dense'} book natively...`);
+    if (useEf) {
+        builder.saveEliasFano(outputFile);
+    } else {
+        builder.saveDense(outputFile);
     }
-    const outputFile = path.join(outputDir, `${width}x${height}_dense${depth}.book`);
-    
-    builder.saveDense(outputFile);
-    
     console.log(`[+] Book successfully saved to ${outputFile}`);
+    if (bootstrapBook) bootstrapBook.unload();
+    solver.unload();
     process.exit(0);
 }
 

@@ -1,4 +1,4 @@
-import { Connect4Solver, OpeningBook } from "../src/index";
+import { NodeConnect4Solver, OpeningBook } from "../src/index";
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
@@ -62,7 +62,7 @@ describe("Polymorphic Dense Book Packing", () => {
     // Header (6) + entries (3 bytes key + 1 byte value)
     expect(stat.size).toBe(6 + expectedCount * 4);
 
-    const solver = new Connect4Solver();
+    const solver = new NodeConnect4Solver();
     await solver.init();
     
     const book = new OpeningBook(solver.width, solver.height);
@@ -83,7 +83,7 @@ describe("Polymorphic Dense Book Packing", () => {
     // Header (6) + entries (4 bytes key + 1 byte value)
     expect(stat.size).toBe(6 + expectedCount * 5);
 
-    const solver = new Connect4Solver();
+    const solver = new NodeConnect4Solver();
     await solver.init();
     const book = new OpeningBook(solver.width, solver.height);
     await book.load(bookData);
@@ -102,7 +102,7 @@ describe("Polymorphic Dense Book Packing", () => {
     // Header (6) + entries (6 bytes key + 1 byte value)
     expect(stat.size).toBe(6 + expectedCount * 7);
 
-    const solver = new Connect4Solver();
+    const solver = new NodeConnect4Solver();
     await solver.init();
     const book = new OpeningBook(solver.width, solver.height);
     await book.load(bookData);
@@ -112,7 +112,7 @@ describe("Polymorphic Dense Book Packing", () => {
   test.skip("should load the generated depth 5 book and return exact scores without searching", async () => {
     const bookData = new Uint8Array(fs.readFileSync(d5Path));
     
-    const solver = new Connect4Solver();
+    const solver = new NodeConnect4Solver();
     await solver.init();
     
     const book = new OpeningBook(solver.width, solver.height);

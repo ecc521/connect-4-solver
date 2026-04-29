@@ -368,7 +368,7 @@ public:
     static Object Init(Napi::Env env, Object exports) {
         Function func = DefineClass(env, "BookBuilder", {
             InstanceMethod("add", &BookBuilder::Add),
-            InstanceMethod("addString", &BookBuilder::AddString),
+            InstanceMethod("addPosition", &BookBuilder::AddPosition),
             InstanceMethod("saveDense", &BookBuilder::SaveDense),
             InstanceMethod("saveEliasFano", &BookBuilder::SaveEliasFano),
             InstanceMethod("size", &BookBuilder::Size)
@@ -408,7 +408,7 @@ private:
         return info.Env().Undefined();
     }
 
-    Napi::Value AddString(const CallbackInfo& info) {
+    Napi::Value AddPosition(const CallbackInfo& info) {
         std::string pos = info[0].As<String>().Utf8Value();
         uint8_t score = info[1].As<Number>().Uint32Value();
         
