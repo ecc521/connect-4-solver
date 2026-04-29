@@ -121,7 +121,7 @@ async function run() {
   const cachePtr = native._createCache(
     width,
     height,
-    BigInt(cacheSizeMb) * 1024n * 1024n,
+    cacheSizeMb * 1024 * 1024,
     false,
   );
   const solvers = Array.from({ length: threads }, () =>
@@ -148,6 +148,7 @@ async function run() {
         height,
         solverPtr,
         pos,
+        false, // weak
         1, // 1 thread per solver (External Parallelism)
         bookPtr,
       );
