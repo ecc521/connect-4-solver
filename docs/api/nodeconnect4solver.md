@@ -62,6 +62,7 @@ async function runBulk(positions: string[]) {
         height,
         solverPtrs[solverIndex],
         pos,
+        false, // weak
         threads,
         null,
       );
@@ -99,7 +100,7 @@ Instantiates an evaluator bound to the specified shared cache. Returns a raw poi
 
 Frees the memory allocated by `_createSolver`.
 
-### `_analyzeExact(width: number, height: number, solverPtr: number, position: string, threads: number, bookPtr: number | null): Promise<number[]>`
+### `_analyzeExact(width: number, height: number, solverPtr: number, position: string, weak: boolean, threads: number, bookPtr: number | null): Promise<number[]>`
 
 Executes an asynchronous exact evaluation natively via Node's `libuv` pool. Returns a raw array of scores mapping to the evaluation outcomes.
 

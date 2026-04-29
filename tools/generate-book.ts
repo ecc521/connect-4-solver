@@ -74,9 +74,6 @@ async function run() {
     );
   }
 
-  const solver = new NodeConnect4Solver({ width, height, cacheSizeMb });
-  await solver.init();
-
   console.log(`[!] Generating raw permutations up to depth ${depth}...`);
   const positions: string[] = native._generatePositions(width, height, depth);
   console.log(
@@ -93,7 +90,7 @@ async function run() {
   const fileExt = useEf ? ".efbook" : ".book";
   const outputFile = path.join(
     outputDir,
-    `${width}x${height}_${useEf ? "elias" : "dense"}${depth}${fileExt}`,
+    `${width}x${height}_dense${depth}${fileExt}`,
   );
 
   const saveAndExit = () => {
