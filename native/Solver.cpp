@@ -116,9 +116,6 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
       nodeCount.fetch_sub(1, std::memory_order_relaxed);
     }
     
-    if (P2.canWinNext()) {
-      return -(Position::WIDTH * Position::HEIGHT + 1 - P2.nbMoves()) / 2;
-    }
     return -negamax(P2, -beta, -alpha, book);
   }
 
