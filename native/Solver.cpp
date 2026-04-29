@@ -118,12 +118,16 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   int searched_cnt = 0;
 #endif
 
+  int best_score = -Position::MAX_SCORE;
+
   while(Position::position_t next = moves.getNext()) {
     Position P2(P);
     P2.play(next);  
     int score = -negamax(P2, -beta, -alpha, book);
 
-    if(score >= beta) {
+    if(score > best_score) best_score = score;
+
+    if(best_score >= beta) {
       if constexpr (Position::WIDTH >= 8) {
 #if BOARD_WIDTH_MACRO >= 8
         if (searched_cnt > 0) {
@@ -140,20 +144,20 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
         }
 #endif
       }
-      transTable->put(key, score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves())); 
-      return score;  
+      transTable->put(key, best_score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves())); 
+      return best_score;  
     }
 #if BOARD_WIDTH_MACRO >= 8
     if constexpr (Position::WIDTH >= 8) {
       searched[searched_cnt++] = Position::ctz_impl(next);
     }
 #endif
-    if(score > alpha) alpha = score; 
+    if(best_score > alpha) alpha = best_score; 
   }
 
   uint8_t work = std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves());
-  transTable->put(key, alpha - Position::MIN_SCORE + 1, work); 
-  return alpha;
+  transTable->put(key, best_score - Position::MIN_SCORE + 1, work); 
+  return best_score;
 }
 
 template <typename SlotType>

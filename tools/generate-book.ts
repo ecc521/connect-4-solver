@@ -177,7 +177,9 @@ async function run() {
       if (processed % threads === 0 || processed === positions.length) {
         let currentTotalNodes = 0n;
         for (const s of solvers) {
-          currentTotalNodes += BigInt(native._getNodeCount(width, height, s, false));
+          currentTotalNodes += BigInt(
+            native._getNodeCount(width, height, s, false),
+          );
         }
 
         const elapsed = (Date.now() - start) / 1000;

@@ -5,7 +5,9 @@ import { getNativeModule } from "../src/index";
 async function main() {
   const args = process.argv.slice(2);
   if (args.length < 3) {
-    console.log("Usage: npx ts-node tools/convert-book.ts <width> <height> <input_file> [--ef]");
+    console.log(
+      "Usage: npx ts-node tools/convert-book.ts <width> <height> <input_file> [--ef]",
+    );
     return;
   }
 

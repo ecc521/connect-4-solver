@@ -35,10 +35,10 @@ book.unload();
 Solution books come in two primary types, depending on how they were generated:
 
 - **Strong Solutions (Perfect):** These books store the exact distance-to-win for every position. The engine uses these to play perfectly and find the shortest possible path to victory.
-- **Weak Solutions:** These books only store the game outcome (Win, Draw, or Loss). While the engine will still play correctly and never lose a won game, it may choose a "slower" winning path because it lacks the move-count data to differentiate between a win in 5 moves vs. a win in 15 moves.
+- **Weak Solutions:** These books only store the binary game outcome (Win, Draw, or Loss). The outcome evaluations are 100% mathematically correct, but any reported move depths are effectively "upper bounds" because the solver stops searching as soon as it finds _any_ winning path, rather than proving it is the _fastest_ path.
 
 > [!TIP]
-> Loading a **Strong Book** into a **Weak Solver** is perfectly safe. Loading a **Weak Book** into a **Strong Solver** will still preserve outcome, but may cause the solver to choose slower winning paths.
+> Loading a **Strong Book** into a **Weak Solver** is perfectly safe. Loading a **Weak Book** into a **Strong Solver** will still preserve the correct Win/Draw/Loss outcome, but because the strong solver cannot differentiate between the `+1` scores returned by the weak book, it will often choose slower, suboptimal winning paths.
 
 ## Generating Custom Books
 
