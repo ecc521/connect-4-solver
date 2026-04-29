@@ -104,6 +104,24 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     if(int val = book->get(P)) return val + Position::MIN_SCORE - 1; // look for solutions stored in opening book
   }
 
+  // Forced Move Resolution
+  // If there is exactly one non-losing move, we skip TT allocation and simply play it.
+  if ((possible & (possible - 1)) == 0) {
+    Position P2(P);
+    P2.play(possible);
+    
+    if (solverTlNodeCount > 0) {
+      solverTlNodeCount--;
+    } else {
+      nodeCount.fetch_sub(1, std::memory_order_relaxed);
+    }
+    
+    if (P2.canWinNext()) {
+      return -(Position::WIDTH * Position::HEIGHT + 1 - P2.nbMoves()) / 2;
+    }
+    return -negamax(P2, -beta, -alpha, book);
+  }
+
   MoveSorter moves;
   for(int i = Position::WIDTH; i--;) {
     if(Position::position_t move = possible & Position::column_mask(columnOrder[i])) {
