@@ -9,6 +9,21 @@ export enum Outcome {
   Draw = "Draw",
 }
 
+export function calculateWDL(val: number, isExact: boolean, exactOutcome?: Outcome) {
+  if (isExact) {
+    if (exactOutcome === Outcome.Win) return { win: 1.0, draw: 0.0, loss: 0.0 };
+    if (exactOutcome === Outcome.Loss) return { win: 0.0, draw: 0.0, loss: 1.0 };
+    return { win: 0.0, draw: 1.0, loss: 0.0 };
+  }
+  const K = 4.0;
+  const pWin = 1 / (1 + Math.exp(-val / K));
+  const pLoss = 1 - pWin;
+  const drawWidth = 0.5;
+  const pDraw = Math.exp(-(val * val) / drawWidth);
+  const total = pWin + pLoss + pDraw;
+  return { win: pWin / total, draw: pDraw / total, loss: pLoss / total };
+}
+
 export interface Evaluation {
   eval: {
     value: number; // Normalized float (+Infinity/-Infinity for exact wins)
@@ -121,7 +136,14 @@ export abstract class BaseConnect4Solver {
     if (typeof timeoutMs !== "number" || isNaN(timeoutMs) || timeoutMs <= 0 || !isFinite(timeoutMs)) throw new Error("Invalid 'timeoutMs' parameter. Must be greater than 0.");
 
     const bookPtr = opts?.book?.ptr ?? 0;
-    if (opts?.book && (typeof bookPtr !== "number" || isNaN(bookPtr))) throw new Error("Invalid 'book' parameter.");
+    const isInvalid = opts?.book && (
+      (typeof bookPtr !== "number" && typeof bookPtr !== "object") ||
+      (typeof bookPtr === "number" && isNaN(bookPtr))
+    );
+    
+    if (isInvalid) {
+      throw new Error("Invalid 'book' parameter.");
+    }
 
     return { threads, maxDepth, timeoutMs, bookPtr };
   }

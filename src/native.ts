@@ -1,4 +1,4 @@
-import { BaseConnect4Solver, Player, Outcome, Evaluation, PositionAnalysis } from "./core";
+import { BaseConnect4Solver, Player, Outcome, Evaluation, PositionAnalysis, calculateWDL } from "./core";
 
 interface NativeSolverType {
   analyze(
@@ -69,6 +69,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       const winningMoveIndex = nbMoves;
       const winner = winningMoveIndex % 2 === 0 ? Player.P1 : Player.P2;
       evaluation = {
+        eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) },
         outcome: Outcome.Win,
         winner: winner,
         movesToEnd: 0,
@@ -88,6 +89,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
 
           if (n === 0) {
             moveOptions.push({
+              eval: { value: 0, wdl: calculateWDL(0, true, Outcome.Draw) },
               outcome: Outcome.Draw,
               winner: null,
               movesToEnd: null,
@@ -95,6 +97,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
             });
           } else if (n > 0) {
             moveOptions.push({
+              eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) },
               outcome: Outcome.Win,
               winner: owner,
               movesToEnd: halfMovesRemaining - n + 1,
@@ -102,6 +105,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
             });
           } else {
             moveOptions.push({
+              eval: { value: Number.NEGATIVE_INFINITY, wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss) },
               outcome: Outcome.Loss,
               winner: opp,
               movesToEnd: halfMovesRemaining + n + 1,
@@ -123,7 +127,9 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           if (
             bestEval.outcome !== Outcome.Win ||
             (ev.movesToEnd !== null &&
+              ev.movesToEnd !== undefined &&
               bestEval.movesToEnd !== null &&
+              bestEval.movesToEnd !== undefined &&
               ev.movesToEnd < bestEval.movesToEnd)
           ) {
             bestEval = ev;
@@ -136,7 +142,9 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           if (
             bestEval.outcome === Outcome.Loss &&
             ev.movesToEnd !== null &&
+            ev.movesToEnd !== undefined &&
             bestEval.movesToEnd !== null &&
+            bestEval.movesToEnd !== undefined &&
             ev.movesToEnd > bestEval.movesToEnd
           ) {
             bestEval = ev;
@@ -152,6 +160,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       currentPlayer,
       evaluation,
       moveOptions,
+      isHeuristic: false,
     };
   }
 

@@ -4,13 +4,14 @@ export const BOARD_WIDTH = 7;
 export * from "./core";
 
 import {
+  BaseConnect4Solver,
   Player,
   Outcome,
   Evaluation,
   PositionAnalysis,
-  SolverModule,
-  BaseConnect4Solver,
+  calculateWDL,
 } from "./core";
+import { SolverModule } from "./core";
 
 const STATUS_WIN = 1;
 const STATUS_INVALID = 2;
@@ -116,28 +117,25 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     const movesRemaining = this.width * this.height - nbMoves;
     const halfMovesRemaining = Math.ceil(movesRemaining / 2);
 
-    const calculateWDL = (val: number, isExact: boolean, exactOutcome?: Outcome) => {
-      if (isExact) {
-        if (exactOutcome === Outcome.Win) return { win: 1.0, draw: 0.0, loss: 0.0 };
-        if (exactOutcome === Outcome.Loss) return { win: 0.0, draw: 0.0, loss: 1.0 };
-        return { win: 0.0, draw: 1.0, loss: 0.0 };
-      }
-      const K = 4.0;
-      const pWin = 1 / (1 + Math.exp(-val / K));
-      const pLoss = 1 - pWin;
-      const drawWidth = 0.5;
-      const pDraw = Math.exp(-(val * val) / drawWidth);
-      const total = pWin + pLoss + pDraw;
-      return { win: pWin / total, draw: pDraw / total, loss: pLoss / total };
-    };
-
     if (this.isHeuristic) {
       if (score > 10000) {
         const realScore = Math.floor(score / 1000);
-        return { eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) }, outcome: Outcome.Win, winner: currentPlayer, movesToEnd: halfMovesRemaining - realScore + 1, score };
+        return {
+          eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) },
+          outcome: Outcome.Win,
+          winner: currentPlayer,
+          movesToEnd: halfMovesRemaining - realScore + 1,
+          score
+        };
       } else if (score < -10000) {
         const realScore = Math.ceil(score / 1000);
-        return { eval: { value: Number.NEGATIVE_INFINITY, wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss) }, outcome: Outcome.Loss, winner: opponent, movesToEnd: halfMovesRemaining + realScore + 1, score };
+        return {
+          eval: { value: Number.NEGATIVE_INFINITY, wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss) },
+          outcome: Outcome.Loss,
+          winner: opponent,
+          movesToEnd: halfMovesRemaining + realScore + 1,
+          score
+        };
       } else {
         const val = score / 100.0;
         return { eval: { value: val, wdl: calculateWDL(val, false) }, score };
@@ -145,11 +143,29 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     }
 
     if (score === 0) {
-      return { eval: { value: 0, wdl: calculateWDL(0, true, Outcome.Draw) }, outcome: Outcome.Draw, winner: null, movesToEnd: null, score };
+      return {
+        eval: { value: 0, wdl: calculateWDL(0, true, Outcome.Draw) },
+        outcome: Outcome.Draw,
+        winner: null,
+        movesToEnd: null,
+        score
+      };
     } else if (score > 0) {
-      return { eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) }, outcome: Outcome.Win, winner: currentPlayer, movesToEnd: halfMovesRemaining - score + 1, score };
+      return {
+        eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) },
+        outcome: Outcome.Win,
+        winner: currentPlayer,
+        movesToEnd: halfMovesRemaining - score + 1,
+        score
+      };
     } else {
-      return { eval: { value: Number.NEGATIVE_INFINITY, wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss) }, outcome: Outcome.Loss, winner: opponent, movesToEnd: halfMovesRemaining + score + 1, score };
+      return {
+        eval: { value: Number.NEGATIVE_INFINITY, wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss) },
+        outcome: Outcome.Loss,
+        winner: opponent,
+        movesToEnd: halfMovesRemaining + score + 1,
+        score
+      };
     }
   }
 
@@ -169,7 +185,15 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     } else if (status === STATUS_WIN) {
       currentPosition = positionStr.slice(0, nbMoves + 1);
       const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
-      evaluation = { outcome: Outcome.Win, winner: winner, movesToEnd: 0, score: Math.floor((this.width * this.height + 1 - nbMoves) / 2) };
+      const movesToEnd = 0;
+      const score = Math.floor((this.width * this.height + 1 - nbMoves) / 2);
+      evaluation = {
+        eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) },
+        outcome: Outcome.Win,
+        winner: winner,
+        movesToEnd: movesToEnd,
+        score: score
+      };
     } else {
       for (let i = 0; i < this.width; i++) {
         const n = resArr[2 + i];
@@ -197,7 +221,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     };
   }
 
-  // Not strictly used by child classes unless they are WASM based
   protected executeWasmAnalyze(mod: SolverModule, positionStr: string, opts?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: any }): Int32Array {
     const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
 
