@@ -71,6 +71,7 @@ class Solver {
 
   static std::unique_ptr<Cache> createCache(size_t table_bytes);
   static std::unique_ptr<Solver> createWithCache(Cache* cache);
+  static std::unique_ptr<Solver> create(size_t table_bytes);
 };
 
 template <typename SlotType>

@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: "Connect 4 Solver"
-  text: "High-performance WASM & Native Solver"
-  tagline: "Perfect Connect 4 solver in C++ with WebAssembly and TypeScript bindings for Node.js, browser, and React Native."
+  text: "C++ & WASM Bitboard Solver"
+  tagline: "High-performance C++ exact & heuristic solver using NNUE + alpha-beta pruning. Bindings for WASM, Node.js, and React Native."
   actions:
     - theme: brand
       text: Getting Started
@@ -17,10 +17,10 @@ hero:
       link: https://github.com/ecc521/connect-4-solver
 
 features:
-  - title: Native C++ Power
-    details: Multi-threaded C++ compiled to WebAssembly with a lock-free transposition table optimized for L1 cache.
-  - title: React Native Bridge
-    details: True native C++ bindings for iOS & Android via JSI/JNI. Bypasses WebAssembly overhead entirely for maximum mobile performance.
-  - title: Zero Latency Books
-    details: Supports pre-evaluated Opening Books to solve early-game states instantly without invoking search routines.
+  - title: Universal C++ Power
+    details: Built in C++ for maximum evaluation speed. Runs natively across Node.js, mobile apps, and directly in the browser via WebAssembly.
+  - title: Heuristic NNUE Engine
+    details: Includes a fast heuristic evaluator powered by a lightweight Neural Network (NNUE) to instantly assess complex positions.
+  - title: Pre-Computed Opening Books
+    details: Use pre-computed Opening Books to solve early-game positions immediately.
 ---

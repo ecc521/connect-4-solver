@@ -21,8 +21,10 @@ The library exports explicit solver classes so you always know what engine archi
 
 ## Quick Start
 
-::: warning ⚠️ Use Solution Books or Heuristic Solver for 7x6+ Early Game Positions
-On the standard 7x6 board and larger, the **exact solver** can take minutes or hours on early-game positions without an Opening Book. For practical exact solving, load a pre-computed [Solution Book](/solution-books). The **heuristic solver** (`heuristic: true`) does not require books at any size.
+::: warning ⚠️ Exact Solving vs. Heuristics on Large Boards
+**Exact Solver (Default):** On 7x6 boards or larger, calculating a mathematically perfect sequence can take minutes or hours on early-game positions. For practical use, you must load a pre-computed [Solution Book](/solution-books) alongside the engine.
+
+**Heuristic Solver:** The [Heuristic Solver](/heuristic-solver) (`heuristic: true`) does not require books at any size and returns instantly. However, it returns an *estimated* score (positive means winning) and the `outcome` will always default to `Draw` unless it sees a forced win.
 :::
 
 ::: code-group

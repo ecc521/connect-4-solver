@@ -19,6 +19,7 @@ export default defineConfig({
           { text: 'Getting Started', link: '/getting-started' },
           { text: 'Solution Books', link: '/solution-books' },
           { text: 'Memory & Threading', link: '/cache' },
+          { text: 'Heuristic Solver', link: '/heuristic-solver' },
         ]
       },
       {

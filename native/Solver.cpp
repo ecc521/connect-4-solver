@@ -292,6 +292,11 @@ std::unique_ptr<Solver> Solver::createWithCache(Cache* cache) {
   }
 }
 
+std::unique_ptr<Solver> Solver::create(size_t table_bytes) {
+  auto cache = createCache(table_bytes);
+  return createWithCache(cache.get());
+}
+
 // Explicit template instantiations
 template class SolverImpl<uint32_t>;
 template class SolverImpl<uint64_t>;
