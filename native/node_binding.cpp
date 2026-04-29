@@ -124,6 +124,7 @@ Value DestroySolver(const CallbackInfo& info) {
         else if (w == 7 && h == 6) delete static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver);
         else if (w == 7 && h == 7) delete static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver);
         else if (w == 8 && h == 6) delete static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver);
+        else if (w == 8 && h == 8) delete static_cast<C4_8x8::GameSolver::Connect4::Solver*>(solver);
         else if (w == 9 && h == 7) delete static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver);
         else if (w == 9 && h == 6) delete static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver);
         else if (w == 11 && h == 4) delete static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver);
@@ -250,6 +251,7 @@ bool IsSolverBusy(int w, int h, void* solver, bool is_heuristic) {
         else if (w == 7 && h == 6) return static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver)->isBusy();
         else if (w == 7 && h == 7) return static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver)->isBusy();
         else if (w == 8 && h == 6) return static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver)->isBusy();
+        else if (w == 8 && h == 8) return static_cast<C4_8x8::GameSolver::Connect4::Solver*>(solver)->isBusy();
         else if (w == 9 && h == 7) return static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver)->isBusy();
         else if (w == 9 && h == 6) return static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver)->isBusy();
         else if (w == 11 && h == 4) return static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver)->isBusy();
@@ -277,6 +279,7 @@ void SetSolverBusy(int w, int h, void* solver, bool is_heuristic, bool busy) {
         else if (w == 7 && h == 6) static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
         else if (w == 7 && h == 7) static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
         else if (w == 8 && h == 6) static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
+        else if (w == 8 && h == 8) static_cast<C4_8x8::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
         else if (w == 9 && h == 7) static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
         else if (w == 9 && h == 6) static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
         else if (w == 11 && h == 4) static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
@@ -295,6 +298,7 @@ public:
             else if (w == 7 && h == 6) result_data = runAnalysisRaw<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7, 6, C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>>(*static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 7 && h == 7) result_data = runAnalysisRaw<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7, 7, C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>>(*static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 8 && h == 6) result_data = runAnalysisRaw<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8, 6, C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>>(*static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 8 && h == 8) result_data = runAnalysisRaw<C4_8x8::GameSolver::Connect4::Solver, C4_8x8::GameSolver::Connect4::Position, 8, 8, C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>>(*static_cast<C4_8x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 9 && h == 7) result_data = runAnalysisRaw<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9, 7, C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>>(*static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 9 && h == 6) result_data = runAnalysisRaw<C4_9x6::GameSolver::Connect4::Solver, C4_9x6::GameSolver::Connect4::Position, 9, 6, C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>>(*static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 11 && h == 4) result_data = runAnalysisRaw<C4_11x4::GameSolver::Connect4::Solver, C4_11x4::GameSolver::Connect4::Position, 11, 4, C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>>(*static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
@@ -340,6 +344,7 @@ public:
             else if (w == 7 && h == 6) result_data = runSolveRaw<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7, 6, C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>>(*static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 7 && h == 7) result_data = runSolveRaw<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7, 7, C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>>(*static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 8 && h == 6) result_data = runSolveRaw<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8, 6, C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>>(*static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 8 && h == 8) result_data = runSolveRaw<C4_8x8::GameSolver::Connect4::Solver, C4_8x8::GameSolver::Connect4::Position, 8, 8, C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>>(*static_cast<C4_8x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 9 && h == 7) result_data = runSolveRaw<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9, 7, C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>>(*static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 9 && h == 6) result_data = runSolveRaw<C4_9x6::GameSolver::Connect4::Solver, C4_9x6::GameSolver::Connect4::Position, 9, 6, C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>>(*static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 11 && h == 4) result_data = runSolveRaw<C4_11x4::GameSolver::Connect4::Solver, C4_11x4::GameSolver::Connect4::Position, 11, 4, C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>>(*static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
@@ -601,6 +606,7 @@ Value GetNodeCount(const CallbackInfo& info) {
         else if (w == 7 && h == 6) count = static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver)->getNodeCount();
         else if (w == 7 && h == 7) count = static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver)->getNodeCount();
         else if (w == 8 && h == 6) count = static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver)->getNodeCount();
+        else if (w == 8 && h == 8) count = static_cast<C4_8x8::GameSolver::Connect4::Solver*>(solver)->getNodeCount();
         else if (w == 9 && h == 7) count = static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver)->getNodeCount();
         else if (w == 9 && h == 6) count = static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver)->getNodeCount();
         else if (w == 11 && h == 4) count = static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver)->getNodeCount();

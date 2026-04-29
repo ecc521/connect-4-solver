@@ -24,6 +24,11 @@
 #include <memory>
 #include <atomic>
 #include <cstdint>
+#include <queue>
+#include <functional>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
 #include "Cache.hpp"
 #include "Position.hpp"
 #include "TranspositionTable.hpp"
@@ -78,8 +83,61 @@ class Solver {
   static std::unique_ptr<Solver> create(size_t table_bytes);
 };
 
+class SolverImplBase {
+ public:
+  class ThreadPool {
+   public:
+    std::vector<std::thread> workers;
+    std::queue<std::function<void()>> tasks;
+    std::mutex queue_mutex;
+    std::condition_variable condition;
+    std::atomic<bool> stop{false};
+    int current_threads{0};
+
+    ThreadPool() : stop(false), current_threads(0) {}
+
+    ~ThreadPool() {
+      stop = true;
+      condition.notify_all();
+      for (std::thread &worker : workers) {
+        if (worker.joinable()) worker.join();
+      }
+    }
+
+    void ensureCapacity(int n) {
+      if (n <= current_threads) return;
+      std::unique_lock<std::mutex> lock(queue_mutex);
+      for (int i = current_threads; i < n; ++i) {
+        workers.emplace_back([this] {
+          for (;;) {
+            std::function<void()> task;
+            {
+              std::unique_lock<std::mutex> lock(this->queue_mutex);
+              this->condition.wait(lock, [this] { return this->stop || !this->tasks.empty(); });
+              if (this->stop && this->tasks.empty()) return;
+              task = std::move(this->tasks.front());
+              this->tasks.pop();
+            }
+            task();
+          }
+        });
+      }
+      current_threads = n;
+    }
+
+    void enqueue(std::function<void()> task) {
+      {
+        std::unique_lock<std::mutex> lock(queue_mutex);
+        tasks.push(std::move(task));
+      }
+      condition.notify_one();
+    }
+  };
+};
+
 template <typename SlotType>
 class SolverImpl : public Solver {
+  using ThreadPool = SolverImplBase::ThreadPool;
  public:
   static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
   std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
@@ -88,14 +146,14 @@ class SolverImpl : public Solver {
 
  private:
   int columnOrder[Position::WIDTH];
-  int32_t history[Position::WIDTH * (Position::HEIGHT + 1)];
+  mutable int32_t history[Position::WIDTH * (Position::HEIGHT + 1)];
 
   int negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book);
 
  public:
 
   SolverImpl(size_t table_bytes) 
-    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0} {
+    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0}, pool(std::make_unique<ThreadPool>()) {
     for(int i = 0; i < Position::WIDTH; i++) {
       columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
     }
@@ -105,7 +163,7 @@ class SolverImpl : public Solver {
   }
 
   SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> cache)
-    : transTable(cache), nodeCount{0} {
+    : transTable(cache), nodeCount{0}, pool(std::make_unique<ThreadPool>()) {
     for(int i = 0; i < Position::WIDTH; i++) {
       columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
     }
@@ -131,6 +189,9 @@ class SolverImpl : public Solver {
 
   bool isBusy() const override { return isSearching.load(std::memory_order_relaxed); }
   void setBusy(bool busy) override { isSearching.store(busy, std::memory_order_relaxed); }
+
+ private:
+  std::unique_ptr<ThreadPool> pool;
 };
 
 } // namespace Connect4

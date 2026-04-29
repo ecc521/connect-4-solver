@@ -44,7 +44,8 @@ async function run() {
     cacheSizeMb = 128,
     threads = 12,
     useEf = false,
-    bootstrap = "";
+    bootstrap = "",
+    weak = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--width") width = parseInt(args[++i]);
@@ -54,11 +55,12 @@ async function run() {
     if (args[i] === "--threads") threads = parseInt(args[++i]);
     if (args[i] === "--ef") useEf = true;
     if (args[i] === "--bootstrap") bootstrap = args[++i];
+    if (args[i] === "--weak") weak = true;
   }
 
   console.log("=========================================================");
   console.log(
-    ` ${width}x${height} ${threads}-Core Native Iterative Alpha-Beta Orchestrator`,
+    ` ${width}x${height} ${threads}-Core Native Iterative Alpha-Beta Orchestrator${weak ? " (WEAK SOLVER)" : ""}`,
   );
   console.log("=========================================================");
 
@@ -96,9 +98,10 @@ async function run() {
     fs.mkdirSync(outputDir, { recursive: true });
   }
   const fileExt = useEf ? ".efbook" : ".book";
+  const typeStr = weak ? "weak" : "dense";
   const outputFile = path.join(
     outputDir,
-    `${width}x${height}_dense${depth}${fileExt}`,
+    `${width}x${height}_${typeStr}${depth}${fileExt}`,
   );
 
   const saveAndExit = () => {
@@ -121,83 +124,56 @@ async function run() {
   process.on("SIGINT", saveAndExit);
   process.on("SIGTERM", saveAndExit);
 
-  process.env.UV_THREADPOOL_SIZE = threads.toString();
+  // process.env.UV_THREADPOOL_SIZE = threads.toString(); // No longer needed!
 
-  const cachePtr = native._createCache(
+  const solver = new NodeConnect4Solver({
     width,
     height,
-    cacheSizeMb * 1024 * 1024,
-    false,
-  );
-  const solvers = Array.from({ length: threads }, () =>
-    native._createSolver(width, height, cachePtr, false),
-  );
+    cacheSizeMb,
+    heuristic: false,
+  });
+  await solver.init();
 
+  console.log(`[+] Created native solver sharing a ${cacheSizeMb}MB cache.`);
   console.log(
-    `[+] Created ${threads} independent solvers sharing a ${cacheSizeMb}MB cache.`,
+    `[+] Crunching ${weak ? "WEAK " : ""}Alpha-Beta evaluations using sequential orchestrator...`,
   );
-  console.log(`[+] Crunching Alpha-Beta evaluations using worker queue...`);
 
-  let totalNodes = 0n;
+  let processed = 0;
   const start = Date.now();
-  // Reverse the array so that queue.pop() evaluates the deepest positions (e.g. depth 10) first.
-  // This provides immediate console feedback and populates the shared TT cache optimally from the bottom up.
+  // Reverse to evaluate deepest positions first for better cache utilization
   positions.reverse();
-  const queue = [...positions];
 
-  const worker = async (solverPtr: any, id: number) => {
-    while (true) {
-      const pos = queue.pop();
-      if (pos === undefined) break;
+  for (const pos of positions) {
+    const analysis = await solver.analyze(pos, {
+      threads,
+      weak,
+      book: bootstrapBook
+        ? { ptr: (bootstrapBook as any)._bookPtr }
+        : undefined,
+    } as any);
 
-      const bookPtr = bootstrapBook ? (bootstrapBook as any)._bookPtr : null;
-      const resArr = await native._analyzeExact(
-        width,
-        height,
-        solverPtr,
-        pos,
-        false, // weak
-        1, // 1 thread per solver (External Parallelism)
-        bookPtr,
-      );
-
-      const score = getRawScore(resArr, width, height);
-      const nodes = native._getNodeCount(width, height, solverPtr, false);
-
-      // The C++ side no longer resets node counts per analysis.
-      // Therefore, native._getNodeCount() returns the CUMULATIVE nodes evaluated by this solver so far.
-      // We will sum them up across all solvers precisely when logging to avoid an exponential math explosion.
-
-      // Accumulate into the builder using the 1-indexed uint8_t byte format
-      builder.addPosition(pos, score - minScore + 1);
-
-      processed++;
-
-      // Log progress occasionally or every X positions to avoid console spam
-      if (processed % threads === 0 || processed === positions.length) {
-        let currentTotalNodes = 0n;
-        for (const s of solvers) {
-          currentTotalNodes += BigInt(
-            native._getNodeCount(width, height, s, false),
-          );
-        }
-
-        const elapsed = (Date.now() - start) / 1000;
-        const pct = ((processed / positions.length) * 100).toFixed(1);
-        const nps = (Number(currentTotalNodes) / elapsed / 1000000).toFixed(1);
-        process.stdout.write(
-          `\r[${processed}/${positions.length}] (${pct}%) | ${nps} MN/s | Total Nodes: ${currentTotalNodes.toLocaleString()} | Current: ${pos}      `,
-        );
-      }
+    if (analysis.evaluation) {
+      builder.addPosition(pos, analysis.evaluation.score - minScore + 1);
     }
-  };
 
-  // Start all workers
-  await Promise.all(solvers.map((s, i) => worker(s, i)));
+    processed++;
+
+    // Log progress occasionally
+    if (processed % 10 === 0 || processed === positions.length) {
+      const currentTotalNodes = BigInt(solver.getNodeCount());
+      const elapsed = (Date.now() - start) / 1000;
+      const pct = ((processed / positions.length) * 100).toFixed(1);
+      const nps = (Number(currentTotalNodes) / elapsed / 1000000).toFixed(1);
+      process.stdout.write(
+        `\r[${processed}/${positions.length}] (${pct}%) | ${nps} MN/s | Total Nodes: ${currentTotalNodes.toLocaleString()} | Current: ${pos}      `,
+      );
+    }
+  }
+
   console.log(""); // Final newline
-
-  const elapsed = (Date.now() - start) / 1000;
-  console.log(`\n[+] Finished evaluation in ${elapsed.toFixed(1)}s.`);
+  const elapsedTotal = (Date.now() - start) / 1000;
+  console.log(`\n[+] Finished evaluation in ${elapsedTotal.toFixed(1)}s.`);
 
   console.log(
     `[+] Packing transitive sequence cache into ${useEf ? "Elias-Fano" : "Dense"} book natively...`,
@@ -209,10 +185,7 @@ async function run() {
   }
   console.log(`[+] Book successfully saved to ${outputFile}`);
   if (bootstrapBook) bootstrapBook.unload();
-  for (const s of solvers) {
-    native._destroySolver(width, height, s, false);
-  }
-  native._destroyCache(cachePtr);
+  solver.release();
   process.exit(0);
 }
 

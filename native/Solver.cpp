@@ -54,6 +54,17 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   if(P.nbMoves() >= Position::WIDTH * Position::HEIGHT - 2) // check for draw game
     return 0;
 
+  if ((possible & (possible - 1)) == 0) {
+    Position P2(P);
+    P2.play(possible);
+    if (solverTlNodeCount > 0) {
+      solverTlNodeCount--;
+    } else {
+      nodeCount.fetch_sub(1, std::memory_order_relaxed);
+    }
+    return -negamax(P2, -beta, -alpha, book);
+  }
+
   int min = -(Position::WIDTH * Position::HEIGHT - 2 - P.nbMoves()) / 2;	// lower bound of score as opponent cannot win next move
   if(alpha < min) {
     alpha = min;                     // there is no need to keep alpha below our max possible score.
@@ -69,9 +80,9 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   if constexpr (Position::HEIGHT % 2 == 0) {
     if (P.nbMoves() % 2 == 0) {
       int evens = P.computeEvensStrategy();
-      if (evens == 1) { // Forced Loss
-        if (beta > -1) {
-          beta = -1;
+      if (evens < 0) { // Forced Loss with calculated upper bound
+        if (beta > evens) {
+          beta = evens;
           if (alpha >= beta) return beta;
         }
       } else if (evens == 0) { // Forced Draw
@@ -104,21 +115,6 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     if(int val = book->get(P)) return val + Position::MIN_SCORE - 1; // look for solutions stored in opening book
   }
 
-  // Forced Move Resolution
-  // If there is exactly one non-losing move, we skip TT allocation and simply play it.
-  if ((possible & (possible - 1)) == 0) {
-    Position P2(P);
-    P2.play(possible);
-    
-    if (solverTlNodeCount > 0) {
-      solverTlNodeCount--;
-    } else {
-      nodeCount.fetch_sub(1, std::memory_order_relaxed);
-    }
-    
-    return -negamax(P2, -beta, -alpha, book);
-  }
-
   MoveSorter moves;
   for(int i = Position::WIDTH; i--;) {
     if(Position::position_t move = possible & Position::column_mask(columnOrder[i])) {
@@ -149,16 +145,19 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
           for (int i = 0; i < searched_cnt; i++) {
             if (history[searched[i]] > -500000) history[searched[i]]--;
           }
-          int bit_idx = Position::ctz_impl(next);
-          history[bit_idx] += searched_cnt;
-          if (history[bit_idx] > 500000) {
-            for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
-              history[i] /= 2;
-            }
-          }
         }
 #endif
       }
+
+      int bit_idx = Position::ctz_impl(next);
+      // Decay history slightly to prevent overflow and prioritize recent cutoffs
+      if (history[bit_idx] > 100000) {
+        for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
+          history[i] /= 2;
+        }
+      }
+      history[bit_idx] += 100;
+      
       transTable->put(key, best_score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves())); 
       return best_score;  
     }
@@ -256,19 +255,24 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
   if (num_threads <= 1) {
     worker();
   } else {
-    std::vector<std::thread> thread_pool;
+    pool->ensureCapacity(num_threads - 1);
+    std::atomic<int> remaining(num_threads - 1);
+    std::mutex wait_mutex;
+    std::condition_variable wait_cv;
+
     for (unsigned int i = 0; i < num_threads - 1; i++) {
-        try {
-            thread_pool.emplace_back(worker);
-        } catch (const std::system_error& e) {
-            std::cerr << "Connect4Solver Warning: Thread pool exhausted while spawning " << num_threads << " threads. Clamping to " << (i + 1) << " threads." << std::endl;
-            break;
+      pool->enqueue([&]() {
+        worker();
+        if (remaining.fetch_sub(1) == 1) {
+          std::unique_lock<std::mutex> lock(wait_mutex);
+          wait_cv.notify_all();
         }
+      });
     }
     worker();
-    for (auto& t : thread_pool) {
-      if (t.joinable()) t.join();
-    }
+
+    std::unique_lock<std::mutex> lock(wait_mutex);
+    wait_cv.wait(lock, [&] { return remaining == 0; });
   }
 #else
   for (int i = 0; i < Position::WIDTH; i++) {

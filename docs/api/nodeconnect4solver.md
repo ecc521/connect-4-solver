@@ -16,63 +16,27 @@ import { NodeConnect4Solver } from "connect-4-solver";
 new NodeConnect4Solver(options?: { width?: number, height?: number, cacheSizeMb?: number, heuristic?: boolean });
 ```
 
-::: info ℹ️ Configuring Thread Limits
-When running `connect-4-solver` in Node.js, asynchronous tasks are offloaded to Node's `libuv` thread pool, which defaults to **4 parallel threads**. Increasing the thread pool size allows for greater concurrency, and frees up space for other applications in the threadpool:
+## Methods
 
-```bash
-export UV_THREADPOOL_SIZE=32
-```
+### `init(): Promise<void>`
 
-:::
+Initializes the native solver and allocates the transposition table cache. Must be called before any evaluation.
 
-::: info ℹ️ Bulk Solving Parallelization
-If you are generating large data sets, running concurrent single-threaded solvers is significantly faster than using one solver with multiple threads.
+### `batchSolve(positions: string[], threads: number, callback: (result: BatchResult) => void, opts?: { bookPtr?: unknown }): void`
 
-While you can safely instantiate an array of `NodeConnect4Solver` classes to achieve this, each instance allocates its own isolated cache, which prevents Transposition Table reuse. Instead, use the raw internal `native` bridge to share a single cache across multiple solvers:
-:::
+**Node.js Only.** Executes a high-throughput parallel evaluation of a large set of positions.
 
-### Example: Concurrent Solving with a Shared Cache
+Unlike `analyze()` and `solve()`, which use Node's internal `libuv` threadpool (defaulting to 4 threads), `batchSolve` spawns its own native C++ threads. This allows you to scale to any number of cores (e.g., 32 or 64) without needing to configure `UV_THREADPOOL_SIZE` or worry about blocking other Node.js asynchronous tasks.
+
+- **positions**: An array of Connect 4 move sequences (e.g., `["444", "333"]`).
+- **threads**: The number of parallel C++ threads to spawn.
+- **callback**: A function called every time a position is finished.
+- **opts.bookPtr**: (Optional) A pointer to a loaded `OpeningBook`.
 
 ```typescript
-import { getNativeModule } from "connect-4-solver";
-
-const width = 7;
-const height = 6;
-const threads = 1;
-const cacheSizeBytes = 4096 * 1024 * 1024; // 4GB
-
-async function runBulk(positions: string[]) {
-  const native = getNativeModule();
-
-  // 1. Allocate a single 4GB shared cache in C++
-  const cachePtr = native._createCache(width, height, cacheSizeBytes, false);
-
-  // 2. Instantiate 12 unique solvers that all point to the SAME shared cache
-  const solverPtrs: number[] = [];
-  for (let i = 0; i < 12; i++) {
-    solverPtrs.push(native._createSolver(width, height, cachePtr, false));
-  }
-
-  // 3. Map positions across the Solvers safely using threads: 1
-  const results = await Promise.all(
-    positions.map((pos, index) => {
-      const solverIndex = index % solverPtrs.length;
-      return native._analyzeExact(
-        width,
-        height,
-        solverPtrs[solverIndex],
-        pos,
-        false, // weak
-        threads,
-        null,
-      );
-    }),
-  );
-
-  // 4. Free the pointers
-  solverPtrs.forEach((ptr) => native._destroySolver(width, height, ptr, false));
-  native._destroyCache(cachePtr);
-}
+solver.batchSolve(positions, 12, (result) => {
+  console.log(`Position ${result.pos} has scores: ${result.scores}`);
+});
 ```
 
 ## Native Module API (Advanced)
@@ -83,6 +47,10 @@ For developers doing heavy bulk-processing who need to interact directly with th
 import { getNativeModule } from "connect-4-solver";
 const native = getNativeModule();
 ```
+
+### `_batchSolve(width: number, height: number, solverPtr: number, positions: string[], threads: number, callback: Function, bookPtr: number | null): void`
+
+The underlying native method used by `batchSolve`. It uses **Thread-Safe Functions (TSFN)** to communicate progress back to the JavaScript main thread from raw C++ threads.
 
 ### `_createCache(width: number, height: number, bytes: number, isHeuristic: boolean): number`
 
