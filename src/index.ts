@@ -116,24 +116,40 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     const movesRemaining = this.width * this.height - nbMoves;
     const halfMovesRemaining = Math.ceil(movesRemaining / 2);
 
+    const calculateWDL = (val: number, isExact: boolean, exactOutcome?: Outcome) => {
+      if (isExact) {
+        if (exactOutcome === Outcome.Win) return { win: 1.0, draw: 0.0, loss: 0.0 };
+        if (exactOutcome === Outcome.Loss) return { win: 0.0, draw: 0.0, loss: 1.0 };
+        return { win: 0.0, draw: 1.0, loss: 0.0 };
+      }
+      const K = 4.0;
+      const pWin = 1 / (1 + Math.exp(-val / K));
+      const pLoss = 1 - pWin;
+      const drawWidth = 0.5;
+      const pDraw = Math.exp(-(val * val) / drawWidth);
+      const total = pWin + pLoss + pDraw;
+      return { win: pWin / total, draw: pDraw / total, loss: pLoss / total };
+    };
+
     if (this.isHeuristic) {
       if (score > 10000) {
         const realScore = Math.floor(score / 1000);
-        return { outcome: Outcome.Win, winner: currentPlayer, movesToEnd: halfMovesRemaining - realScore + 1, score: realScore };
+        return { eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) }, outcome: Outcome.Win, winner: currentPlayer, movesToEnd: halfMovesRemaining - realScore + 1, score };
       } else if (score < -10000) {
         const realScore = Math.ceil(score / 1000);
-        return { outcome: Outcome.Loss, winner: opponent, movesToEnd: halfMovesRemaining + realScore + 1, score: realScore };
+        return { eval: { value: Number.NEGATIVE_INFINITY, wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss) }, outcome: Outcome.Loss, winner: opponent, movesToEnd: halfMovesRemaining + realScore + 1, score };
       } else {
-        return { outcome: Outcome.Draw, winner: score > 0 ? currentPlayer : score < 0 ? opponent : null, movesToEnd: null, score: score / 100.0 };
+        const val = score / 100.0;
+        return { eval: { value: val, wdl: calculateWDL(val, false) }, score };
       }
     }
 
     if (score === 0) {
-      return { outcome: Outcome.Draw, winner: null, movesToEnd: null, score: 0 };
+      return { eval: { value: 0, wdl: calculateWDL(0, true, Outcome.Draw) }, outcome: Outcome.Draw, winner: null, movesToEnd: null, score };
     } else if (score > 0) {
-      return { outcome: Outcome.Win, winner: currentPlayer, movesToEnd: halfMovesRemaining - score + 1, score: score };
+      return { eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) }, outcome: Outcome.Win, winner: currentPlayer, movesToEnd: halfMovesRemaining - score + 1, score };
     } else {
-      return { outcome: Outcome.Loss, winner: opponent, movesToEnd: halfMovesRemaining + score + 1, score: score };
+      return { eval: { value: Number.NEGATIVE_INFINITY, wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss) }, outcome: Outcome.Loss, winner: opponent, movesToEnd: halfMovesRemaining + score + 1, score };
     }
   }
 
@@ -164,29 +180,26 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       let bestEval: Evaluation | null = null;
       for (const ev of moveOptions) {
         if (!ev) continue;
-        if (!bestEval) { bestEval = ev; continue; }
-        if (ev.outcome === Outcome.Win) {
-          if (bestEval.outcome !== Outcome.Win || (ev.movesToEnd !== null && bestEval.movesToEnd !== null && ev.movesToEnd < bestEval.movesToEnd)) bestEval = ev;
-        } else if (ev.outcome === Outcome.Draw) {
-          if (bestEval.outcome === Outcome.Loss) bestEval = ev;
-          else if (this.isHeuristic && bestEval.outcome === Outcome.Draw && ev.score > bestEval.score) bestEval = ev;
-        } else if (ev.outcome === Outcome.Loss) {
-          if (bestEval.outcome === Outcome.Loss && ev.movesToEnd !== null && bestEval.movesToEnd !== null && ev.movesToEnd > bestEval.movesToEnd) bestEval = ev;
-        }
+        if (!bestEval || ev.score > bestEval.score) bestEval = ev;
       }
       evaluation = bestEval;
     }
 
     const depthReached = this.isHeuristic ? resArr[2 + this.width] : undefined;
-    return { position: currentPosition, originalPosition, currentPlayer, evaluation, moveOptions, depthReached };
+    return {
+      position: currentPosition,
+      originalPosition,
+      currentPlayer,
+      evaluation,
+      moveOptions,
+      depthReached,
+      isHeuristic: this.isHeuristic
+    };
   }
 
   // Not strictly used by child classes unless they are WASM based
   protected executeWasmAnalyze(mod: SolverModule, positionStr: string, opts?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: any }): Int32Array {
-    const threads = opts?.threads ?? 1;
-    const maxDepth = opts?.maxDepth ?? 20;
-    const timeoutMs = opts?.timeoutMs ?? 25;
-    const bookPtr = opts?.book ? opts.book.ptr : 0;
+    const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
 
     const allocatedMemory = mod.stringToNewUTF8(positionStr);
     let outputPointer = 0;
@@ -231,14 +244,11 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
   async analyze(positionStr: string, opts?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: any }): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
     
-    return new Promise<PositionAnalysis>((resolve, reject) => {
+    return new Promise<PositionAnalysis>(async (resolve, reject) => {
       this._analysisQueue = this._analysisQueue.catch(() => {}).then(async () => {
         try {
           const native = getNativeModule();
-          const threads = opts?.threads ?? 1;
-          const maxDepth = opts?.maxDepth ?? 20;
-          const timeoutMs = opts?.timeoutMs ?? 25;
-          const bookPtr = opts?.book ? opts.book.ptr : 0;
+          const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
 
           let resArr: number[];
           if (this.isHeuristic) resArr = await native._analyzeHeuristic(this.width, this.height, this._solverPtr, positionStr, threads, maxDepth, timeoutMs);

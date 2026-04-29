@@ -42,10 +42,13 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       );
     }
 
+    // Sanitize and strict-clamp the arguments before crossing the JNI bridge
+    const { threads, maxDepth, timeoutMs } = this.sanitizeOpts(opts);
+
     // Call the Objective-C++ / JNI Layer passing the raw arguments strongly
     const nativeResArr = await Connect4SolverNative.analyze(
       positionStr,
-      opts?.threads ?? 1,
+      threads,
       this.width,
       this.height,
       false, // weak=false

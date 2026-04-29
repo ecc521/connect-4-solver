@@ -30,7 +30,7 @@ await solver.init();
 
 When calling `.analyze()` on a heuristic solver, you can dynamically tune its strength and speed via two optional parameters:
 
-* `maxDepth` *(Default: 20)*: The maximum ply-depth the engine is allowed to search. Higher depths result in much stronger play, but take exponentially longer to compute.
+* `maxDepth` *(Default: Infinity)*: The maximum ply-depth the engine is allowed to search. By default, this is dynamically clamped to the maximum mathematical depth of the board (e.g., `42` for a 7x6 board), meaning the engine will search as deep as it possibly can until it hits the timeout. 
 * `timeoutMs` *(Default: 25)*: A safety timeout in milliseconds. If the engine takes longer than this to search to `maxDepth`, it will immediately abort the search and return the best move it has found so far.
 
 ```typescript
@@ -43,10 +43,30 @@ const result = await solver.analyze("1122", {
 console.log(`The solver successfully reached depth: ${result.depthReached}`);
 ```
 
-## Depth vs. Timeout
+### Depth vs. Timeout
 
 Because the heuristic solver uses iterative deepening, it always has a "best guess" available. If it hits the `timeoutMs` limit while searching depth 14, it will gracefully abort the depth 14 search and return the completed evaluation from depth 13.
 
 You can inspect `result.depthReached` to see exactly how deep the solver managed to look before returning.
 
-> **Note:** The heuristic solver *never* uses Opening Books. Passing a `book` to a heuristic solver's `analyze` method will be ignored.
+## Evaluation & Win Probability
+
+Because the heuristic solver estimates the strength of a position rather than calculating an exact win/loss, the returned `Evaluation` object includes a Stockfish-style `eval` wrapper. 
+
+The engine normalizes the neural network output into a standard `eval.value` float and maps it to a **WDL (Win/Draw/Loss)** probability curve. This allows you to easily display human-readable progress bars in your UI without needing to understand the raw mathematical scores!
+
+*The following table provides a rough approximation of how `eval.value` maps to the WDL curve. Do not hardcode these thresholds—always read from the `eval.wdl` object directly in your application!*
+
+| `eval.value` | Win Probability | Draw Probability | Loss Probability | Meaning |
+|---|---|---|---|---|
+| `+Infinity` | 100% | 0% | 0% | Forced Win found |
+| `+8.0` | 88% | <1% | 12% | Crushing Advantage |
+| `+4.0` | 73% | 1% | 26% | Strong Advantage |
+| `0.0` | 25% | 50% | 25% | Dead Even |
+| `-4.0` | 26% | 1% | 73% | Strong Disadvantage |
+| `-8.0` | 12% | <1% | 88% | Crushing Disadvantage |
+| `-Infinity` | 0% | 0% | 100% | Forced Loss found |
+
+> **Note:** The exact mapping coefficients of the sigmoid curve will be continuously refined in future releases as the NNUE weights are trained. The table above is simply an example. The `0.0` to `1.0` probability interface in `eval.wdl`, however, will remain perfectly stable!
+
+> **Books:** The heuristic solver *never* uses Opening Books. Passing a `book` to a heuristic solver's `analyze` method will be ignored.
