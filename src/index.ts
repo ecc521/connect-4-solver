@@ -302,7 +302,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         this._solverPtr,
         allocatedMemory,
         threads,
-        bookPtr,
+        bookPtr as number,
       );
 
     const dataLength = (this.isHeuristic ? 3 : 2) + this.width;
@@ -380,7 +380,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
             const { threads, maxDepth, timeoutMs, bookPtr } =
               this.sanitizeOpts(opts);
 
-            let resArr: number[];
+            let resArr: Int32Array | number[];
             if (this.isHeuristic)
               resArr = await native._analyzeHeuristic(
                 this.width,

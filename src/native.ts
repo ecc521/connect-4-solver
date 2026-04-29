@@ -3,6 +3,7 @@ import {
   Player,
   Outcome,
   Evaluation,
+  AnalyzeOptions,
   PositionAnalysis,
   calculateWDL,
 } from "./core";

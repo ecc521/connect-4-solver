@@ -65,7 +65,7 @@ export class OpeningBook {
       if (native) {
         native._destroyBook(this.width, this.height, this._ptr);
       } else if (this.mod) {
-        this.mod._destroyBook(this.width, this.height, this._ptr);
+        this.mod._destroyBook(this.width, this.height, this._ptr as number);
       }
       this._ptr = 0;
     }

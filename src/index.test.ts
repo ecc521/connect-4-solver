@@ -122,10 +122,10 @@ describe("NodeConnect4Solver Async Parity Test", () => {
     expect(result.evaluation).toBeNull();
   });
 
-  test("should correctly analyze 200 positions against expected C++ raw solver output", async () => {
-    const dataPath = path.join(__dirname, "..", "test-data", "positions.txt");
+  test("should correctly analyze all 7x6 positions against expected C++ raw solver output", async () => {
+    const dataPath = path.join(__dirname, "..", "test-data", "positions_7x6.txt");
     await runParityTest(solver, dataPath, 7, 6, !bookLoaded);
-  });
+  }, 120000);
 
   describe("Generic Board Sizes Support", () => {
     it("should correctly instantiate and evaluate an 8x6 board at depth 34", async () => {
