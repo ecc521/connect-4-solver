@@ -1,7 +1,7 @@
 {
   "name": "connect-4-solver",
   "version": "4.0.0",
-  "description": "High-performance Connect 4 solver for multiple board sizes",
+  "description": "High-performance solver for a variety of board sizes using NNUE + alpha-beta pruning. Bindings for WASM, Node.js, and React Native.",
   "main": "dist/index.js",
   "exports": {
     ".": {
@@ -65,9 +65,6 @@
     "url": "https://github.com/ecc521/connect4/issues"
   },
   "homepage": "https://github.com/ecc521/connect4#readme",
-  "peerDependencies": {
-    "react-native": "*"
-  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/jest": "^30.0.0",
@@ -77,6 +74,8 @@
     "eslint-plugin-prettier": "^5.5.5",
     "jest": "^30.3.0",
     "prettier": "^3.5.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "ts-jest": "^29.4.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.1",

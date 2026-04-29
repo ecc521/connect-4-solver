@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Connect 4 Solver"
   text: "C++ & WASM Bitboard Solver"
-  tagline: "High-performance C++ exact & heuristic solver using NNUE + alpha-beta pruning. Bindings for WASM, Node.js, and React Native."
+  tagline: "High-performance solver for a variety of board sizes using NNUE + alpha-beta pruning. Bindings for WASM, Node.js, and React Native."
   actions:
     - theme: brand
       text: Getting Started
