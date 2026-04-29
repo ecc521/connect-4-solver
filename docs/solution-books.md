@@ -72,6 +72,7 @@ npx ts-node tools/generate-book.ts --width 7 --height 7 --depth 10 --cacheMB 409
 - `--cacheMB`: The size of the RAM Transposition Table in Megabytes (`MB`). `--cacheMB 4096` allocates roughly 4GB of RAM. A larger cache prevents deep leaf nodes from evicting your shallow nodes during generation.
 - `--threads`: Number of parallel C++ worker threads to distribute the Alpha-Beta evaluation across.
 - `--ef`: Instructs the generator to natively compress and save the output as an `.efbook` (Elias-Fano) instead of a standard Dense array.
+- `--weak`: Generates a **Weak Solution** book. Instead of finding the exact distance-to-mate, the solver will only determine the binary outcome (Win/Draw/Loss). This is significantly faster for deep searches.
 - `--bootstrap <path>`: Provide a path to a smaller, existing `.book` or `.efbook`. The solver will query this book during evaluation, massively speeding up the generation of deeper books.
 
 ### Binary Compression
