@@ -31,15 +31,26 @@ describe("Polymorphic Dense Book Packing", () => {
       "12345671234567123 10", // 17 moves
       "123456712345671234 -10", // 18 moves
       "1234567123456712345 11", // 19 moves
-      "12345671234567123456 -11" // 20 moves
+      "12345671234567123456 -11", // 20 moves
     ];
     fs.writeFileSync(mockTxt, positions.join("\n") + "\n");
 
-    execSync('cd tools && make clean && make pack_dense_book CXXFLAGS="--std=c++14 -W -Wall -O3 -DNDEBUG -I../native -march=native -DBOARD_WIDTH_MACRO=7 -DBOARD_HEIGHT_MACRO=6"', { stdio: "inherit" });
+    execSync(
+      'cd tools && make clean && make pack_dense_book CXXFLAGS="--std=c++14 -W -Wall -O3 -DNDEBUG -I../native -march=native -DBOARD_WIDTH_MACRO=7 -DBOARD_HEIGHT_MACRO=6"',
+      { stdio: "inherit" },
+    );
 
-    execSync(`cd tools && ./pack_dense_book 5 < ../__tests__/mock_scored.txt`, { stdio: "inherit" });
-    execSync(`cd tools && ./pack_dense_book 14 < ../__tests__/mock_scored.txt`, { stdio: "inherit" });
-    execSync(`cd tools && ./pack_dense_book 20 < ../__tests__/mock_scored.txt`, { stdio: "ignore" });
+    execSync(`cd tools && ./pack_dense_book 5 < ../__tests__/mock_scored.txt`, {
+      stdio: "inherit",
+    });
+    execSync(
+      `cd tools && ./pack_dense_book 14 < ../__tests__/mock_scored.txt`,
+      { stdio: "inherit" },
+    );
+    execSync(
+      `cd tools && ./pack_dense_book 20 < ../__tests__/mock_scored.txt`,
+      { stdio: "ignore" },
+    );
   });
 
   afterAll(() => {
@@ -53,7 +64,7 @@ describe("Polymorphic Dense Book Packing", () => {
   test("should pack a depth 5 book using 3-byte keys and ignore deeper elements", async () => {
     const stat = fs.statSync(d5Path);
     const bookData = new Uint8Array(fs.readFileSync(d5Path));
-    
+
     // Check header for 3 byte keys
     expect(bookData[3]).toBe(3); // key_bytes
 
@@ -64,19 +75,19 @@ describe("Polymorphic Dense Book Packing", () => {
 
     const solver = new NodeConnect4Solver();
     await solver.init();
-    
+
     const book = new OpeningBook(solver.width, solver.height);
     await book.load(bookData);
-    
+
     book.destroy();
   });
 
   test("should pack a depth 14 book using 4-byte keys", async () => {
     const stat = fs.statSync(d14Path);
     const bookData = new Uint8Array(fs.readFileSync(d14Path));
-    
+
     // Depth 14 7x7 fits in 31.7 bits => 4 bytes
-    expect(bookData[3]).toBe(4); 
+    expect(bookData[3]).toBe(4);
 
     // Depth 14 means the first 14 positions should be packed
     const expectedCount = 14;
@@ -93,9 +104,9 @@ describe("Polymorphic Dense Book Packing", () => {
   test("should pack a depth 20 book using 6-byte keys", async () => {
     const stat = fs.statSync(d20Path);
     const bookData = new Uint8Array(fs.readFileSync(d20Path));
-    
+
     // Depth 20 7x7: 26 digits -> 41.2 bits => 6 bytes
-    expect(bookData[3]).toBe(6); 
+    expect(bookData[3]).toBe(6);
 
     // Depth 20 means all 20 positions
     const expectedCount = 20;
@@ -111,23 +122,23 @@ describe("Polymorphic Dense Book Packing", () => {
 
   test.skip("should load the generated depth 5 book and return exact scores without searching", async () => {
     const bookData = new Uint8Array(fs.readFileSync(d5Path));
-    
+
     const solver = new NodeConnect4Solver();
     await solver.init();
-    
+
     const book = new OpeningBook(solver.width, solver.height);
     await book.load(bookData);
 
     // Evaluate a depth 2 position (1 2)
     // The exact score is cached in the book, so it should return instantly and match
     const result = await solver.analyze("12", { book });
-    
+
     expect(result.evaluation?.score).toBe(0);
-    
+
     // Evaluate a depth 2 position (1 1)
     const result2 = await solver.analyze("11", { book });
     expect(result2.evaluation?.score).toBe(1);
-    
+
     book.destroy();
   });
 });

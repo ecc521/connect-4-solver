@@ -2,12 +2,14 @@
 
 The Node.js solver for exact and heuristic evaluation. Uses **Node N-API** to call the C++ engine directly — no WASM involved.
 
-**Import:** 
+**Import:**
+
 ```typescript
 import { NodeConnect4Solver } from "connect-4-solver";
 ```
 
 ## Constructor
+
 **Implements:** [`BaseConnect4Solver`](./base-solver)
 
 ```typescript
@@ -20,6 +22,7 @@ When running `connect-4-solver` in Node.js, asynchronous tasks are offloaded to 
 ```bash
 export UV_THREADPOOL_SIZE=32
 ```
+
 :::
 
 ::: info ℹ️ Bulk Solving Parallelization
@@ -29,6 +32,7 @@ While you can safely instantiate an array of `NodeConnect4Solver` classes to ach
 :::
 
 ### Example: Concurrent Solving with a Shared Cache
+
 ```typescript
 import { getNativeModule } from "connect-4-solver";
 
@@ -39,28 +43,34 @@ const cacheSizeBytes = 4096 * 1024 * 1024; // 4GB
 
 async function runBulk(positions: string[]) {
   const native = getNativeModule();
-  
+
   // 1. Allocate a single 4GB shared cache in C++
   const cachePtr = native._createCache(width, height, cacheSizeBytes, false);
-  
+
   // 2. Instantiate 12 unique solvers that all point to the SAME shared cache
   const solverPtrs: number[] = [];
   for (let i = 0; i < 12; i++) {
-      solverPtrs.push(native._createSolver(width, height, cachePtr, false));
+    solverPtrs.push(native._createSolver(width, height, cachePtr, false));
   }
-  
+
   // 3. Map positions across the Solvers safely using threads: 1
   const results = await Promise.all(
     positions.map((pos, index) => {
       const solverIndex = index % solverPtrs.length;
-      return native._analyzeExact(width, height, solverPtrs[solverIndex], pos, threads, null);
-    })
+      return native._analyzeExact(
+        width,
+        height,
+        solverPtrs[solverIndex],
+        pos,
+        threads,
+        null,
+      );
+    }),
   );
-  
+
   // 4. Free the pointers
-  solverPtrs.forEach(ptr => native._destroySolver(width, height, ptr, false));
+  solverPtrs.forEach((ptr) => native._destroySolver(width, height, ptr, false));
   native._destroyCache(cachePtr);
-  
 }
 ```
 
@@ -74,24 +84,31 @@ const native = getNativeModule();
 ```
 
 ### `_createCache(width: number, height: number, bytes: number, isHeuristic: boolean): number`
+
 Allocates a shared Transposition Table in C++ RAM. Returns a raw pointer to the instance.
 
 ### `_destroyCache(cachePtr: number): void`
+
 Frees the memory allocated by `_createCache`.
 
 ### `_createSolver(width: number, height: number, cachePtr: number, isHeuristic: boolean): number`
+
 Instantiates an evaluator bound to the specified shared cache. Returns a raw pointer to the solver instance.
 
 ### `_destroySolver(width: number, height: number, solverPtr: number, isHeuristic: boolean): void`
+
 Frees the memory allocated by `_createSolver`.
 
 ### `_analyzeExact(width: number, height: number, solverPtr: number, position: string, threads: number, bookPtr: number | null): Promise<number[]>`
+
 Executes an asynchronous exact evaluation natively via Node's `libuv` pool. Returns a raw array of scores mapping to the evaluation outcomes.
 
 ### `_analyzeHeuristic(width: number, height: number, solverPtr: number, position: string, threads: number, maxDepth: number, timeoutMs: number): Promise<number[]>`
+
 Executes an asynchronous heuristic evaluation. Returns a raw array of scores.
 
 ### `BookBuilder` Class
+
 A native C++ class for compiling evaluated positions into binary `.book` and `.efbook` files.
 
 ```typescript
@@ -104,5 +121,3 @@ builder.addPosition("4444", 5);
 builder.saveDense("output.book");
 builder.saveEliasFano("output.efbook");
 ```
-
-

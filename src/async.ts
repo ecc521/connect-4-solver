@@ -3,7 +3,10 @@ import { PositionAnalysis, Connect4SolverOptions } from "./index";
 export abstract class AbstractAsyncWebWorkerSolver {
   private worker: Worker;
   private messageId = 0;
-  private pendingRequests = new Map<number, { resolve: (val: any) => void; reject: (err: any) => void }>();
+  private pendingRequests = new Map<
+    number,
+    { resolve: (val: unknown) => void; reject: (err: unknown) => void }
+  >();
   private initPromise: Promise<void>;
   private initialized = false;
 
@@ -11,7 +14,7 @@ export abstract class AbstractAsyncWebWorkerSolver {
     worker: Worker,
     initType: string,
     opts?: Connect4SolverOptions | number,
-    heightOpt?: number
+    heightOpt?: number,
   ) {
     this.worker = worker;
     this.worker.onmessage = (e: MessageEvent) => {
@@ -47,7 +50,7 @@ export abstract class AbstractAsyncWebWorkerSolver {
     });
   }
 
-  private sendMessage(type: string, payload: any = {}): Promise<any> {
+  private sendMessage(type: string, payload: unknown = {}): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const id = ++this.messageId;
       this.pendingRequests.set(id, { resolve, reject });
@@ -65,23 +68,47 @@ export abstract class AbstractAsyncWebWorkerSolver {
     await this.sendMessage("loadBook", { data });
   }
 
-  async analyze(positionStr: string, opts?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: any }): Promise<PositionAnalysis> {
-    return this.sendMessage("analyze", { position: positionStr, opts });
+  async analyze(
+    positionStr: string,
+    opts?: {
+      threads?: number;
+      maxDepth?: number;
+      timeoutMs?: number;
+      book?: unknown;
+    },
+  ): Promise<PositionAnalysis> {
+    return this.sendMessage("analyze", { position: positionStr, opts }) as Promise<PositionAnalysis>;
   }
 
   release(): void {
     this.sendMessage("unload").catch(() => {});
   }
+
+  unload(): void {
+    this.release();
+  }
+
+  getNodeCount(): number {
+    return 0; // Async worker doesn't support synchronous node count
+  }
 }
 
 export class WebWorkerWasmConnect4Solver extends AbstractAsyncWebWorkerSolver {
-    constructor(worker: Worker, opts?: Connect4SolverOptions | number, heightOpt?: number) {
-        super(worker, "init-threaded", opts, heightOpt);
-    }
+  constructor(
+    worker: Worker,
+    opts?: Connect4SolverOptions | number,
+    heightOpt?: number,
+  ) {
+    super(worker, "init-threaded", opts, heightOpt);
+  }
 }
 
 export class WebWorkerWasmNoSABConnect4Solver extends AbstractAsyncWebWorkerSolver {
-    constructor(worker: Worker, opts?: Connect4SolverOptions | number, heightOpt?: number) {
-        super(worker, "init-nosab", opts, heightOpt);
-    }
+  constructor(
+    worker: Worker,
+    opts?: Connect4SolverOptions | number,
+    heightOpt?: number,
+  ) {
+    super(worker, "init-nosab", opts, heightOpt);
+  }
 }

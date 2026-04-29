@@ -10,13 +10,17 @@ Every time you instantiate a solver (e.g. `NodeConnect4Solver`, `SyncWasmConnect
 import { NodeConnect4Solver } from "connect-4-solver";
 
 // Implicit Memory Allocation (defaults to 128MB)
-const solver = new NodeConnect4Solver({ width: 7, height: 6, cacheSizeMb: 128 });
+const solver = new NodeConnect4Solver({
+  width: 7,
+  height: 6,
+  cacheSizeMb: 128,
+});
 await solver.init(); // Allocates ~128MB of Memory automatically
 
 // ... run operations ...
 
 // You MUST manually trigger the deallocation!
-solver.unload(); 
+solver.unload();
 ```
 
 ::: warning ⚠️ MANDATORY DEALLOCATION
@@ -47,12 +51,11 @@ When running in Node.js, asynchronous tasks are offloaded to Node's `libuv` thre
 export UV_THREADPOOL_SIZE=32
 ```
 
-
 ### Mobile Thread Pools (React Native)
 
-When using `ReactNativeConnect4Solver`, asynchronous tasks are offloaded to native background thread pools to prevent blocking the JS UI thread. 
+When using `ReactNativeConnect4Solver`, asynchronous tasks are offloaded to native background thread pools to prevent blocking the JS UI thread.
 
 If you trigger concurrent evaluations across **multiple solver instances** at the exact same time, the bridge handles execution as follows:
-* **Android:** The Kotlin module uses an unbounded cached thread pool. It will attempt to execute as many concurrent solvers as you request. It is entirely your responsibility not to overwhelm the device's CPU.
-* **iOS:** The Objective-C++ module utilizes Grand Central Dispatch (`dispatch_get_global_queue`), which dynamically executes or queues concurrent evaluations based on the device's available CPU cores and thermal state.
 
+- **Android:** The Kotlin module uses an unbounded cached thread pool. It will attempt to execute as many concurrent solvers as you request. It is entirely your responsibility not to overwhelm the device's CPU.
+- **iOS:** The Objective-C++ module utilizes Grand Central Dispatch (`dispatch_get_global_queue`), which dynamically executes or queues concurrent evaluations based on the device's available CPU cores and thermal state.

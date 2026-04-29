@@ -35,23 +35,31 @@ describe("HeuristicNodeConnect4Solver", () => {
       return;
     }
 
-    const exactSolver = new NodeConnect4Solver({ width: 7, height: 6, heuristic: false });
+    const exactSolver = new NodeConnect4Solver({
+      width: 7,
+      height: 6,
+      heuristic: false,
+    });
     await exactSolver.init();
 
-    const lines = fs.readFileSync(dataPath, "utf8").split("\n").filter(l => l.trim().length > 0).slice(0, 50);
+    const lines = fs
+      .readFileSync(dataPath, "utf8")
+      .split("\n")
+      .filter((l) => l.trim().length > 0)
+      .slice(0, 50);
     let successCount = 0;
     const failures: string[] = [];
 
     for (const line of lines) {
       const parts = line.split(" ");
       const pos = parts[0];
-      
+
       // Heuristic Solver is NOT allowed to use the book.
       const [exactRes, heuristicRes] = await Promise.all([
         exactSolver.analyze(pos, { book }),
-        solver.analyze(pos, { timeoutMs: 25 })
+        solver.analyze(pos, { timeoutMs: 25 }),
       ]);
-      
+
       // 1. Find the best possible score outcome from the exact solver
       let maxExactScore = -100;
       for (const opt of exactRes.moveOptions) {
@@ -70,23 +78,29 @@ describe("HeuristicNodeConnect4Solver", () => {
       }
 
       // 3. Check if the heuristic's best move is an optimal move category match
-      const chosenMoveExactScore = exactRes.moveOptions[bestHeuristicMoveIndex]?.score ?? -100;
-      
-      const match = (maxExactScore > 0 && chosenMoveExactScore > 0) || 
-                    (maxExactScore === 0 && chosenMoveExactScore === 0) ||
-                    (maxExactScore < 0 && chosenMoveExactScore < 0);
+      const chosenMoveExactScore =
+        exactRes.moveOptions[bestHeuristicMoveIndex]?.score ?? -100;
+
+      const match =
+        (maxExactScore > 0 && chosenMoveExactScore > 0) ||
+        (maxExactScore === 0 && chosenMoveExactScore === 0) ||
+        (maxExactScore < 0 && chosenMoveExactScore < 0);
 
       if (match) {
         successCount++;
       } else {
-        failures.push(`Pos: ${pos} | Best Possible: ${maxExactScore} | Heuristic Picked: ${chosenMoveExactScore}`);
+        failures.push(
+          `Pos: ${pos} | Best Possible: ${maxExactScore} | Heuristic Picked: ${chosenMoveExactScore}`,
+        );
       }
     }
 
     exactSolver.release();
 
     const successRate = successCount / lines.length;
-    console.log(`Heuristic Deep Position Accuracy (25ms): ${(successRate * 100).toFixed(1)}% (${successCount}/${lines.length})`);
+    console.log(
+      `Heuristic Deep Position Accuracy (25ms): ${(successRate * 100).toFixed(1)}% (${successCount}/${lines.length})`,
+    );
     if (successRate < 0.65) {
       console.log("Top Failures:\n" + failures.slice(0, 5).join("\n"));
     }
@@ -94,27 +108,40 @@ describe("HeuristicNodeConnect4Solver", () => {
   }, 30000);
 
   test("should match exact solver outcome when given uncapped time/depth", async (): Promise<void> => {
-    const pos = "112233"; 
-    const exactSolver = new NodeConnect4Solver({ width: 7, height: 6, heuristic: false });
+    const pos = "112233";
+    const exactSolver = new NodeConnect4Solver({
+      width: 7,
+      height: 6,
+      heuristic: false,
+    });
     await exactSolver.init();
 
     const [exactRes, heuristicRes] = await Promise.all([
       exactSolver.analyze(pos),
-      solver.analyze(pos, { maxDepth: 42, timeoutMs: 5000 })
+      solver.analyze(pos, { maxDepth: 42, timeoutMs: 5000 }),
     ]);
 
     // Heuristic scores are scaled by 1000 for terminal wins
     const hScore = heuristicRes.evaluation?.score ?? 0;
     const eScore = exactRes.evaluation?.score ?? 0;
-    
-    const hNormalized = hScore > 10000 ? Math.floor(hScore / 1000) : (hScore < -10000 ? Math.ceil(hScore / 1000) : hScore);
+
+    const hNormalized =
+      hScore > 10000
+        ? Math.floor(hScore / 1000)
+        : hScore < -10000
+          ? Math.ceil(hScore / 1000)
+          : hScore;
 
     expect(hNormalized).toBe(eScore);
     exactSolver.release();
   });
 
   test("should gracefully abort dense searches when maxTime threshold hits", async (): Promise<void> => {
-    const massiveSolver = new NodeConnect4Solver({ width: 9, height: 7, heuristic: true });
+    const massiveSolver = new NodeConnect4Solver({
+      width: 9,
+      height: 7,
+      heuristic: true,
+    });
     await massiveSolver.init();
 
     const start = Date.now();

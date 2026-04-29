@@ -8,7 +8,9 @@
     "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": true,
+    "checkJs": false
   },
-  "include": ["src/**/*", "scripts/**/*"]
+  "include": ["src/**/*", "tools/**/*", "__tests__/**/*"]
 }

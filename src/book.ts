@@ -2,7 +2,7 @@ import { SolverModule } from "./core";
 import { getNoSABModuleInitPromise, getNoSABModule } from "./index";
 
 export class OpeningBook {
-  protected _ptr: any = 0;
+  protected _ptr: unknown = 0;
   protected mod: SolverModule | null = null;
   public readonly width: number;
   public readonly height: number;
@@ -14,7 +14,9 @@ export class OpeningBook {
 
   static async fromBuffer(data: Uint8Array): Promise<OpeningBook> {
     if (data.length < 6) {
-      throw new Error("Invalid Connect 4 opening book: file is too small to contain a header.");
+      throw new Error(
+        "Invalid Connect 4 opening book: file is too small to contain a header.",
+      );
     }
     const width = data[0];
     const height = data[1];
@@ -25,14 +27,17 @@ export class OpeningBook {
 
   async load(data: Uint8Array): Promise<void> {
     if (this._ptr !== 0) return;
-    
+
     const { getNativeModule } = require("./index");
     const native = getNativeModule();
     if (native) {
       const fs = require("fs");
       const path = require("path");
       const os = require("os");
-      const bookFilePath = path.join(os.tmpdir(), `book_${this.width}x${this.height}_${Date.now()}.book`);
+      const bookFilePath = path.join(
+        os.tmpdir(),
+        `book_${this.width}x${this.height}_${Date.now()}.book`,
+      );
       fs.writeFileSync(bookFilePath, data);
       this._ptr = native._createBook(this.width, this.height, bookFilePath);
       return;
@@ -40,7 +45,7 @@ export class OpeningBook {
 
     await getNoSABModuleInitPromise();
     this.mod = getNoSABModule();
-    
+
     const bookFilePath = `book_${this.width}x${this.height}.book`;
     this.mod.FS.writeFile(bookFilePath, data);
 
@@ -49,7 +54,7 @@ export class OpeningBook {
     this.mod._free(allocatedMemory);
   }
 
-  get ptr(): any {
+  get ptr(): unknown {
     return this._ptr;
   }
 

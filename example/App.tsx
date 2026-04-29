@@ -10,17 +10,19 @@ import {
 import { ReactNativeConnect4Solver } from 'connect-4-solver/native';
 
 function App(): React.JSX.Element {
-  const [resultText, setResultText] = useState('Press below to evaluate natively');
+  const [resultText, setResultText] = useState(
+    'Press below to evaluate natively',
+  );
   const [isEvaluating, setIsEvaluating] = useState(false);
 
   const evaluateNative = async () => {
     try {
       setIsEvaluating(true);
       setResultText('Initializing native solver...');
-      
+
       const solver = new ReactNativeConnect4Solver(7, 6);
       await solver.init();
-      
+
       setResultText('Evaluating "121212"...');
       const start = Date.now();
       const result = await solver.analyzeAsync('121212');
@@ -28,10 +30,12 @@ function App(): React.JSX.Element {
 
       if (result.evaluation) {
         setResultText(
-          `Success!\n\nOutcome: ${result.evaluation.outcome}\nWinner: ${result.evaluation.winner}\nScore: ${result.evaluation.score}\nTime: ${elapsed}ms`
+          `Success!\n\nOutcome: ${result.evaluation.outcome}\nWinner: ${result.evaluation.winner}\nScore: ${result.evaluation.score}\nTime: ${elapsed}ms`,
         );
       } else {
-        setResultText(`Evaluated successfully, but no win detected.\nTime: ${elapsed}ms`);
+        setResultText(
+          `Evaluated successfully, but no win detected.\nTime: ${elapsed}ms`,
+        );
       }
     } catch (err: any) {
       setResultText(`Error evaluating natively:\n${err.message}`);
@@ -51,8 +55,8 @@ function App(): React.JSX.Element {
           <Text style={styles.resultText}>{resultText}</Text>
         </View>
 
-        <TouchableOpacity 
-          style={styles.button} 
+        <TouchableOpacity
+          style={styles.button}
           onPress={evaluateNative}
           disabled={isEvaluating}
         >

@@ -1,4 +1,11 @@
-import { BaseConnect4Solver, Player, Outcome, Evaluation, PositionAnalysis, calculateWDL } from "./core";
+import {
+  BaseConnect4Solver,
+  Player,
+  Outcome,
+  Evaluation,
+  PositionAnalysis,
+  calculateWDL,
+} from "./core";
 
 interface NativeSolverType {
   analyze(
@@ -26,7 +33,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
 
   async analyze(
     positionStr: string,
-    opts?: { threads?: number },
+    opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis> {
     let Connect4SolverNative: NativeSolverType;
     try {
@@ -43,7 +50,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     }
 
     // Sanitize and strict-clamp the arguments before crossing the JNI bridge
-    const { threads, maxDepth, timeoutMs } = this.sanitizeOpts(opts);
+    const { threads } = this.sanitizeOpts(opts);
 
     // Call the Objective-C++ / JNI Layer passing the raw arguments strongly
     const nativeResArr = await Connect4SolverNative.analyze(
@@ -69,7 +76,10 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       const winningMoveIndex = nbMoves;
       const winner = winningMoveIndex % 2 === 0 ? Player.P1 : Player.P2;
       evaluation = {
-        eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) },
+        eval: {
+          value: Number.POSITIVE_INFINITY,
+          wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
+        },
         outcome: Outcome.Win,
         winner: winner,
         movesToEnd: 0,
@@ -97,7 +107,10 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
             });
           } else if (n > 0) {
             moveOptions.push({
-              eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) },
+              eval: {
+                value: Number.POSITIVE_INFINITY,
+                wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
+              },
               outcome: Outcome.Win,
               winner: owner,
               movesToEnd: halfMovesRemaining - n + 1,
@@ -105,7 +118,10 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
             });
           } else {
             moveOptions.push({
-              eval: { value: Number.NEGATIVE_INFINITY, wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss) },
+              eval: {
+                value: Number.NEGATIVE_INFINITY,
+                wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss),
+              },
               outcome: Outcome.Loss,
               winner: opp,
               movesToEnd: halfMovesRemaining + n + 1,
@@ -164,8 +180,15 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     };
   }
 
-  async analyzeAsync(positionStr: string, opts?: any): Promise<PositionAnalysis> {
+  async analyzeAsync(
+    positionStr: string,
+    opts?: AnalyzeOptions,
+  ): Promise<PositionAnalysis> {
     return this.analyze(positionStr, opts);
+  }
+
+  getNodeCount(): number {
+    return 0; // Native mobile doesn't expose node count yet
   }
 
   /**
@@ -179,7 +202,10 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         NativeModules: { Connect4Solver?: NativeSolverType };
       };
       if (rn.NativeModules.Connect4Solver) {
-        rn.NativeModules.Connect4Solver.releaseSolver(this.width, this.height).catch(() => {});
+        rn.NativeModules.Connect4Solver.releaseSolver(
+          this.width,
+          this.height,
+        ).catch(() => {});
       }
     } catch {
       // Ignore if not in React Native environment

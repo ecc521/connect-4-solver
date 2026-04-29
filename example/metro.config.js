@@ -12,9 +12,7 @@ const root = path.resolve(__dirname, '..');
 const config = {
   watchFolders: [root],
   resolver: {
-    nodeModulesPaths: [
-      path.resolve(__dirname, 'node_modules'),
-    ],
+    nodeModulesPaths: [path.resolve(__dirname, 'node_modules')],
     // Force Metro to resolve (sub)dependencies only from the `example` node_modules
     disableHierarchicalLookup: true,
   },

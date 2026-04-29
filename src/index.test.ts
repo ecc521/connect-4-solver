@@ -10,7 +10,7 @@ async function runParityTest(
   w: number,
   h: number,
   ignoreEarlyGame = false,
-  book?: import("../src/book").OpeningBook
+  book?: import("../src/book").OpeningBook,
 ): Promise<void> {
   if (!fs.existsSync(dataPath)) {
     console.warn(`Skipping parity test, ${dataPath} not found.`);

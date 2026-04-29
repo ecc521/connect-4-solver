@@ -2,7 +2,8 @@
 
 The React Native solver bypasses WebAssembly entirely. It uses JSI (JavaScript Interface) on iOS and JNI (Java Native Interface) on Android to call the C++ engine directly.
 
-**Import:** 
+**Import:**
+
 ```typescript
 import { ReactNativeConnect4Solver } from "connect-4-solver/native";
 ```
@@ -12,6 +13,7 @@ To use this module, you must have successfully run `pod install` in your `ios/` 
 :::
 
 ## Constructor
+
 **Implements:** [`BaseConnect4Solver`](./base-solver)
 
 ```typescript

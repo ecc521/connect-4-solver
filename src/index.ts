@@ -10,6 +10,8 @@ import {
   Evaluation,
   PositionAnalysis,
   calculateWDL,
+  AnalyzeOptions,
+  Connect4SolverOptions,
 } from "./core";
 import { SolverModule } from "./core";
 
@@ -24,17 +26,43 @@ let _noSABInitPromise: Promise<void> | null = null;
 let ThreadedModule: SolverModule | null = null;
 let _threadedInitPromise: Promise<void> | null = null;
 
-let NativeModule: any = null;
+interface NativeModuleType {
+  _createSolver(w: number, h: number, cache: unknown, heuristic: boolean): unknown;
+  _destroySolver(w: number, h: number, solver: unknown, heuristic: boolean): void;
+  _createCache(w: number, h: number, size: number, heuristic: boolean): unknown;
+  _destroyCache(cache: unknown): void;
+  _analyzeExact(w: number, h: number, solver: unknown, pos: string, threads: number, book: unknown): Promise<Int32Array>;
+  _analyzeHeuristic(w: number, h: number, solver: unknown, pos: string, threads: number, depth: number, timeout: number): Promise<Int32Array>;
+  _createBook(w: number, h: number, path: string): unknown;
+  _destroyBook(w: number, h: number, book: unknown): void;
+  _getNodeCount(w: number, h: number, solver: unknown, heuristic: boolean): number;
+  _generatePositions(w: number, h: number, depth: number): string[];
+}
+
+let NativeModule: NativeModuleType | null = null;
 let nativeModuleAttempted = false;
 
-export function getNativeModule() {
+export function getNativeModule(): NativeModuleType | null {
   if (!nativeModuleAttempted) {
     nativeModuleAttempted = true;
     try {
-      if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-        const req = typeof module !== 'undefined' && module.require ? module.require : require;
+      if (
+        typeof process !== "undefined" &&
+        process.versions &&
+        process.versions.node
+      ) {
+        const req =
+          typeof module !== "undefined" && module.require
+            ? module.require
+            : require;
         const path = req("path");
-        const nodePath = path.join(__dirname, "..", "build", "Release", "connect4.node");
+        const nodePath = path.join(
+          __dirname,
+          "..",
+          "build",
+          "Release",
+          "connect4.node",
+        );
         NativeModule = req(nodePath);
       }
     } catch (e) {
@@ -47,7 +75,8 @@ export function getNativeModule() {
 export function getNoSABModuleInitPromise() {
   if (!_noSABInitPromise) {
     /* eslint-disable @typescript-eslint/no-require-imports */
-    const createModule = require("../build/analyze.js") as unknown as () => Promise<SolverModule>;
+    const createModule =
+      require("../build/analyze.js") as unknown as () => Promise<SolverModule>;
     /* eslint-enable @typescript-eslint/no-require-imports */
     _noSABInitPromise = createModule().then((mod: SolverModule) => {
       NoSABModule = mod;
@@ -59,7 +88,8 @@ export function getNoSABModuleInitPromise() {
 export function getThreadedModuleInitPromise() {
   if (!_threadedInitPromise) {
     /* eslint-disable @typescript-eslint/no-require-imports */
-    const createModule = require("../build/analyze_threaded.js") as unknown as () => Promise<SolverModule>;
+    const createModule =
+      require("../build/analyze_threaded.js") as unknown as () => Promise<SolverModule>;
     /* eslint-enable @typescript-eslint/no-require-imports */
     _threadedInitPromise = createModule().then((mod: SolverModule) => {
       ThreadedModule = mod;
@@ -69,21 +99,21 @@ export function getThreadedModuleInitPromise() {
 }
 
 export function getNoSABModule(): SolverModule {
-  if (!NoSABModule) throw new Error("Module not initialized. Call getNoSABModuleInitPromise() first.");
+  if (!NoSABModule)
+    throw new Error(
+      "Module not initialized. Call getNoSABModuleInitPromise() first.",
+    );
   return NoSABModule;
 }
 
 export function getThreadedModule(): SolverModule {
-  if (!ThreadedModule) throw new Error("Module not initialized. Call getThreadedModuleInitPromise() first.");
+  if (!ThreadedModule)
+    throw new Error(
+      "Module not initialized. Call getThreadedModuleInitPromise() first.",
+    );
   return ThreadedModule;
 }
 
-export interface Connect4SolverOptions {
-  width?: number;
-  height?: number;
-  cacheSizeMb?: number;
-  heuristic?: boolean;
-}
 
 export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   protected isHeuristic: boolean;
@@ -121,20 +151,26 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       if (score > 10000) {
         const realScore = Math.floor(score / 1000);
         return {
-          eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) },
+          eval: {
+            value: Number.POSITIVE_INFINITY,
+            wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
+          },
           outcome: Outcome.Win,
           winner: currentPlayer,
           movesToEnd: halfMovesRemaining - realScore + 1,
-          score
+          score,
         };
       } else if (score < -10000) {
         const realScore = Math.ceil(score / 1000);
         return {
-          eval: { value: Number.NEGATIVE_INFINITY, wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss) },
+          eval: {
+            value: Number.NEGATIVE_INFINITY,
+            wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss),
+          },
           outcome: Outcome.Loss,
           winner: opponent,
           movesToEnd: halfMovesRemaining + realScore + 1,
-          score
+          score,
         };
       } else {
         const val = score / 100.0;
@@ -148,28 +184,37 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         outcome: Outcome.Draw,
         winner: null,
         movesToEnd: null,
-        score
+        score,
       };
     } else if (score > 0) {
       return {
-        eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) },
+        eval: {
+          value: Number.POSITIVE_INFINITY,
+          wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
+        },
         outcome: Outcome.Win,
         winner: currentPlayer,
         movesToEnd: halfMovesRemaining - score + 1,
-        score
+        score,
       };
     } else {
       return {
-        eval: { value: Number.NEGATIVE_INFINITY, wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss) },
+        eval: {
+          value: Number.NEGATIVE_INFINITY,
+          wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss),
+        },
         outcome: Outcome.Loss,
         winner: opponent,
         movesToEnd: halfMovesRemaining + score + 1,
-        score
+        score,
       };
     }
   }
 
-  protected parseResArr(resArr: Int32Array | number[], positionStr: string): PositionAnalysis {
+  protected parseResArr(
+    resArr: Int32Array | number[],
+    positionStr: string,
+  ): PositionAnalysis {
     const originalPosition = positionStr;
     const status = resArr[0];
     const nbMoves = resArr[1];
@@ -178,7 +223,9 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     let evaluation: Evaluation | null = null;
     const moveOptions: (Evaluation | null)[] = [];
 
-    const unplayableScore = this.isHeuristic ? -1000000 : UNPLAYABLE_COLUMN_SCORE;
+    const unplayableScore = this.isHeuristic
+      ? -1000000
+      : UNPLAYABLE_COLUMN_SCORE;
 
     if (status === STATUS_INVALID) {
       currentPosition = positionStr.slice(0, nbMoves);
@@ -188,11 +235,14 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       const movesToEnd = 0;
       const score = Math.floor((this.width * this.height + 1 - nbMoves) / 2);
       evaluation = {
-        eval: { value: Number.POSITIVE_INFINITY, wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win) },
+        eval: {
+          value: Number.POSITIVE_INFINITY,
+          wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
+        },
         outcome: Outcome.Win,
         winner: winner,
         movesToEnd: movesToEnd,
-        score: score
+        score: score,
       };
     } else {
       for (let i = 0; i < this.width; i++) {
@@ -217,17 +267,43 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       evaluation,
       moveOptions,
       depthReached,
-      isHeuristic: this.isHeuristic
+      isHeuristic: this.isHeuristic,
     };
   }
 
-  protected executeWasmAnalyze(mod: SolverModule, positionStr: string, opts?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: any }): Int32Array {
+  protected executeWasmAnalyze(
+    mod: SolverModule,
+    positionStr: string,
+    opts?: {
+      threads?: number;
+      maxDepth?: number;
+      timeoutMs?: number;
+      book?: any;
+    },
+  ): Int32Array {
     const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
 
     const allocatedMemory = mod.stringToNewUTF8(positionStr);
     let outputPointer = 0;
-    if (this.isHeuristic) outputPointer = mod._analyzeHeuristic(this.width, this.height, this._solverPtr, allocatedMemory, threads, maxDepth, timeoutMs);
-    else outputPointer = mod._analyzeExact(this.width, this.height, this._solverPtr, allocatedMemory, threads, bookPtr);
+    if (this.isHeuristic)
+      outputPointer = mod._analyzeHeuristic(
+        this.width,
+        this.height,
+        this._solverPtr,
+        allocatedMemory,
+        threads,
+        maxDepth,
+        timeoutMs,
+      );
+    else
+      outputPointer = mod._analyzeExact(
+        this.width,
+        this.height,
+        this._solverPtr,
+        allocatedMemory,
+        threads,
+        bookPtr,
+      );
 
     const dataLength = (this.isHeuristic ? 3 : 2) + this.width;
     const finalData = new Int32Array(dataLength);
@@ -240,12 +316,19 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   }
 
   abstract init(): Promise<void>;
-  abstract analyze(positionStr: string, opts?: any): PositionAnalysis | Promise<PositionAnalysis>;
+  abstract analyze(
+    positionStr: string,
+    opts?: AnalyzeOptions,
+  ): PositionAnalysis | Promise<PositionAnalysis>;
+  abstract getNodeCount(): number;
   abstract release(): void;
   unload(): void {
     this.release();
   }
-  async analyzeAsync(positionStr: string, opts?: any): Promise<PositionAnalysis> {
+  async analyzeAsync(
+    positionStr: string,
+    opts?: any,
+  ): Promise<PositionAnalysis> {
     return this.analyze(positionStr, opts);
   }
 }
@@ -257,38 +340,98 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     if (this.initialized) return;
     const native = getNativeModule();
     if (!native) {
-      throw new Error("NodeConnect4Solver can only be executed in a Node.js environment where 'connect4.node' successfully compiled.");
+      throw new Error(
+        "NodeConnect4Solver can only be executed in a Node.js environment where 'connect4.node' successfully compiled.",
+      );
     }
-    this._cachePtr = native._createCache(this.width, this.height, this.cacheSizeMb * 1024 * 1024, this.isHeuristic);
-    this._solverPtr = native._createSolver(this.width, this.height, this._cachePtr, this.isHeuristic);
+    this._cachePtr = native._createCache(
+      this.width,
+      this.height,
+      this.cacheSizeMb * 1024 * 1024,
+      this.isHeuristic,
+    );
+    this._solverPtr = native._createSolver(
+      this.width,
+      this.height,
+      this._cachePtr,
+      this.isHeuristic,
+    );
     this.initialized = true;
   }
 
-  async analyze(positionStr: string, opts?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: any }): Promise<PositionAnalysis> {
+  async analyze(
+    positionStr: string,
+    opts?: {
+      threads?: number;
+      maxDepth?: number;
+      timeoutMs?: number;
+      book?: any;
+    },
+  ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
-    
+
     return new Promise<PositionAnalysis>(async (resolve, reject) => {
-      this._analysisQueue = this._analysisQueue.catch(() => {}).then(async () => {
-        try {
-          const native = getNativeModule();
-          const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
+      this._analysisQueue = this._analysisQueue
+        .catch(() => {})
+        .then(async () => {
+          try {
+            const native = getNativeModule();
+            if (!native) throw new Error("Native module not loaded");
+            const { threads, maxDepth, timeoutMs, bookPtr } =
+              this.sanitizeOpts(opts);
 
-          let resArr: number[];
-          if (this.isHeuristic) resArr = await native._analyzeHeuristic(this.width, this.height, this._solverPtr, positionStr, threads, maxDepth, timeoutMs);
-          else resArr = await native._analyzeExact(this.width, this.height, this._solverPtr, positionStr, threads, bookPtr === 0 ? null : bookPtr);
+            let resArr: number[];
+            if (this.isHeuristic)
+              resArr = await native._analyzeHeuristic(
+                this.width,
+                this.height,
+                this._solverPtr,
+                positionStr,
+                threads,
+                maxDepth,
+                timeoutMs,
+              );
+            else
+              resArr = await native._analyzeExact(
+                this.width,
+                this.height,
+                this._solverPtr,
+                positionStr,
+                threads,
+                bookPtr === 0 ? null : bookPtr,
+              );
 
-          resolve(this.parseResArr(resArr, positionStr));
-        } catch (err) {
-          reject(err);
-        }
-      });
+            resolve(this.parseResArr(resArr, positionStr));
+          } catch (err) {
+            reject(err);
+          }
+        });
     });
+  }
+
+  getNodeCount(): number {
+    if (!this.initialized) return 0;
+    const native = getNativeModule();
+    if (!native) return 0;
+    return native._getNodeCount(
+      this.width,
+      this.height,
+      this._solverPtr,
+      this.isHeuristic,
+    );
   }
 
   release(): void {
     if (!this.initialized) return;
     const native = getNativeModule();
-    if (this._solverPtr !== 0) native._destroySolver(this.width, this.height, this._solverPtr, this.isHeuristic);
+    if (!native) return;
+    if (this._solverPtr !== 0)
+      native._destroySolver(
+        this.width,
+        this.height,
+        this._solverPtr,
+        this.isHeuristic,
+      );
     if (this._cachePtr !== 0) native._destroyCache(this._cachePtr);
     this._solverPtr = 0;
     this._cachePtr = 0;
@@ -301,12 +444,23 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     if (this.initialized) return;
     await getThreadedModuleInitPromise();
     const mod = getThreadedModule();
-    this._cachePtr = mod._createCache(this.width, this.height, this.cacheSizeMb * 1024 * 1024, this.isHeuristic);
-    this._solverPtr = mod._createSolver(this.width, this.height, this._cachePtr, this.isHeuristic);
+    if (!mod) throw new Error("Threaded module not initialized");
+    this._cachePtr = mod._createCache(
+      this.width,
+      this.height,
+      this.cacheSizeMb * 1024 * 1024,
+      this.isHeuristic,
+    );
+    this._solverPtr = mod._createSolver(
+      this.width,
+      this.height,
+      this._cachePtr,
+      this.isHeuristic,
+    );
     this.initialized = true;
   }
 
-  analyze(positionStr: string, opts?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: any }): PositionAnalysis {
+  analyze(positionStr: string, opts?: AnalyzeOptions): PositionAnalysis {
     if (!this.initialized) throw new Error("Call init() first.");
     const mod = getThreadedModule();
     const resArr = this.executeWasmAnalyze(mod, positionStr, opts);
@@ -316,11 +470,28 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
   release(): void {
     if (!this.initialized) return;
     const mod = getThreadedModule();
-    if (this._solverPtr !== 0) mod._destroySolver(this.width, this.height, this._solverPtr, this.isHeuristic);
+    if (this._solverPtr !== 0)
+      mod._destroySolver(
+        this.width,
+        this.height,
+        this._solverPtr,
+        this.isHeuristic,
+      );
     if (this._cachePtr !== 0) mod._destroyCache(this._cachePtr);
     this._solverPtr = 0;
     this._cachePtr = 0;
     this.initialized = false;
+  }
+
+  getNodeCount(): number {
+    if (!this.initialized) return 0;
+    const mod = getThreadedModule();
+    return mod._getNodeCount(
+      this.width,
+      this.height,
+      this._solverPtr,
+      this.isHeuristic,
+    );
   }
 }
 
@@ -329,12 +500,23 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     if (this.initialized) return;
     await getNoSABModuleInitPromise();
     const mod = getNoSABModule();
-    this._cachePtr = mod._createCache(this.width, this.height, this.cacheSizeMb * 1024 * 1024, this.isHeuristic);
-    this._solverPtr = mod._createSolver(this.width, this.height, this._cachePtr, this.isHeuristic);
+    if (!mod) throw new Error("No-SAB module not initialized");
+    this._cachePtr = mod._createCache(
+      this.width,
+      this.height,
+      this.cacheSizeMb * 1024 * 1024,
+      this.isHeuristic,
+    );
+    this._solverPtr = mod._createSolver(
+      this.width,
+      this.height,
+      this._cachePtr,
+      this.isHeuristic,
+    );
     this.initialized = true;
   }
 
-  analyze(positionStr: string, opts?: { maxDepth?: number, timeoutMs?: number, book?: any }): PositionAnalysis {
+  analyze(positionStr: string, opts?: AnalyzeOptions): PositionAnalysis {
     if (!this.initialized) throw new Error("Call init() first.");
     const mod = getNoSABModule();
     // Force 1 thread since it's NoSAB
@@ -346,11 +528,28 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
   release(): void {
     if (!this.initialized) return;
     const mod = getNoSABModule();
-    if (this._solverPtr !== 0) mod._destroySolver(this.width, this.height, this._solverPtr, this.isHeuristic);
+    if (this._solverPtr !== 0)
+      mod._destroySolver(
+        this.width,
+        this.height,
+        this._solverPtr,
+        this.isHeuristic,
+      );
     if (this._cachePtr !== 0) mod._destroyCache(this._cachePtr);
     this._solverPtr = 0;
     this._cachePtr = 0;
     this.initialized = false;
+  }
+
+  getNodeCount(): number {
+    if (!this.initialized) return 0;
+    const mod = getNoSABModule();
+    return mod._getNodeCount(
+      this.width,
+      this.height,
+      this._solverPtr,
+      this.isHeuristic,
+    );
   }
 }
 

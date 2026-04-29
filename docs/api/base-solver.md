@@ -6,24 +6,27 @@
 
 Every solver accepts the following configuration object upon instantiation:
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `width` | 7 | Board width columns |
-| `height` | 6 | Board height rows |
-| `cacheSizeMb` | 128 | Cache memory allocation in MB |
-| `heuristic` | false | Uses the heuristic evaluator instead of the exact solver |
+| Parameter     | Default | Description                                              |
+| ------------- | ------- | -------------------------------------------------------- |
+| `width`       | 7       | Board width columns                                      |
+| `height`      | 6       | Board height rows                                        |
+| `cacheSizeMb` | 128     | Cache memory allocation in MB                            |
+| `heuristic`   | false   | Uses the heuristic evaluator instead of the exact solver |
 
 ## Core Methods
 
 ### `init()`
-Bootstraps the native module, WebAssembly binary, or WebWorker, and automatically allocates the memory cache. 
+
+Bootstraps the native module, WebAssembly binary, or WebWorker, and automatically allocates the memory cache.
 **Returns:** `Promise<void>`
-*(Must be awaited before calling `analyze`)*.
+_(Must be awaited before calling `analyze`)_.
 
 ### `analyze(position: string, options?: { threads?: number, maxDepth?: number, timeoutMs?: number, book?: OpeningBook })`
-Computes the score for the current board state and evaluates all valid child move columns. 
+
+Computes the score for the current board state and evaluates all valid child move columns.
 
 **Options:**
+
 - `threads`: Maximum number of worker threads allowed (default: `1`). Will be clamped to maximum allowed by the specific solver used.
 - `maxDepth`: (Heuristic only) The maximum search depth before falling back to evaluation functions (default: `20`).
 - `timeoutMs`: (Heuristic only) The maximum time in milliseconds to spend searching before returning the best result found so far (default: `25`).
@@ -36,12 +39,14 @@ Computes the score for the current board state and evaluates all valid child mov
 > **Thread Limits:** Each platform has an automatic thread limit. These may be configurable.
 
 ### Supported Board Sizes
+
 The WASM bundle includes evaluators for the following board sizes:
 `"6x5", "6x6", "7x6", "7x7", "8x6", "9x6", "8x8", "9x7", "11x4"`
 
 > Additional sizes can be supported by compiling the C++ source with Emscripten yourself.
 
 ### `unload()`
+
 Safely destroys the explicitly allocated pointers and frees the cache memory from RAM.
 **Returns:** `void`
 
@@ -50,6 +55,7 @@ Safely destroys the explicitly allocated pointers and frees the cache memory fro
 ## Returned Types
 
 ### `PositionAnalysis`
+
 The object returned when an `analyze()` call completes successfully.
 
 ```typescript
@@ -65,6 +71,7 @@ export interface PositionAnalysis {
 ```
 
 ### `Evaluation`
+
 Represents the calculated strength of a specific move sequence.
 
 ```typescript

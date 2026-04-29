@@ -1,6 +1,6 @@
 import { SyncWasmConnect4Solver, SyncWasmNoSABConnect4Solver, Connect4SolverOptions, AbstractSyncSolver } from "./index";
 
-export function setupWorkerHandler() {
+export function setupWorkerHandler(): void {
   let solver: AbstractSyncSolver | null = null;
 
   self.onmessage = async (e: MessageEvent) => {
@@ -24,14 +24,14 @@ export function setupWorkerHandler() {
         if (solver) solver.release();
         self.postMessage({ id, success: true });
       }
-      }
-    } catch (err: any) {
-      self.postMessage({ id, success: false, error: err.message });
+    } catch (err: unknown) {
+      const error = err as Error;
+      self.postMessage({ id, success: false, error: error.message });
     }
   };
 }
 
-export function setupNoSABWorkerHandler() {
+export function setupNoSABWorkerHandler(): void {
   let solver: AbstractSyncSolver | null = null;
 
   self.onmessage = async (e: MessageEvent) => {
@@ -54,8 +54,9 @@ export function setupNoSABWorkerHandler() {
         if (solver) solver.release();
         self.postMessage({ id, success: true });
       }
-    } catch (err: any) {
-      self.postMessage({ id, success: false, error: err.message });
+    } catch (err: unknown) {
+      const error = err as Error;
+      self.postMessage({ id, success: false, error: error.message });
     }
   };
 }

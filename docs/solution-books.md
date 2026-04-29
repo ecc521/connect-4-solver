@@ -10,6 +10,7 @@ You can download pre-computed, highly optimized Opening Books for various standa
 **[Download Solution Books](https://github.com/ecc521/connect-4-solver/releases/tag/solutionbooks)**
 
 ### Usage Example
+
 To use a book, instantiate an `OpeningBook`, load the raw `.book` file buffer into it, and pass it into your solver's `analyze` method options!
 
 ```typescript
@@ -55,15 +56,17 @@ npx ts-node tools/generate-book.ts --width 7 --height 7 --depth 10 --cacheMB 409
 > **Safe to Quit:** Generating deep books can take hours or days. You can safely press `Ctrl+C` (SIGINT) at any time to halt the generator. The script executes the Alpha-Beta evaluation synchronously across the C++ worker threads.
 
 #### Arguments
-* `--width` & `--height`: The dimensions of the Connect 4 board.
-* `--depth`: The maximum move sequence length to precompute. (e.g., Depth 10 evaluates all game states up to ply 10).
-* `--cacheMB`: The size of the RAM Transposition Table in Megabytes (`MB`). `--cacheMB 4096` allocates roughly 4GB of RAM. A larger cache prevents deep leaf nodes from evicting your shallow nodes during generation.
-* `--threads`: Number of parallel C++ worker threads to distribute the Alpha-Beta evaluation across.
-* `--ef`: Instructs the generator to natively compress and save the output as an `.efbook` (Elias-Fano) instead of a standard Dense array.
-* `--bootstrap <path>`: Provide a path to a smaller, existing `.book` or `.efbook`. The solver will query this book during evaluation, massively speeding up the generation of deeper books.
+
+- `--width` & `--height`: The dimensions of the Connect 4 board.
+- `--depth`: The maximum move sequence length to precompute. (e.g., Depth 10 evaluates all game states up to ply 10).
+- `--cacheMB`: The size of the RAM Transposition Table in Megabytes (`MB`). `--cacheMB 4096` allocates roughly 4GB of RAM. A larger cache prevents deep leaf nodes from evicting your shallow nodes during generation.
+- `--threads`: Number of parallel C++ worker threads to distribute the Alpha-Beta evaluation across.
+- `--ef`: Instructs the generator to natively compress and save the output as an `.efbook` (Elias-Fano) instead of a standard Dense array.
+- `--bootstrap <path>`: Provide a path to a smaller, existing `.book` or `.efbook`. The solver will query this book during evaluation, massively speeding up the generation of deeper books.
 
 ### Binary Compression
-The orchestrator generates standard **Dense Array** books by default. The engine also supports **Elias-Fano** compression, which greatly reduces file sizes and memory usage. While Elias-Fano supports O(1) random lookups at <1ms, it is still substantially slower per lookup than Dense Arrays. 
+
+The orchestrator generates standard **Dense Array** books by default. The engine also supports **Elias-Fano** compression, which greatly reduces file sizes and memory usage. While Elias-Fano supports O(1) random lookups at <1ms, it is still substantially slower per lookup than Dense Arrays.
 
 Sparse books are supported, however using extremely sparse books is not recommended. Books will be queried for all solver evaluations where `depth <= maxDepthContainedInBook`.
 

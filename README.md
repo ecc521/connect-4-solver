@@ -20,7 +20,7 @@ npm install connect-4-solver
 We have comprehensive documentation covering API usage, WebWorkers, Solution Books, and Memory Management.
 
 **[📚 Read the Official Documentation](https://ecc521.github.io/connect-4-solver/)**
-*(If the link is dead, run `npm run docs:dev` locally to view the full Vitepress site!)*
+_(If the link is dead, run `npm run docs:dev` locally to view the full Vitepress site!)_
 
 ### Building from source
 
@@ -57,4 +57,4 @@ If you don't want to install Emscripten locally, you can use the provided Docker
 
 - Published under **AGPL v3** license.
 - Partially based off the work of [Pascal Pons](http://blog.gamesolver.org) and [John Tromp](https://tromp.github.io/c4/c4.html).
-- Extensively modified to add multi-threaded support, NNUE, tiered-cache tables, and a variety of other optimizations as well as multi-platform support. 
+- Extensively modified to add multi-threaded support, NNUE, tiered-cache tables, and a variety of other optimizations as well as multi-platform support.

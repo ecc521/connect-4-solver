@@ -14,17 +14,17 @@ npm install connect-4-solver
 
 The library exports explicit solver classes so you always know what engine architecture you are executing. All solvers implement [`BaseConnect4Solver`](/api/base-solver), ensuring consistent functionality across platforms, however there may be additional configuration options in the explicit solver classes:
 
-* **`NodeConnect4Solver`**: (Node.js) Native N-API. Asynchronous.
-* **`ReactNativeConnect4Solver`**: (iOS/Android) Native JSI. Asynchronous. (Import from `"connect-4-solver/native"`).
-* **`WebWorkerWasmConnect4Solver`**: (Browser) WebWorker wrapper for WASM. Asynchronous.
-* **`SyncWasmConnect4Solver`**: Standard WASM execution. Blocks the current thread.
+- **`NodeConnect4Solver`**: (Node.js) Native N-API. Asynchronous.
+- **`ReactNativeConnect4Solver`**: (iOS/Android) Native JSI. Asynchronous. (Import from `"connect-4-solver/native"`).
+- **`WebWorkerWasmConnect4Solver`**: (Browser) WebWorker wrapper for WASM. Asynchronous.
+- **`SyncWasmConnect4Solver`**: Standard WASM execution. Blocks the current thread.
 
 ## Quick Start
 
 ::: warning ⚠️ Exact Solving vs. Heuristics on Large Boards
 **Exact Solver (Default):** On 7x6 boards or larger, calculating a mathematically perfect sequence can take minutes or hours on early-game positions. For practical use, you must load a pre-computed [Solution Book](/solution-books) alongside the engine.
 
-**Heuristic Solver:** The [Heuristic Solver](/heuristic-solver) (`heuristic: true`) does not require books at any size and returns instantly. However, it returns an *estimated* score (positive means winning) and the `outcome` will always default to `Draw` unless it sees a forced win.
+**Heuristic Solver:** The [Heuristic Solver](/heuristic-solver) (`heuristic: true`) does not require books at any size and returns instantly. However, it returns an _estimated_ score (positive means winning) and the `outcome` will always default to `Draw` unless it sees a forced win.
 :::
 
 ::: code-group
@@ -39,7 +39,10 @@ async function run() {
   const book = await OpeningBook.fromBuffer(bookData);
 
   // Initialize the solver matching the book's board size
-  const solver = new NodeConnect4Solver({ width: book.width, height: book.height });
+  const solver = new NodeConnect4Solver({
+    width: book.width,
+    height: book.height,
+  });
   await solver.init();
 
   // Analyze a position (column sequence: 1 to board width)
@@ -47,7 +50,9 @@ async function run() {
 
   if (result.evaluation) {
     if (result.evaluation.outcome === Outcome.Win) {
-      console.log(`${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`);
+      console.log(
+        `${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`,
+      );
     } else if (result.evaluation.outcome === Outcome.Draw) {
       console.log("The game is a draw");
     }
@@ -63,7 +68,11 @@ run();
 
 ```typescript [Browser (Async)]
 // App.tsx
-import { WebWorkerWasmConnect4Solver, OpeningBook, Outcome } from "connect-4-solver/async";
+import {
+  WebWorkerWasmConnect4Solver,
+  OpeningBook,
+  Outcome,
+} from "connect-4-solver/async";
 
 async function run() {
   // Fetch the binary opening book
@@ -72,17 +81,24 @@ async function run() {
   const book = await OpeningBook.fromBuffer(bookBuffer);
 
   // 1. Instantiate the Worker (Syntax may vary based on your bundler, e.g. Vite)
-  const worker = new Worker(new URL('./c4-worker.ts', import.meta.url), { type: 'module' });
+  const worker = new Worker(new URL("./c4-worker.ts", import.meta.url), {
+    type: "module",
+  });
 
   // 2. Wrap it with the Async Solver matching the book's size
-  const solver = new WebWorkerWasmConnect4Solver(worker, { width: book.width, height: book.height });
+  const solver = new WebWorkerWasmConnect4Solver(worker, {
+    width: book.width,
+    height: book.height,
+  });
   await solver.init();
 
   const result = await solver.analyze("4424", { book }); // Non-blocking
-  
+
   if (result.evaluation) {
     if (result.evaluation.outcome === Outcome.Win) {
-      console.log(`${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`);
+      console.log(
+        `${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`,
+      );
     } else if (result.evaluation.outcome === Outcome.Draw) {
       console.log("The game is a draw");
     }
@@ -97,7 +113,11 @@ run();
 ```
 
 ```typescript [React Native]
-import { ReactNativeConnect4Solver, OpeningBook, Outcome } from "connect-4-solver/native";
+import {
+  ReactNativeConnect4Solver,
+  OpeningBook,
+  Outcome,
+} from "connect-4-solver/native";
 
 async function run() {
   // Read the binary opening book
@@ -106,14 +126,19 @@ async function run() {
   const book = await OpeningBook.fromBuffer(bookBuffer);
 
   // Uses the C++ JSI bridge (no WASM overhead)
-  const solver = new ReactNativeConnect4Solver({ width: book.width, height: book.height });
+  const solver = new ReactNativeConnect4Solver({
+    width: book.width,
+    height: book.height,
+  });
   await solver.init();
 
   const result = await solver.analyze("4424", { book });
 
   if (result.evaluation) {
     if (result.evaluation.outcome === Outcome.Win) {
-      console.log(`${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`);
+      console.log(
+        `${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`,
+      );
     } else if (result.evaluation.outcome === Outcome.Draw) {
       console.log("The game is a draw");
     }
@@ -128,7 +153,11 @@ run();
 ```
 
 ```typescript [Browser (Sync)]
-import { SyncWasmNoSABConnect4Solver, OpeningBook, Outcome } from "connect-4-solver";
+import {
+  SyncWasmNoSABConnect4Solver,
+  OpeningBook,
+  Outcome,
+} from "connect-4-solver";
 
 async function run() {
   // Fetch the binary opening book
@@ -137,7 +166,10 @@ async function run() {
   const book = await OpeningBook.fromBuffer(bookBuffer);
 
   // No WebWorker setup required, but blocks the main thread
-  const solver = new SyncWasmNoSABConnect4Solver({ width: book.width, height: book.height });
+  const solver = new SyncWasmNoSABConnect4Solver({
+    width: book.width,
+    height: book.height,
+  });
   await solver.init();
 
   // ⚠️ Blocks the main thread until it finishes resolving!
@@ -145,7 +177,9 @@ async function run() {
 
   if (result.evaluation) {
     if (result.evaluation.outcome === Outcome.Win) {
-      console.log(`${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`);
+      console.log(
+        `${result.evaluation.winner} wins in ${result.evaluation.movesToEnd} moves`,
+      );
     } else if (result.evaluation.outcome === Outcome.Draw) {
       console.log("The game is a draw");
     }

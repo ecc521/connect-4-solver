@@ -1,97 +1,75 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Connect 4 Solver - React Native Example
 
-# Getting Started
+This is a demonstration app for the `connect-4-solver` library, specifically showcasing the **Native C++ Bindings** for iOS and Android.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+Unlike the WebAssembly version used in browsers, this example uses **JSI (JavaScript Interface)** on iOS and **JNI (Java Native Interface)** on Android to communicate directly with the high-performance C++ solver engine.
 
-## Step 1: Start Metro
+## Features
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+- **Zero-Latency Analysis**: Native execution bypasses WASM overhead.
+- **Asynchronous Execution**: Background threads prevent UI freezing during deep searches.
+- **Cross-Platform**: Shared C++ core running on both iOS and Android.
+- **Real-time Evaluation**: Stockfish-style WDL (Win/Draw/Loss) probability curves.
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+## Prerequisites
 
-```sh
-# Using npm
-npm start
+Before running the example, ensure you have your mobile development environment set up:
+- [React Native Environment Setup](https://reactnative.dev/docs/set-up-your-environment)
+- **iOS**: macOS with Xcode and CocoaPods.
+- **Android**: Android Studio and SDK.
 
-# OR using Yarn
-yarn start
+## Getting Started
+
+### 1. Install Dependencies
+
+From the root of this repository:
+```bash
+npm install
+npm run build
 ```
 
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+Then, navigate to this example directory:
+```bash
+cd example
+npm install
 ```
 
-### iOS
+### 2. iOS Setup
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+Install the CocoaPods:
+```bash
+cd ios
+pod install
+cd ..
 ```
 
-Then, and every time you update your native dependencies, run:
+### 3. Run the App
 
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+**For iOS:**
+```bash
 npm run ios
-
-# OR using Yarn
-yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+**For Android:**
+```bash
+npm run android
+```
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+## How it Works
 
-## Step 3: Modify your app
+The app uses the `ReactNativeConnect4Solver` class from the parent library. This class automatically routes calls to the native mobile modules:
 
-Now that you have successfully run the app, let's make changes!
+```typescript
+import { ReactNativeConnect4Solver } from "connect-4-solver/native";
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+const solver = new ReactNativeConnect4Solver(7, 6);
+await solver.init();
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+// Analysis runs on a background thread natively
+const result = await solver.analyzeAsync("4424");
+console.log(result.evaluation?.eval.wdl);
+```
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+## Performance Note
 
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+On mobile devices, we use a slightly smaller default transposition table (~24MB) to be memory-efficient while still providing "perfect" play for standard 7x6 boards.
