@@ -16,24 +16,31 @@ using namespace GameSolver::Connect4;
 namespace GameSolver {
 namespace Connect4 {
 
+namespace {
+  thread_local uint32_t heuristicTlNodeCount = 0;
+}
+
 template <int WIDTH, int HEIGHT>
 int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc) {
   assert(alpha < beta);
   assert(!P.canWinNext());
 
-  if (stopSearch.load()) return 0;
-  unsigned long long nodes = ++nodeCount;
-  if ((nodes & 16383) == 0 && end_time_ms > 0) {
+  if (++heuristicTlNodeCount >= 16384) {
+    nodeCount.fetch_add(heuristicTlNodeCount, std::memory_order_relaxed);
+    heuristicTlNodeCount = 0;
+    if (stopSearch.load(std::memory_order_relaxed)) return 0;
+    if (end_time_ms > 0) {
 #ifdef __EMSCRIPTEN__
-    if (emscripten_get_now() >= end_time_ms) {
-      stopSearch = true;
-    }
+      if (emscripten_get_now() >= end_time_ms) {
+        stopSearch = true;
+      }
 #else
-    auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()).time_since_epoch().count();
-    if (now >= end_time_ms) {
-      stopSearch = true;
-    }
+      auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()).time_since_epoch().count();
+      if (now >= end_time_ms) {
+        stopSearch = true;
+      }
 #endif
+    }
   }
   typename GenericPosition<WIDTH, HEIGHT>::position_t possible = P.possibleNonLosingMoves();
   if(possible == 0) // opponent wins next move

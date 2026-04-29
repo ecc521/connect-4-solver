@@ -44,7 +44,11 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   assert(alpha < beta);
   assert(!P.canWinNext());
 
-  nodeCount++; // increment counter of explored nodes
+  if (++solverTlNodeCount >= 16384) {
+    nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+    solverTlNodeCount = 0;
+  }
+
 
   Position::position_t possible = P.possibleNonLosingMoves();
   if(possible == 0)     // if no possible non losing move, opponent wins next move
