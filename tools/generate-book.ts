@@ -98,7 +98,7 @@ async function run() {
     fs.mkdirSync(outputDir, { recursive: true });
   }
   const fileExt = useEf ? ".efbook" : ".book";
-  const typeStr = weak ? "weak" : "dense";
+  const typeStr = weak ? "dense_weak" : "dense";
   const outputFile = path.join(
     outputDir,
     `${width}x${height}_${typeStr}${depth}${fileExt}`,
@@ -136,40 +136,49 @@ async function run() {
 
   console.log(`[+] Created native solver sharing a ${cacheSizeMb}MB cache.`);
   console.log(
-    `[+] Crunching ${weak ? "WEAK " : ""}Alpha-Beta evaluations using sequential orchestrator...`,
+    `[+] Crunching ${weak ? "WEAK " : ""}Alpha-Beta evaluations using ${threads} concurrent workers...`,
   );
 
   let processed = 0;
   const start = Date.now();
+  const totalPositions = positions.length;
   // Reverse to evaluate deepest positions first for better cache utilization
   positions.reverse();
 
-  for (const pos of positions) {
-    const analysis = await solver.analyze(pos, {
-      threads,
-      weak,
-      book: bootstrapBook
-        ? { ptr: (bootstrapBook as any)._bookPtr }
-        : undefined,
-    } as any);
+  const bookPtr = bootstrapBook ? (bootstrapBook as any)._bookPtr : undefined;
 
-    if (analysis.evaluation) {
-      builder.addPosition(pos, analysis.evaluation.score - minScore + 1);
+  const worker = async () => {
+    while (true) {
+      const pos = positions.pop();
+      if (!pos) break;
+
+      const analysis = await solver.analyze(pos, {
+        threads: 1, // Use 1 thread per position for maximum throughput
+        weak,
+        book: bookPtr ? { ptr: bookPtr } : undefined,
+      } as any);
+
+      if (analysis.evaluation) {
+        builder.addPosition(pos, analysis.evaluation.score - minScore + 1);
+      }
+
+      processed++;
+
+      // Log progress occasionally
+      if (processed % 10 === 0 || processed === totalPositions) {
+        const currentTotalNodes = BigInt(solver.getNodeCount());
+        const elapsed = (Date.now() - start) / 1000;
+        const pct = ((processed / totalPositions) * 100).toFixed(1);
+        const nps = (Number(currentTotalNodes) / elapsed / 1000000).toFixed(1);
+        process.stdout.write(
+          `\r[${processed}/${totalPositions}] (${pct}%) | ${nps} MN/s | Total Nodes: ${currentTotalNodes.toLocaleString()} | Current: ${pos}      `,
+        );
+      }
     }
+  };
 
-    processed++;
-
-    // Log progress occasionally
-    if (processed % 10 === 0 || processed === positions.length) {
-      const currentTotalNodes = BigInt(solver.getNodeCount());
-      const elapsed = (Date.now() - start) / 1000;
-      const pct = ((processed / positions.length) * 100).toFixed(1);
-      const nps = (Number(currentTotalNodes) / elapsed / 1000000).toFixed(1);
-      process.stdout.write(
-        `\r[${processed}/${positions.length}] (${pct}%) | ${nps} MN/s | Total Nodes: ${currentTotalNodes.toLocaleString()} | Current: ${pos}      `,
-      );
-    }
-  }
+  // Launch concurrent workers
+  await Promise.all(Array.from({ length: threads }, () => worker()));
 
   console.log(""); // Final newline
   const elapsedTotal = (Date.now() - start) / 1000;
