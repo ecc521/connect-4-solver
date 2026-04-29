@@ -17,7 +17,14 @@ export abstract class AbstractAsyncWebWorkerSolver {
     heightOpt?: number,
   ) {
     this.worker = worker;
-    this.worker.onmessage = (e: MessageEvent) => {
+    this.worker.onmessage = (
+      e: MessageEvent<{
+        id: number;
+        success: boolean;
+        result: unknown;
+        error: string;
+      }>,
+    ): void => {
       const { id, success, result, error } = e.data;
       const p = this.pendingRequests.get(id);
       if (p) {
@@ -47,10 +54,10 @@ export abstract class AbstractAsyncWebWorkerSolver {
       height,
       cacheSizeMb,
       heuristic,
-    });
+    }) as Promise<void>;
   }
 
-  private sendMessage(type: string, payload: unknown = {}): Promise<unknown> {
+  private sendMessage(type: string, payload: object = {}): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const id = ++this.messageId;
       this.pendingRequests.set(id, { resolve, reject });
@@ -77,11 +84,16 @@ export abstract class AbstractAsyncWebWorkerSolver {
       book?: unknown;
     },
   ): Promise<PositionAnalysis> {
-    return this.sendMessage("analyze", { position: positionStr, opts }) as Promise<PositionAnalysis>;
+    return this.sendMessage("analyze", {
+      position: positionStr,
+      opts,
+    }) as Promise<PositionAnalysis>;
   }
 
   release(): void {
-    this.sendMessage("unload").catch(() => {});
+    this.sendMessage("unload").catch(() => {
+      /* ignore */
+    });
   }
 
   unload(): void {

@@ -9,8 +9,8 @@ async function runParityTest(
   dataPath: string,
   w: number,
   h: number,
-  ignoreEarlyGame = false,
-  book?: import("../src/book").OpeningBook,
+  _ignoreEarlyGame = false,
+  book?: OpeningBook,
 ): Promise<void> {
   if (!fs.existsSync(dataPath)) {
     console.warn(`Skipping parity test, ${dataPath} not found.`);
@@ -91,6 +91,7 @@ describe("NodeConnect4Solver Async Parity Test", () => {
         const book = new OpeningBook(solver.width, solver.height);
         await book.load(bookData);
         // Attach it to solver as a mock property for cleanup/testing if needed
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
         (solver as any)._testBook = book;
         bookLoaded = true;
         break;
@@ -123,7 +124,12 @@ describe("NodeConnect4Solver Async Parity Test", () => {
   });
 
   test("should correctly analyze all 7x6 positions against expected C++ raw solver output", async () => {
-    const dataPath = path.join(__dirname, "..", "test-data", "positions_7x6.txt");
+    const dataPath = path.join(
+      __dirname,
+      "..",
+      "test-data",
+      "positions_7x6.txt",
+    );
     await runParityTest(solver, dataPath, 7, 6, !bookLoaded);
   }, 120000);
 
@@ -166,16 +172,14 @@ describe("NodeConnect4Solver Async Parity Test", () => {
         await testSolver.init();
 
         // For generic sizes, we check for a book in the data directory
-        let hasBook = false;
-        let testBook: any = undefined;
+        let testBook: OpeningBook | undefined = undefined;
         const bookPath = path.join(__dirname, "..", "data", `${w}x${h}.book`);
         if (fs.existsSync(bookPath)) {
           testBook = new OpeningBook(testSolver.width, testSolver.height);
           await testBook.load(new Uint8Array(fs.readFileSync(bookPath)));
-          hasBook = true;
         }
 
-        await runParityTest(testSolver, dataPath, w, h, !hasBook, testBook);
+        await runParityTest(testSolver, dataPath, w, h, !testBook, testBook);
         if (testBook) testBook.destroy();
         testSolver.release();
       });

@@ -52,7 +52,7 @@ class HeuristicSolver {
   static const int INVALID_MOVE = -1000000;
 
   // Returns the heuristic score of a position via iterative deepening
-  std::pair<int, int> solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms = 0.0, bool reset_tt = true, NNUEAccumulator<WIDTH, HEIGHT>* acc = nullptr);
+  std::pair<int, int> solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms = 0.0, bool reset_tt = true, NNUEAccumulator<WIDTH, HEIGHT>* acc = nullptr, int threads = 1);
 
   /**
    * Evaluate possible heuristic moves for current player

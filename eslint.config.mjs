@@ -51,6 +51,8 @@ export default tseslint.config(
   },
   {
     ignores: [
+      "docs/.vitepress/",
+      "tools/",
       "dist/",
       "build/",
       "node_modules/",

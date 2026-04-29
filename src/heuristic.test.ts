@@ -29,9 +29,16 @@ describe("HeuristicNodeConnect4Solver", () => {
   });
 
   test("should achieve >= 80% best-move accuracy on deep positions in 25ms window", async (): Promise<void> => {
-    const dataPath = path.join(__dirname, "..", "test-data", "positions_7x6.txt");
+    const dataPath = path.join(
+      __dirname,
+      "..",
+      "test-data",
+      "positions_7x6.txt",
+    );
     if (!fs.existsSync(dataPath)) {
-      console.warn("Skipping heuristic batch test: positions_7x6.txt not found.");
+      console.warn(
+        "Skipping heuristic batch test: positions_7x6.txt not found.",
+      );
       return;
     }
 

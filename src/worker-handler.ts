@@ -1,14 +1,38 @@
-import { SyncWasmConnect4Solver, SyncWasmNoSABConnect4Solver, Connect4SolverOptions, AbstractSyncSolver } from "./index";
+import {
+  SyncWasmConnect4Solver,
+  SyncWasmNoSABConnect4Solver,
+  Connect4SolverOptions,
+  AbstractSyncSolver,
+  AnalyzeOptions,
+} from "./index";
+
+interface WorkerMessage {
+  id: number;
+  type: string;
+  payload: {
+    width: number;
+    height: number;
+    cacheSizeMb: number;
+    heuristic: boolean;
+    position: string;
+    opts: AnalyzeOptions;
+  };
+}
 
 export function setupWorkerHandler(): void {
   let solver: AbstractSyncSolver | null = null;
 
-  self.onmessage = async (e: MessageEvent) => {
+  self.onmessage = async (e: MessageEvent<WorkerMessage>): Promise<void> => {
     const { id, type, payload } = e.data;
     try {
       if (type === "init-threaded") {
         const { width, height, cacheSizeMb, heuristic } = payload;
-        const opts: Connect4SolverOptions = { width, height, cacheSizeMb, heuristic };
+        const opts: Connect4SolverOptions = {
+          width,
+          height,
+          cacheSizeMb,
+          heuristic,
+        };
         solver = new SyncWasmConnect4Solver(opts);
         await solver.init();
         self.postMessage({ id, success: true });
@@ -34,12 +58,17 @@ export function setupWorkerHandler(): void {
 export function setupNoSABWorkerHandler(): void {
   let solver: AbstractSyncSolver | null = null;
 
-  self.onmessage = async (e: MessageEvent) => {
+  self.onmessage = async (e: MessageEvent<WorkerMessage>): Promise<void> => {
     const { id, type, payload } = e.data;
     try {
       if (type === "init-nosab") {
         const { width, height, cacheSizeMb, heuristic } = payload;
-        const opts: Connect4SolverOptions = { width, height, cacheSizeMb, heuristic };
+        const opts: Connect4SolverOptions = {
+          width,
+          height,
+          cacheSizeMb,
+          heuristic,
+        };
         solver = new SyncWasmNoSABConnect4Solver(opts);
         await solver.init();
         self.postMessage({ id, success: true });

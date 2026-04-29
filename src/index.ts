@@ -27,15 +27,45 @@ let ThreadedModule: SolverModule | null = null;
 let _threadedInitPromise: Promise<void> | null = null;
 
 interface NativeModuleType {
-  _createSolver(w: number, h: number, cache: unknown, heuristic: boolean): unknown;
-  _destroySolver(w: number, h: number, solver: unknown, heuristic: boolean): void;
+  _createSolver(
+    w: number,
+    h: number,
+    cache: unknown,
+    heuristic: boolean,
+  ): unknown;
+  _destroySolver(
+    w: number,
+    h: number,
+    solver: unknown,
+    heuristic: boolean,
+  ): void;
   _createCache(w: number, h: number, size: number, heuristic: boolean): unknown;
   _destroyCache(cache: unknown): void;
-  _analyzeExact(w: number, h: number, solver: unknown, pos: string, threads: number, book: unknown): Promise<Int32Array>;
-  _analyzeHeuristic(w: number, h: number, solver: unknown, pos: string, threads: number, depth: number, timeout: number): Promise<Int32Array>;
+  _analyzeExact(
+    w: number,
+    h: number,
+    solver: unknown,
+    pos: string,
+    threads: number,
+    book: unknown,
+  ): Promise<Int32Array>;
+  _analyzeHeuristic(
+    w: number,
+    h: number,
+    solver: unknown,
+    pos: string,
+    threads: number,
+    depth: number,
+    timeout: number,
+  ): Promise<Int32Array>;
   _createBook(w: number, h: number, path: string): unknown;
   _destroyBook(w: number, h: number, book: unknown): void;
-  _getNodeCount(w: number, h: number, solver: unknown, heuristic: boolean): number;
+  _getNodeCount(
+    w: number,
+    h: number,
+    solver: unknown,
+    heuristic: boolean,
+  ): number;
   _generatePositions(w: number, h: number, depth: number): string[];
 }
 
@@ -46,16 +76,11 @@ export function getNativeModule(): NativeModuleType | null {
   if (!nativeModuleAttempted) {
     nativeModuleAttempted = true;
     try {
-      if (
-        typeof process !== "undefined" &&
-        process.versions &&
-        process.versions.node
-      ) {
-        const req =
-          typeof module !== "undefined" && module.require
-            ? module.require
-            : require;
-        const path = req("path");
+      if (typeof process !== "undefined" && process?.versions?.node) {
+        const req = (typeof module !== "undefined" && module.require
+          ? module.require.bind(module)
+          : require) as (id: string) => unknown;
+        const path = req("path") as { join: (...args: string[]) => string };
         const nodePath = path.join(
           __dirname,
           "..",
@@ -63,16 +88,16 @@ export function getNativeModule(): NativeModuleType | null {
           "Release",
           "connect4.node",
         );
-        NativeModule = req(nodePath);
+        NativeModule = req(nodePath) as NativeModuleType;
       }
-    } catch (e) {
+    } catch {
       // Fail silently
     }
   }
   return NativeModule;
 }
 
-export function getNoSABModuleInitPromise() {
+export function getNoSABModuleInitPromise(): Promise<void> {
   if (!_noSABInitPromise) {
     /* eslint-disable @typescript-eslint/no-require-imports */
     const createModule =
@@ -85,7 +110,7 @@ export function getNoSABModuleInitPromise() {
   return _noSABInitPromise;
 }
 
-export function getThreadedModuleInitPromise() {
+export function getThreadedModuleInitPromise(): Promise<void> {
   if (!_threadedInitPromise) {
     /* eslint-disable @typescript-eslint/no-require-imports */
     const createModule =
@@ -114,16 +139,15 @@ export function getThreadedModule(): SolverModule {
   return ThreadedModule;
 }
 
-
 export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   protected isHeuristic: boolean;
   protected cacheSizeMb: number;
 
-  protected _solverPtr: any = 0;
-  protected _cachePtr: any = 0;
+  protected _solverPtr = 0;
+  protected _cachePtr = 0;
 
   constructor(opts?: Connect4SolverOptions | number, heightOpt?: number) {
-    super(opts as any, heightOpt);
+    super(opts as Connect4SolverOptions, heightOpt);
     let cacheSizeMb = 128;
     let heuristic = false;
 
@@ -278,13 +302,13 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       threads?: number;
       maxDepth?: number;
       timeoutMs?: number;
-      book?: any;
+      book?: { ptr: number };
     },
   ): Int32Array {
     const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
 
     const allocatedMemory = mod.stringToNewUTF8(positionStr);
-    let outputPointer = 0;
+    let outputPointer: number;
     if (this.isHeuristic)
       outputPointer = mod._analyzeHeuristic(
         this.width,
@@ -302,7 +326,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         this._solverPtr,
         allocatedMemory,
         threads,
-        bookPtr as number,
+        bookPtr,
       );
 
     const dataLength = (this.isHeuristic ? 3 : 2) + this.width;
@@ -327,7 +351,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   }
   async analyzeAsync(
     positionStr: string,
-    opts?: any,
+    opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis> {
     return this.analyze(positionStr, opts);
   }
@@ -337,7 +361,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
   private _analysisQueue: Promise<void> = Promise.resolve();
 
   async init(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized) return Promise.resolve();
     const native = getNativeModule();
     if (!native) {
       throw new Error(
@@ -357,6 +381,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       this.isHeuristic,
     );
     this.initialized = true;
+    return Promise.resolve();
   }
 
   async analyze(
@@ -365,14 +390,16 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       threads?: number;
       maxDepth?: number;
       timeoutMs?: number;
-      book?: any;
+      book?: { ptr: number };
     },
   ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
 
-    return new Promise<PositionAnalysis>(async (resolve, reject) => {
+    return new Promise<PositionAnalysis>((resolve, reject) => {
       this._analysisQueue = this._analysisQueue
-        .catch(() => {})
+        .catch(() => {
+          /* ignore */
+        })
         .then(async () => {
           try {
             const native = getNativeModule();
@@ -402,8 +429,8 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
               );
 
             resolve(this.parseResArr(resArr, positionStr));
-          } catch (err) {
-            reject(err);
+          } catch (err: unknown) {
+            reject(err instanceof Error ? err : new Error(String(err)));
           }
         });
     });
@@ -441,7 +468,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
 
 export class SyncWasmConnect4Solver extends AbstractSyncSolver {
   async init(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized) return Promise.resolve();
     await getThreadedModuleInitPromise();
     const mod = getThreadedModule();
     if (!mod) throw new Error("Threaded module not initialized");
@@ -458,6 +485,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
       this.isHeuristic,
     );
     this.initialized = true;
+    return Promise.resolve();
   }
 
   analyze(positionStr: string, opts?: AnalyzeOptions): PositionAnalysis {
@@ -497,7 +525,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
 
 export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
   async init(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized) return Promise.resolve();
     await getNoSABModuleInitPromise();
     const mod = getNoSABModule();
     if (!mod) throw new Error("No-SAB module not initialized");
@@ -514,6 +542,7 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
       this.isHeuristic,
     );
     this.initialized = true;
+    return Promise.resolve();
   }
 
   analyze(positionStr: string, opts?: AnalyzeOptions): PositionAnalysis {

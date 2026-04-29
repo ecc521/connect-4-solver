@@ -206,7 +206,9 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         rn.NativeModules.Connect4Solver.releaseSolver(
           this.width,
           this.height,
-        ).catch(() => {});
+        ).catch(() => {
+          /* ignore */
+        });
       }
     } catch {
       // Ignore if not in React Native environment

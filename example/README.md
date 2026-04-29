@@ -14,6 +14,7 @@ Unlike the WebAssembly version used in browsers, this example uses **JSI (JavaSc
 ## Prerequisites
 
 Before running the example, ensure you have your mobile development environment set up:
+
 - [React Native Environment Setup](https://reactnative.dev/docs/set-up-your-environment)
 - **iOS**: macOS with Xcode and CocoaPods.
 - **Android**: Android Studio and SDK.
@@ -23,12 +24,14 @@ Before running the example, ensure you have your mobile development environment 
 ### 1. Install Dependencies
 
 From the root of this repository:
+
 ```bash
 npm install
 npm run build
 ```
 
 Then, navigate to this example directory:
+
 ```bash
 cd example
 npm install
@@ -37,6 +40,7 @@ npm install
 ### 2. iOS Setup
 
 Install the CocoaPods:
+
 ```bash
 cd ios
 pod install
@@ -46,11 +50,13 @@ cd ..
 ### 3. Run the App
 
 **For iOS:**
+
 ```bash
 npm run ios
 ```
 
 **For Android:**
+
 ```bash
 npm run android
 ```
@@ -60,13 +66,13 @@ npm run android
 The app uses the `ReactNativeConnect4Solver` class from the parent library. This class automatically routes calls to the native mobile modules:
 
 ```typescript
-import { ReactNativeConnect4Solver } from "connect-4-solver/native";
+import { ReactNativeConnect4Solver } from 'connect-4-solver/native';
 
 const solver = new ReactNativeConnect4Solver(7, 6);
 await solver.init();
 
 // Analysis runs on a background thread natively
-const result = await solver.analyzeAsync("4424");
+const result = await solver.analyzeAsync('4424');
 console.log(result.evaluation?.eval.wdl);
 ```
 

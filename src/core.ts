@@ -20,7 +20,7 @@ export interface AnalyzeOptions {
   threads?: number;
   maxDepth?: number;
   timeoutMs?: number;
-  book?: { ptr: unknown };
+  book?: { ptr: number };
 }
 
 export function calculateWDL(
@@ -30,7 +30,8 @@ export function calculateWDL(
 ): { win: number; draw: number; loss: number } {
   if (isExact) {
     if (exactOutcome === Outcome.Win) return { win: 1.0, draw: 0.0, loss: 0.0 };
-    if (exactOutcome === Outcome.Loss) return { win: 0.0, draw: 0.0, loss: 1.0 };
+    if (exactOutcome === Outcome.Loss)
+      return { win: 0.0, draw: 0.0, loss: 1.0 };
     return { win: 0.0, draw: 1.0, loss: 0.0 };
   }
   const K = 4.0;
@@ -190,7 +191,7 @@ export abstract class BaseConnect4Solver {
     threads: number;
     maxDepth: number;
     timeoutMs: number;
-    bookPtr: unknown;
+    bookPtr: number;
   } {
     let threads = opts?.threads ?? 1;
     if (

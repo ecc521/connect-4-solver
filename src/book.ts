@@ -1,8 +1,15 @@
 import { SolverModule } from "./core";
-import { getNoSABModuleInitPromise, getNoSABModule } from "./index";
+import {
+  getNoSABModuleInitPromise,
+  getNoSABModule,
+  getNativeModule,
+} from "./index";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 
 export class OpeningBook {
-  protected _ptr: unknown = 0;
+  protected _ptr = 0;
   protected mod: SolverModule | null = null;
   public readonly width: number;
   public readonly height: number;
@@ -28,18 +35,18 @@ export class OpeningBook {
   async load(data: Uint8Array): Promise<void> {
     if (this._ptr !== 0) return;
 
-    const { getNativeModule } = require("./index");
     const native = getNativeModule();
     if (native) {
-      const fs = require("fs");
-      const path = require("path");
-      const os = require("os");
       const bookFilePath = path.join(
         os.tmpdir(),
         `book_${this.width}x${this.height}_${Date.now()}.book`,
       );
       fs.writeFileSync(bookFilePath, data);
-      this._ptr = native._createBook(this.width, this.height, bookFilePath);
+      this._ptr = native._createBook(
+        this.width,
+        this.height,
+        bookFilePath,
+      ) as number;
       return;
     }
 
@@ -54,18 +61,17 @@ export class OpeningBook {
     this.mod._free(allocatedMemory);
   }
 
-  get ptr(): unknown {
+  get ptr(): number {
     return this._ptr;
   }
 
   release(): void {
     if (this._ptr !== 0) {
-      const { getNativeModule } = require("./index");
       const native = getNativeModule();
       if (native) {
         native._destroyBook(this.width, this.height, this._ptr);
       } else if (this.mod) {
-        this.mod._destroyBook(this.width, this.height, this._ptr as number);
+        this.mod._destroyBook(this.width, this.height, this._ptr);
       }
       this._ptr = 0;
     }
