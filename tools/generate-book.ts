@@ -3,6 +3,14 @@ import { getNativeModule } from "../src/index";
 import { OpeningBook } from "../src/index";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
+
+// Automatically drop CPU priority to lowest (nice 19)
+try {
+  os.setPriority(os.constants.priority.PRIORITY_LOW);
+} catch (e) {
+  // Ignore if unsupported by OS
+}
 
 function getRawScore(
   resArr: Int32Array | number[],
@@ -132,6 +140,9 @@ async function run() {
 
   let totalNodes = 0n;
   const start = Date.now();
+  // Reverse the array so that queue.pop() evaluates the deepest positions (e.g. depth 10) first.
+  // This provides immediate console feedback and populates the shared TT cache optimally from the bottom up.
+  positions.reverse();
   const queue = [...positions];
 
   const worker = async (solverPtr: any, id: number) => {
@@ -153,8 +164,9 @@ async function run() {
       const score = getRawScore(resArr, width, height);
       const nodes = native._getNodeCount(width, height, solverPtr, false);
 
-      // Node count is reset per analysis in the C++ side now, so we sum it up
-      totalNodes += BigInt(nodes);
+      // The C++ side no longer resets node counts per analysis.
+      // Therefore, native._getNodeCount() returns the CUMULATIVE nodes evaluated by this solver so far.
+      // We will sum them up across all solvers precisely when logging to avoid an exponential math explosion.
 
       // Accumulate into the builder using the 1-indexed uint8_t byte format
       builder.addPosition(pos, score - minScore + 1);
@@ -163,11 +175,16 @@ async function run() {
 
       // Log progress occasionally or every X positions to avoid console spam
       if (processed % threads === 0 || processed === positions.length) {
+        let currentTotalNodes = 0n;
+        for (const s of solvers) {
+          currentTotalNodes += BigInt(native._getNodeCount(width, height, s, false));
+        }
+
         const elapsed = (Date.now() - start) / 1000;
         const pct = ((processed / positions.length) * 100).toFixed(1);
-        const nps = (Number(totalNodes) / elapsed / 1000000).toFixed(1);
+        const nps = (Number(currentTotalNodes) / elapsed / 1000000).toFixed(1);
         process.stdout.write(
-          `\r[${processed}/${positions.length}] (${pct}%) | ${nps} MN/s | Total Nodes: ${totalNodes.toLocaleString()} | Current: ${pos}      `,
+          `\r[${processed}/${positions.length}] (${pct}%) | ${nps} MN/s | Total Nodes: ${currentTotalNodes.toLocaleString()} | Current: ${pos}      `,
         );
       }
     }
