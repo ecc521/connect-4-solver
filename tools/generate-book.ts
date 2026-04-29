@@ -107,7 +107,7 @@ async function run() {
     } catch (e) {
       console.error(`[-] Failed to save book:`, e);
     }
-    process.exit(0);
+    process.kill(process.pid, "SIGKILL");
   };
 
   process.on("SIGINT", saveAndExit);
