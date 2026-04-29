@@ -38,6 +38,7 @@ class HeuristicSolver {
   
   std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> transTable;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
+  std::atomic<bool> isSearching{false};
   std::atomic<bool> stopSearch;
   int columnOrder[WIDTH]; // column exploration order
   int32_t history[WIDTH * (HEIGHT + 1)];

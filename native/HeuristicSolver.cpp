@@ -8,8 +8,10 @@
 #ifdef USE_PTHREADS
 #include <thread>
 #include <algorithm>
+#include <iostream>
 #endif
 #include <chrono>
+#include <stdexcept>
 
 using namespace GameSolver::Connect4;
 
@@ -18,6 +20,18 @@ namespace Connect4 {
 
 namespace {
   thread_local uint32_t heuristicTlNodeCount = 0;
+
+  struct SearchGuard {
+    std::atomic<bool>& flag;
+    SearchGuard(std::atomic<bool>& f) : flag(f) {
+      if (flag.exchange(true)) {
+        throw std::runtime_error("Solver is already busy");
+      }
+    }
+    ~SearchGuard() {
+      flag.store(false, std::memory_order_relaxed);
+    }
+  };
 }
 
 template <int WIDTH, int HEIGHT>
@@ -89,17 +103,11 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   const typename GenericPosition<WIDTH, HEIGHT>::position_t key = P.key();
   uint32_t tt_val = transTable->get(key);
   
-  // Layout: Score(16) | Depth(6) | Flags(2) | Move(4) | Key(4)
   int val = tt_val ? ((int)(tt_val & 0xFFFF) - 32768) : 0;
   int tt_depth = (tt_val >> 16) & 0x3F;
   int tt_flags = (tt_val >> 22) & 0x03; 
   int best_move_col = tt_val ? (tt_val >> 24) - 1 : -1;
   uint32_t tt_extra_key = (tt_val >> 28) & 0xF;
-
-  // We have 32 bits of partial_key in TT + 22 bits in index = 54 bits.
-  // The key is 64 bits, so 10 bits remain. We store 4 of them here.
-  // Size is ~4M (22 bits). partial_key = key / size. 
-  // TT stores partial_key % 2^32. So we want (partial_key >> 32) & 0xF.
   uint32_t current_extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
 
   if(tt_val && tt_depth >= depth && tt_extra_key == current_extra_key) {
@@ -132,10 +140,6 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   int best_seen_col = -1;
   int orig_alpha = alpha;
   int best_score = -1000000;
-  bool first_move = true;
-
-  int searched[WIDTH];
-  int searched_cnt = 0;
 
   while(typename GenericPosition<WIDTH, HEIGHT>::position_t next = moves.getNext()) {
     if (stopSearch.load(std::memory_order_relaxed)) break;
@@ -159,24 +163,10 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     if(score > alpha) alpha = score;
 
     if(alpha >= beta) {
-      if constexpr (WIDTH >= 8) {
-        if (searched_cnt > 0) {
-          for (int i = 0; i < searched_cnt; i++) {
-            if (history[searched[i]] > -500000) history[searched[i]]--;
-          }
-          history[bit_idx] += searched_cnt;
-          if (history[bit_idx] > 500000) {
-            for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
-              history[i] /= 2;
-            }
-          }
-        }
-      }
       uint32_t extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
       transTable->put(key, (extra_key << 28) | ((uint32_t)(next_col + 1) << 24) | (2 << 22) | ((uint32_t)depth << 16) | (uint32_t)(score + 32768)); 
       return score;  
     }
-    searched[searched_cnt++] = bit_idx;
     if(score > alpha) {
       alpha = score; 
     }
@@ -190,6 +180,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
 
 template <int WIDTH, int HEIGHT>
 std::pair<int, int> HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool reset_tt, NNUEAccumulator<WIDTH, HEIGHT>* acc) {
+  SearchGuard guard(isSearching);
   if (reset_tt) {
     reset();
     stopSearch = false;
@@ -221,6 +212,7 @@ std::pair<int, int> HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const Generi
 
 template <int WIDTH, int HEIGHT>
 std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads, double timeout_ms) {
+  SearchGuard guard(isSearching);
   std::vector<int> scores(WIDTH, -1000000);
   std::atomic<int> max_depth_reached{0};
 #ifdef __EMSCRIPTEN__
@@ -232,25 +224,6 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
   reset();
 
 #ifdef USE_PTHREADS
-  if (threads <= 1) {
-    for (int i = 0; i < WIDTH; i++) {
-      int col = columnOrder[i];
-      if (P.canPlay(col)) {
-        if(P.isWinningMove(col)) {
-          scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
-          if (max_depth_reached < 1) max_depth_reached = 1;
-        } else {
-          GenericPosition<WIDTH, HEIGHT> P2(P);
-          P2.playCol(col);
-          auto res = solve_heuristic(P2, max_depth - 1, end_time_ms, false);
-          scores[col] = -res.first;
-          if (res.second + 1 > max_depth_reached) max_depth_reached = res.second + 1;
-        }
-      }
-    }
-    return {scores, max_depth_reached};
-  }
-
   std::atomic<int> next_col{0};
   auto worker = [&]() {
     while (true) {
@@ -277,19 +250,17 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
   };
 
   unsigned int num_threads = std::min((unsigned int)WIDTH, (unsigned int)threads);
-  std::vector<std::thread> thread_pool;
-  for (unsigned int i = 0; i < num_threads - 1; i++) {
-    try {
-      thread_pool.emplace_back(worker);
-    } catch (const std::system_error& e) {
-      std::cerr << "Connect4Solver Warning: Thread pool exhausted while spawning " << num_threads << " threads. Clamping to " << (i + 1) << " threads." << std::endl;
-      break;
+  if (num_threads <= 1) {
+    worker();
+  } else {
+    std::vector<std::thread> thread_pool;
+    for (unsigned int i = 0; i < num_threads - 1; i++) {
+        thread_pool.emplace_back(worker);
     }
-  }
-  worker();
-
-  for (auto& t : thread_pool) {
-    if (t.joinable()) t.join();
+    worker();
+    for (auto& t : thread_pool) {
+      if (t.joinable()) t.join();
+    }
   }
 #else
   for (int i = 0; i < WIDTH; i++) {
@@ -312,9 +283,9 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 }
 
 template <int WIDTH, int HEIGHT>
-HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache) : transTable(cache), nodeCount{0} {
-  for(int i = 0; i < WIDTH; i++) // initialize the column exploration order, starting with center columns
-    columnOrder[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; // example for WIDTH=7: columnOrder = {3, 4, 2, 5, 1, 6, 0}
+HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache) : transTable(cache), nodeCount{0}, isSearching{false} {
+  for(int i = 0; i < WIDTH; i++) 
+    columnOrder[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; 
   for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
     history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
   }

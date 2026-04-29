@@ -80,6 +80,7 @@ class SolverImpl : public Solver {
   static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
   std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
   std::atomic<unsigned long long> nodeCount;
+  std::atomic<bool> isSearching{false};
 
  private:
   int columnOrder[Position::WIDTH];

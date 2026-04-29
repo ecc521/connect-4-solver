@@ -36,7 +36,7 @@ describe("Polymorphic Dense Book Packing", () => {
     fs.writeFileSync(mockTxt, positions.join("\n") + "\n");
 
     execSync(
-      'cd tools && make clean && make pack_dense_book CXXFLAGS="--std=c++14 -W -Wall -O3 -DNDEBUG -I../native -march=native -DBOARD_WIDTH_MACRO=7 -DBOARD_HEIGHT_MACRO=6"',
+      'cd tools && make clean && make pack_dense_book CXXFLAGS="--std=c++17 -W -Wall -O3 -DNDEBUG -I../native -march=native -DBOARD_WIDTH_MACRO=7 -DBOARD_HEIGHT_MACRO=6"',
       { stdio: "inherit" },
     );
 

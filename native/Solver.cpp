@@ -18,6 +18,8 @@
 
 #include "Solver.hpp"
 #include "MoveSorter.hpp"
+#include <stdexcept>
+#include <iostream>
 #ifdef USE_PTHREADS
 #include <thread>
 #include <algorithm>
@@ -28,16 +30,24 @@ using namespace GameSolver::Connect4;
 namespace GameSolver {
 namespace Connect4 {
 
+namespace {
+  thread_local uint32_t solverTlNodeCount = 0;
+
+  struct SearchGuard {
+    std::atomic<bool>& flag;
+    SearchGuard(std::atomic<bool>& f) : flag(f) {
+      if (flag.exchange(true)) {
+        throw std::runtime_error("Solver is already busy");
+      }
+    }
+    ~SearchGuard() {
+      flag.store(false, std::memory_order_relaxed);
+    }
+  };
+}
+
 /**
  * Reccursively score connect 4 position using negamax variant of alpha-beta algorithm.
- * @param: position to evaluate, this function assumes nobody already won and
- *         current player cannot win next move. This has to be checked before
- * @param: alpha < beta, a score window within which we are evaluating the position.
- *
- * @return the exact score, an upper or lower bound score depending of the case:
- * - if actual score of position <= alpha then actual score <= return value <= alpha
- * - if actual score of position >= beta then beta <= return value <= actual score
- * - if alpha <= actual score <= beta then return value = actual score
  */
 template <typename SlotType>
 int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
@@ -48,7 +58,6 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
     solverTlNodeCount = 0;
   }
-
 
   Position::position_t possible = P.possibleNonLosingMoves();
   if(possible == 0)     // if no possible non losing move, opponent wins next move
@@ -63,7 +72,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     if(alpha >= beta) return alpha;  // prune the exploration if the [alpha;beta] window is empty.
   }
 
-  int max = (Position::WIDTH * Position::HEIGHT - 1 - P.nbMoves()) / 2;	// upper bound of our score as we cannot win immediately
+  int max = (Position::WIDTH * Position::HEIGHT - 1 - P.nbMoves()) / 2;	// upper bound of score as current player cannot win next move
   if(beta > max) {
     beta = max;                     // there is no need to keep beta above our max possible score.
     if(alpha >= beta) return beta;  // prune the exploration if the [alpha;beta] window is empty.
@@ -87,18 +96,18 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   }
 
   const Position::position_t key = P.key();
-  if(int val = transTable->get(key)) {
+  if(uint8_t val = transTable->get(key)) {
     if(val > Position::MAX_SCORE - Position::MIN_SCORE + 1) { // we have an lower bound
       min = val + 2 * Position::MIN_SCORE - Position::MAX_SCORE - 2;
       if(alpha < min) {
-        alpha = min;                     // there is no need to keep beta above our max possible score.
-        if(alpha >= beta) return alpha;  // prune the exploration if the [alpha;beta] window is empty.
+        alpha = min;                     
+        if(alpha >= beta) return alpha;  
       }
     } else { // we have an upper bound
       max = val + Position::MIN_SCORE - 1;
       if(beta > max) {
-        beta = max;                     // there is no need to keep beta above our max possible score.
-        if(alpha >= beta) return beta;  // prune the exploration if the [alpha;beta] window is empty.
+        beta = max;                     
+        if(alpha >= beta) return beta;  
       }
     }
   }
@@ -123,8 +132,9 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
 
   while(Position::position_t next = moves.getNext()) {
     Position P2(P);
-    P2.play(next);  // It's opponent turn in P2 position after current player plays x column.
-    int score = -negamax(P2, -beta, -alpha, book); // explore opponent's score within [-beta;-alpha] windows:
+    P2.play(next);  
+    int score = -negamax(P2, -beta, -alpha, book);
+
     if(score >= beta) {
       if constexpr (Position::WIDTH >= 8) {
 #if BOARD_WIDTH_MACRO >= 8
@@ -142,8 +152,8 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
         }
 #endif
       }
-      transTable->put(key, score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves())); // save the lower bound of the position
-      return score;  // prune the exploration if we find a possible move better than what we were looking for.
+      transTable->put(key, score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves())); 
+      return score;  
     }
 #if BOARD_WIDTH_MACRO >= 8
     if constexpr (Position::WIDTH >= 8) {
@@ -154,17 +164,18 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   }
 
   uint8_t work = std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves());
-  transTable->put(key, alpha - Position::MIN_SCORE + 1, work); // save the upper bound of the position
+  transTable->put(key, alpha - Position::MIN_SCORE + 1, work); 
   return alpha;
 }
 
 template <typename SlotType>
 int SolverImpl<SlotType>::solve(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
-  if(P.canWinNext()) // check if win in one move as the Negamax function does not support this case.
+  SearchGuard guard(isSearching);
+  if(P.canWinNext()) 
     return (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
   
   if(book) {
-    if(int val = book->get(P)) return val + Position::MIN_SCORE - 1; // look for solutions stored in opening book
+    if(int val = book->get(P)) return val + Position::MIN_SCORE - 1;
   }
   
   int min = -(Position::WIDTH * Position::HEIGHT - P.nbMoves()) / 2;
@@ -174,47 +185,32 @@ int SolverImpl<SlotType>::solve(const Position &P, bool weak, const OpeningBookB
     max = 1;
   }
 
-  while(min < max) {                    // iteratively narrow the min-max exploration window
+  while(min < max) {                    
     int med = min + (max - min) / 2;
     if(med <= 0 && min / 2 < med) med = min / 2;
     else if(med >= 0 && max / 2 > med) med = max / 2;
-    int r = negamax(P, med, med + 1, book);   // use a null depth window to know if the actual score is greater or smaller than med
+    int r = negamax(P, med, med + 1, book);   
     if(r <= med) max = r;
     else min = r;
   }
+  nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+  solverTlNodeCount = 0;
   return min;
 }
 
 template <typename SlotType>
 std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
-  (void)threads;
+  SearchGuard guard(isSearching);
   std::vector<int> scores(Position::WIDTH, -1000);
 
 #ifdef USE_PTHREADS
-  if (threads <= 1) {
-    for (int i = 0; i < Position::WIDTH; i++) {
-      int col = columnOrder[i];
-      if (P.canPlay(col)) {
-        if(P.isWinningMove(col)) {
-          scores[col] = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
-        } else {
-          Position P2(P);
-          P2.playCol(col);
-          scores[col] = -solve(P2, weak, book);
-        }
-      }
-    }
-    return scores;
-  }
-
   std::atomic<int> next_col{0};
-
   auto worker = [&]() {
     while (true) {
       int i = next_col.fetch_add(1);
       if (i >= Position::WIDTH) break;
       int col = columnOrder[i];
-
+      solverTlNodeCount = 0;
       if (P.canPlay(col)) {
         if(P.isWinningMove(col)) {
           scores[col] = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
@@ -224,24 +220,28 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
           scores[col] = -solve(P2, weak, book);
         }
       }
+      nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+      solverTlNodeCount = 0;
     }
   };
 
   unsigned int num_threads = std::min((unsigned int)Position::WIDTH, (unsigned int)threads);
-  
-  std::vector<std::thread> thread_pool;
-  for (unsigned int i = 0; i < num_threads - 1; i++) {
-    try {
-      thread_pool.emplace_back(worker);
-    } catch (const std::system_error& e) {
-      std::cerr << "Connect4Solver Warning: Thread pool exhausted while spawning " << num_threads << " threads. Clamping to " << (i + 1) << " threads." << std::endl;
-      break;
+  if (num_threads <= 1) {
+    worker();
+  } else {
+    std::vector<std::thread> thread_pool;
+    for (unsigned int i = 0; i < num_threads - 1; i++) {
+        try {
+            thread_pool.emplace_back(worker);
+        } catch (const std::system_error& e) {
+            std::cerr << "Connect4Solver Warning: Thread pool exhausted while spawning " << num_threads << " threads. Clamping to " << (i + 1) << " threads." << std::endl;
+            break;
+        }
     }
-  }
-  worker(); // use the main thread too
-
-  for (auto& t : thread_pool) {
-    if (t.joinable()) t.join();
+    worker();
+    for (auto& t : thread_pool) {
+      if (t.joinable()) t.join();
+    }
   }
 #else
   for (int i = 0; i < Position::WIDTH; i++) {
@@ -255,14 +255,12 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
       }
     }
   }
+  nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+  solverTlNodeCount = 0;
 #endif
 
   return scores;
 }
-
-
-
-
 
 template <typename SlotType>
 class TypedCache : public Cache {
