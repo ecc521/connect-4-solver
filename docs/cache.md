@@ -47,13 +47,13 @@ Multithreaded WASM requires `SharedArrayBuffer`, which is only available when yo
 
 The distributed multithreaded WASM binary (`analyze_threaded.js`) is pre-compiled using Emscripten with a strict `PTHREAD_POOL_SIZE=4` to optimize memory and startup latency. This means that requesting more than 4 threads will automatically be capped by the engine. To increase this limit, you must recompile the C++ source code using `emcc` and explicitly raise the `PTHREAD_POOL_SIZE` flag in `build.sh` and/or enable dynamic worker creation (`-s PTHREAD_POOL_SIZE_STRICT=0`).
 
-### Node.js Thread Pool
+### Node.js (Native) Persistent Thread Pool
 
-When running in Node.js, asynchronous tasks are offloaded to Node's `libuv` thread pool, which defaults to **4 threads**. If you're running concurrent evaluations, increase the pool size before your application starts:
+In Node.js, the `NodeConnect4Solver` manages its own **Persistent Thread Pool** in C++.
 
-```bash
-export UV_THREADPOOL_SIZE=32
-```
+- **No libuv limit:** It completely bypasses the Node.js `libuv` thread pool. You do NOT need to set `UV_THREADPOOL_SIZE`.
+- **High Water Mark:** The pool is lazy-initialized. If you only use 1 thread, 0 background threads are spawned. If you request 12 threads, the solver spawns 11 persistent workers. These workers stay alive and go to sleep when idle, waking up instantly for the next `analyze()` call.
+- **Resource Efficiency:** Threads are only spawned as needed. Once a solver has reached a certain thread count, it "remembers" that capacity for its entire lifetime to avoid the overhead of repeatedly creating and destroying threads.
 
 ### Mobile Thread Pools (React Native)
 

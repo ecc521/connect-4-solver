@@ -22,22 +22,15 @@ new NodeConnect4Solver(options?: { width?: number, height?: number, cacheSizeMb?
 
 Initializes the native solver and allocates the transposition table cache. Must be called before any evaluation.
 
-### `batchSolve(positions: string[], threads: number, callback: (result: BatchResult) => void, opts?: { bookPtr?: unknown }): void`
+### `analyze(position: string, opts?: AnalyzeOptions): Promise<PositionAnalysis>`
 
-**Node.js Only.** Executes a high-throughput parallel evaluation of a large set of positions.
+Executes an asynchronous evaluation of a position. 
 
-Unlike `analyze()` and `solve()`, which use Node's internal `libuv` threadpool (defaulting to 4 threads), `batchSolve` spawns its own native C++ threads. This allows you to scale to any number of cores (e.g., 32 or 64) without needing to configure `UV_THREADPOOL_SIZE` or worry about blocking other Node.js asynchronous tasks.
+In Node.js, this method uses a **persistent native C++ thread pool** that bypasses the standard libuv limitations. This means you can scale to your full CPU core count (e.g., 12, 16, or 32 threads) without any extra configuration.
 
-- **positions**: An array of Connect 4 move sequences (e.g., `["444", "333"]`).
-- **threads**: The number of parallel C++ threads to spawn.
-- **callback**: A function called every time a position is finished.
-- **opts.bookPtr**: (Optional) A pointer to a loaded `OpeningBook`.
+### `solve(position: string, opts?: SolveOptions): Promise<Evaluation>`
 
-```typescript
-solver.batchSolve(positions, 12, (result) => {
-  console.log(`Position ${result.pos} has scores: ${result.scores}`);
-});
-```
+Executes an exact evaluation of a position. Like `analyze()`, this uses the native persistent thread pool.
 
 ## Native Module API (Advanced)
 
@@ -47,10 +40,6 @@ For developers doing heavy bulk-processing who need to interact directly with th
 import { getNativeModule } from "connect-4-solver";
 const native = getNativeModule();
 ```
-
-### `_batchSolve(width: number, height: number, solverPtr: number, positions: string[], threads: number, callback: Function, bookPtr: number | null): void`
-
-The underlying native method used by `batchSolve`. It uses **Thread-Safe Functions (TSFN)** to communicate progress back to the JavaScript main thread from raw C++ threads.
 
 ### `_createCache(width: number, height: number, bytes: number, isHeuristic: boolean): number`
 
@@ -70,7 +59,7 @@ Frees the memory allocated by `_createSolver`.
 
 ### `_analyzeExact(width: number, height: number, solverPtr: number, position: string, weak: boolean, threads: number, bookPtr: number | null): Promise<number[]>`
 
-Executes an asynchronous exact evaluation natively via Node's `libuv` pool. Returns a raw array of scores mapping to the evaluation outcomes.
+Executes an asynchronous exact evaluation natively via a persistent C++ thread pool. Returns a raw array of scores mapping to the evaluation outcomes.
 
 ### `_analyzeHeuristic(width: number, height: number, solverPtr: number, position: string, threads: number, maxDepth: number, timeoutMs: number): Promise<number[]>`
 
