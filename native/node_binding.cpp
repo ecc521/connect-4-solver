@@ -52,6 +52,7 @@ Value CreateCache(const CallbackInfo& info) {
         else if (w == 7 && h == 6) ptr = C4_7x6::GameSolver::Connect4::Solver::createCache(bytes).release();
         else if (w == 7 && h == 7) ptr = C4_7x7::GameSolver::Connect4::Solver::createCache(bytes).release();
         else if (w == 8 && h == 6) ptr = C4_8x6::GameSolver::Connect4::Solver::createCache(bytes).release();
+        else if (w == 8 && h == 8) ptr = C4_8x8::GameSolver::Connect4::Solver::createCache(bytes).release();
         else if (w == 9 && h == 7) ptr = C4_9x7::GameSolver::Connect4::Solver::createCache(bytes).release();
         else if (w == 9 && h == 6) ptr = C4_9x6::GameSolver::Connect4::Solver::createCache(bytes).release();
         else if (w == 11 && h == 4) ptr = C4_11x4::GameSolver::Connect4::Solver::createCache(bytes).release();
@@ -92,6 +93,7 @@ Value CreateSolver(const CallbackInfo& info) {
         else if (w == 7 && h == 6) ptr = C4_7x6::GameSolver::Connect4::Solver::createWithCache(cache).release();
         else if (w == 7 && h == 7) ptr = C4_7x7::GameSolver::Connect4::Solver::createWithCache(cache).release();
         else if (w == 8 && h == 6) ptr = C4_8x6::GameSolver::Connect4::Solver::createWithCache(cache).release();
+        else if (w == 8 && h == 8) ptr = C4_8x8::GameSolver::Connect4::Solver::createWithCache(cache).release();
         else if (w == 9 && h == 7) ptr = C4_9x7::GameSolver::Connect4::Solver::createWithCache(cache).release();
         else if (w == 9 && h == 6) ptr = C4_9x6::GameSolver::Connect4::Solver::createWithCache(cache).release();
         else if (w == 11 && h == 4) ptr = C4_11x4::GameSolver::Connect4::Solver::createWithCache(cache).release();
@@ -142,6 +144,7 @@ Value CreateBook(const CallbackInfo& info) {
     else if (w == 7 && h == 6) ptr = C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>::load(path, w, h).release();
     else if (w == 7 && h == 7) ptr = C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>::load(path, w, h).release();
     else if (w == 8 && h == 6) ptr = C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>::load(path, w, h).release();
+    else if (w == 8 && h == 8) ptr = C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>::load(path, w, h).release();
     else if (w == 9 && h == 7) ptr = C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>::load(path, w, h).release();
     else if (w == 9 && h == 6) ptr = C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>::load(path, w, h).release();
     else if (w == 11 && h == 4) ptr = C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>::load(path, w, h).release();
@@ -159,6 +162,7 @@ Value DestroyBook(const CallbackInfo& info) {
     else if (w == 7 && h == 6) delete static_cast<C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>*>(book_ptr);
     else if (w == 7 && h == 7) delete static_cast<C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>*>(book_ptr);
     else if (w == 8 && h == 6) delete static_cast<C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>*>(book_ptr);
+    else if (w == 8 && h == 8) delete static_cast<C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>*>(book_ptr);
     else if (w == 9 && h == 7) delete static_cast<C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>*>(book_ptr);
     else if (w == 9 && h == 6) delete static_cast<C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>*>(book_ptr);
     else if (w == 11 && h == 4) delete static_cast<C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>*>(book_ptr);
@@ -616,6 +620,7 @@ public:
         Function func = DefineClass(env, "BookBuilder", {
             InstanceMethod("add", &BookBuilder::Add),
             InstanceMethod("addPosition", &BookBuilder::AddPosition),
+            InstanceMethod("loadFromBook", &BookBuilder::LoadFromBook),
             InstanceMethod("saveDense", &BookBuilder::SaveDense),
             InstanceMethod("saveEliasFano", &BookBuilder::SaveEliasFano),
             InstanceMethod("size", &BookBuilder::Size)
@@ -642,6 +647,23 @@ private:
     std::vector<std::pair<uint64_t, uint8_t>> items64;
     std::vector<std::pair<unsigned __int128, uint8_t>> items128;
 
+    Napi::Value LoadFromBook(const CallbackInfo& info) {
+        void* book_ptr = UnwrapPointer<void>(info[0]);
+        if (!book_ptr) return info.Env().Undefined();
+
+        if (width == 6 && height == 5) { auto entries = static_cast<C4_6x5::GameSolver::Connect4::OpeningBookBase<6, 5>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
+        else if (width == 6 && height == 6) { auto entries = static_cast<C4_6x6::GameSolver::Connect4::OpeningBookBase<6, 6>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
+        else if (width == 7 && height == 6) { auto entries = static_cast<C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
+        else if (width == 7 && height == 7) { auto entries = static_cast<C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
+        else if (width == 8 && height == 6) { auto entries = static_cast<C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
+        else if (width == 8 && height == 8) { auto entries = static_cast<C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
+        else if (width == 9 && height == 7) { auto entries = static_cast<C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
+        else if (width == 9 && height == 6) { auto entries = static_cast<C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
+        else if (width == 11 && height == 4) { auto entries = static_cast<C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
+
+        return info.Env().Undefined();
+    }
+
     bool is128() const {
         return width * (height + 1) > 64;
     }
@@ -664,6 +686,7 @@ private:
         else if (width == 7 && height == 6) { C4_7x6::GameSolver::Connect4::Position P; P.play(pos); items64.push_back({P.key3(), score}); }
         else if (width == 7 && height == 7) { C4_7x7::GameSolver::Connect4::Position P; P.play(pos); items64.push_back({P.key3(), score}); }
         else if (width == 8 && height == 6) { C4_8x6::GameSolver::Connect4::Position P; P.play(pos); items64.push_back({P.key3(), score}); }
+        else if (width == 8 && height == 8) { C4_8x8::GameSolver::Connect4::Position P; P.play(pos); items128.push_back({P.key3(), score}); }
         else if (width == 9 && height == 7) { C4_9x7::GameSolver::Connect4::Position P; P.play(pos); items128.push_back({P.key3(), score}); }
         else if (width == 9 && height == 6) { C4_9x6::GameSolver::Connect4::Position P; P.play(pos); items64.push_back({P.key3(), score}); }
         else if (width == 11 && height == 4) { C4_11x4::GameSolver::Connect4::Position P; P.play(pos); items64.push_back({P.key3(), score}); }
@@ -682,6 +705,7 @@ private:
         else if (width == 7 && height == 6) C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>::save_dense(filename, depth, items64);
         else if (width == 7 && height == 7) C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>::save_dense(filename, depth, items64);
         else if (width == 8 && height == 6) C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>::save_dense(filename, depth, items64);
+        else if (width == 8 && height == 8) C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>::save_dense(filename, depth, items128);
         else if (width == 9 && height == 7) C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>::save_dense(filename, depth, items128);
         else if (width == 9 && height == 6) C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>::save_dense(filename, depth, items64);
         else if (width == 11 && height == 4) C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>::save_dense(filename, depth, items64);
@@ -695,6 +719,7 @@ private:
         else if (width == 7 && height == 6) C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>::save_elias_fano(filename, depth, items64);
         else if (width == 7 && height == 7) C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>::save_elias_fano(filename, depth, items64);
         else if (width == 8 && height == 6) C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>::save_elias_fano(filename, depth, items64);
+        else if (width == 8 && height == 8) C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>::save_elias_fano(filename, depth, items128);
         else if (width == 9 && height == 7) C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>::save_elias_fano(filename, depth, items128);
         else if (width == 9 && height == 6) C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>::save_elias_fano(filename, depth, items64);
         else if (width == 11 && height == 4) C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>::save_elias_fano(filename, depth, items64);

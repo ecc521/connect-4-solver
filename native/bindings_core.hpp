@@ -119,6 +119,20 @@ namespace C4_9x6 {
 #undef OPENING_BOOK_HPP
 #undef MOVE_SORTER_HPP
 
+#define BOARD_WIDTH_MACRO 8
+#define BOARD_HEIGHT_MACRO 8
+namespace C4_8x8 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
 #define BOARD_WIDTH_MACRO 11
 #define BOARD_HEIGHT_MACRO 4
 namespace C4_11x4 {
