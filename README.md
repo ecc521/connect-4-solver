@@ -55,6 +55,6 @@ If you don't want to install Emscripten locally, you can use the provided Docker
 
 ## Credits & License
 
-- Core algorithm by [Pascal Pons](http://blog.gamesolver.org).
-- Original C++ source code is published under **AGPL v3** license.
-- Wrapper and distribution by Tucker Willenborg (also AGPL v3).
+- Published under **AGPL v3** license.
+- Partially based off the work of [Pascal Pons](http://blog.gamesolver.org) and [John Tromp](https://tromp.github.io/c4/c4.html).
+- Extensively modified to add multi-threaded support, NNUE, tiered-cache tables, and a variety of other optimizations as well as multi-platform support. 
