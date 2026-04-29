@@ -138,7 +138,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   int searched_cnt = 0;
 
   while(typename GenericPosition<WIDTH, HEIGHT>::position_t next = moves.getNext()) {
-    if (stopSearch.load()) break;
+    if (stopSearch.load(std::memory_order_relaxed)) break;
     GenericPosition<WIDTH, HEIGHT> P2(P);
     P2.play(next);  
     
@@ -210,7 +210,7 @@ std::pair<int, int> HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const Generi
   int depth_reached = 0;
   for (int d = 1; d <= max_depth; d++) {
     best_score = negamax_heuristic(P, -1000000, 1000000, d, end_time_ms, *acc);
-    if (stopSearch.load()) break;
+    if (stopSearch.load(std::memory_order_relaxed)) break;
     depth_reached = d;
     if (best_score > 10000 || best_score < -10000) {
       break;
