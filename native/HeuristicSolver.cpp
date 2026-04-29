@@ -1,3 +1,4 @@
+#include <mutex>
 /*
  * This file is part of Connect4 Game Solver <http://connect4.gamesolver.org>
  * Copyright (C) 2017-2019 Pascal Pons <contact@gamesolver.org>
@@ -20,18 +21,7 @@ namespace Connect4 {
 
 namespace {
   thread_local uint32_t heuristicTlNodeCount = 0;
-
-  struct SearchGuard {
-    std::atomic<bool>& flag;
-    SearchGuard(std::atomic<bool>& f) : flag(f) {
-      if (flag.exchange(true)) {
-        throw std::runtime_error("Solver is already busy");
-      }
-    }
-    ~SearchGuard() {
-      flag.store(false, std::memory_order_relaxed);
-    }
-  };
+  thread_local int smp_thread_id = 0;
 }
 
 template <int WIDTH, int HEIGHT>
@@ -67,7 +57,10 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     if (GenericPosition<WIDTH, HEIGHT>::popcount(possible) == 1) {
       depth = 1; // Quiescence extension: Forced move resolves tactical tension
     } else {
-      return NNUE<WIDTH, HEIGHT>::evaluate_accumulated(acc, P);
+      int eval = NNUE<WIDTH, HEIGHT>::evaluate_accumulated(acc, P);
+      if (eval > 9000) eval = 9000;
+      if (eval < -9000) eval = -9000;
+      return eval;
     }
   }
 
@@ -132,6 +125,10 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     if(typename GenericPosition<WIDTH, HEIGHT>::position_t move = possible & GenericPosition<WIDTH, HEIGHT>::column_mask(col)) {
       int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<position_t>(move);
       int base_score = P.moveScore(move) * 1000000 + history[bit_idx];
+      if (smp_thread_id > 0) {
+        // Perturb the score slightly to induce search divergence
+        base_score += ((smp_thread_id * 17 + bit_idx) % 7);
+      }
       if(col == best_move_col) base_score += 1000000000;
       moves.add(move, base_score);
     }
@@ -179,17 +176,19 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
 }
 
 template <int WIDTH, int HEIGHT>
-std::pair<int, int> HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool reset_tt, NNUEAccumulator<WIDTH, HEIGHT>* acc) {
-  SearchGuard guard(isSearching);
+SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool reset_tt, NNUEAccumulator<WIDTH, HEIGHT>* acc, int threads) {
   if (reset_tt) {
     reset();
     stopSearch = false;
-  } else {
-    nodeCount = 0;
   }
 
-  if(P.canWinNext()) 
-    return {(WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000, 0};
+  if(P.canWinNext()) {
+    int score = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+    for (int i = 0; i < WIDTH; i++) {
+        if (P.canPlay(i) && P.isWinningMove(i)) return {score, i, (int)P.nbMoves(), getNodeCount()};
+    }
+    return {score, -1, (int)P.nbMoves(), getNodeCount()};
+  }
   
   NNUEAccumulator<WIDTH, HEIGHT> local_acc;
   if (!acc) {
@@ -198,23 +197,34 @@ std::pair<int, int> HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const Generi
   }
 
   int best_score = 0;
+  int best_move = -1;
   int depth_reached = 0;
   for (int d = 1; d <= max_depth; d++) {
-    best_score = negamax_heuristic(P, -1000000, 1000000, d, end_time_ms, *acc);
-    if (stopSearch.load(std::memory_order_relaxed)) break;
+    int current_score = negamax_heuristic(P, -1000000, 1000000, d, end_time_ms, *acc);
+    if (stopSearch.load(std::memory_order_relaxed) && d > 1) break;
+    best_score = current_score;
+    
+    // Extract best move from TT
+    uint32_t val = transTable->get(P.key());
+    if (val != 0) {
+        int move_idx = (int)((val >> 24) & 0xF);
+        if (move_idx > 0) best_move = move_idx - 1;
+    }
+
     depth_reached = d;
-    if (best_score > 10000 || best_score < -10000) {
+    if (best_score > 1000000 || best_score < -1000000) {
       break;
     }
   }
-  return {best_score, depth_reached};
+  nodeCount.fetch_add(heuristicTlNodeCount, std::memory_order_relaxed);
+  heuristicTlNodeCount = 0;
+  return {best_score, best_move, depth_reached, getNodeCount()};
 }
 
 template <int WIDTH, int HEIGHT>
 std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads, double timeout_ms) {
-  SearchGuard guard(isSearching);
   std::vector<int> scores(WIDTH, -1000000);
-  std::atomic<int> max_depth_reached{0};
+  int final_depth_reached = 0;
 #ifdef __EMSCRIPTEN__
   double end_time_ms = timeout_ms > 0.0 ? emscripten_get_now() + timeout_ms : 0.0;
 #else
@@ -222,64 +232,90 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 #endif
 
   reset();
+  nodeCount = 0;
+
+  int total_valid_cols = 0;
+  for (int i = 0; i < WIDTH; i++) {
+    if (P.canPlay(i)) total_valid_cols++;
+  }
+  if (total_valid_cols == 0) return {scores, 0};
+
+  for (int d = 1; d <= max_depth; d++) {
+    std::vector<int> current_scores = scores;
 
 #ifdef USE_PTHREADS
-  std::atomic<int> next_col{0};
-  auto worker = [&]() {
-    while (true) {
-      int i = next_col.fetch_add(1);
-      if (i >= WIDTH) break;
-      int col = columnOrder[i];
+    std::atomic<int> next_col{0};
+    auto worker = [&]() {
+      while (true) {
+        int i = next_col.fetch_add(1, std::memory_order_relaxed);
+        if (i >= WIDTH) break;
+        if (stopSearch.load(std::memory_order_relaxed)) break;
 
+        int col = columnOrder[i];
+        if (P.canPlay(col)) {
+          if(P.isWinningMove(col)) {
+            current_scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+          } else {
+            GenericPosition<WIDTH, HEIGHT> P2(P);
+            P2.playCol(col);
+            NNUEAccumulator<WIDTH, HEIGHT> local_acc;
+            local_acc.init(P2);
+            int score = -negamax_heuristic(P2, -1000000, 1000000, d - 1, end_time_ms, local_acc);
+            if (stopSearch.load(std::memory_order_relaxed)) break;
+            current_scores[col] = score;
+          }
+        }
+      }
+      nodeCount.fetch_add(heuristicTlNodeCount, std::memory_order_relaxed);
+      heuristicTlNodeCount = 0;
+    };
+
+    unsigned int num_threads = std::min((unsigned int)WIDTH, (unsigned int)threads);
+    if (num_threads <= 1) {
+      worker();
+    } else {
+      std::vector<std::thread> thread_pool;
+      for (unsigned int i = 1; i < num_threads; i++) {
+          try {
+              thread_pool.emplace_back(worker);
+          } catch (const std::system_error& e) {
+              std::cerr << "Connect4Solver Warning: Thread pool exhausted." << std::endl;
+              break;
+          }
+      }
+      worker();
+      for (auto& t : thread_pool) {
+        if (t.joinable()) t.join();
+      }
+    }
+#else
+    for (int i = 0; i < WIDTH; i++) {
+      if (stopSearch.load(std::memory_order_relaxed)) break;
+      int col = columnOrder[i];
       if (P.canPlay(col)) {
         if(P.isWinningMove(col)) {
-          scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
-          int current = max_depth_reached.load();
-          while (current < 1 && !max_depth_reached.compare_exchange_weak(current, 1));
+          current_scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
         } else {
           GenericPosition<WIDTH, HEIGHT> P2(P);
           P2.playCol(col);
-          auto res = solve_heuristic(P2, max_depth - 1, end_time_ms, false);
-          scores[col] = -res.first;
-          int reached = res.second + 1;
-          int current = max_depth_reached.load();
-          while (reached > current && !max_depth_reached.compare_exchange_weak(current, reached));
+          NNUEAccumulator<WIDTH, HEIGHT> local_acc;
+          local_acc.init(P2);
+          int score = -negamax_heuristic(P2, -1000000, 1000000, d - 1, end_time_ms, local_acc);
+          if (stopSearch.load(std::memory_order_relaxed)) break;
+          current_scores[col] = score;
         }
       }
     }
-  };
-
-  unsigned int num_threads = std::min((unsigned int)WIDTH, (unsigned int)threads);
-  if (num_threads <= 1) {
-    worker();
-  } else {
-    std::vector<std::thread> thread_pool;
-    for (unsigned int i = 0; i < num_threads - 1; i++) {
-        thread_pool.emplace_back(worker);
-    }
-    worker();
-    for (auto& t : thread_pool) {
-      if (t.joinable()) t.join();
-    }
-  }
-#else
-  for (int i = 0; i < WIDTH; i++) {
-    int col = columnOrder[i];
-    if (P.canPlay(col)) {
-      if(P.isWinningMove(col)) {
-        scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
-        if (max_depth_reached < 1) max_depth_reached = 1;
-      } else {
-        GenericPosition<WIDTH, HEIGHT> P2(P);
-        P2.playCol(col);
-        auto res = solve_heuristic(P2, max_depth - 1, end_time_ms, false);
-        scores[col] = -res.first;
-        if (res.second + 1 > max_depth_reached) max_depth_reached = res.second + 1;
-      }
-    }
-  }
+    nodeCount.fetch_add(heuristicTlNodeCount, std::memory_order_relaxed);
+    heuristicTlNodeCount = 0;
 #endif
-  return {scores, max_depth_reached};
+
+    if (stopSearch.load(std::memory_order_relaxed) && d > 1) break;
+    scores = current_scores;
+    final_depth_reached = d;
+  }
+
+  return {scores, final_depth_reached};
 }
 
 template <int WIDTH, int HEIGHT>

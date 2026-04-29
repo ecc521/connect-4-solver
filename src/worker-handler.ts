@@ -44,6 +44,10 @@ export function setupWorkerHandler(): void {
         if (!solver) throw new Error("Solver not initialized");
         const result = await solver.analyze(payload.position, payload.opts);
         self.postMessage({ id, success: true, result });
+      } else if (type === "solve") {
+        if (!solver) throw new Error("Solver not initialized");
+        const result = await solver.solve(payload.position, payload.opts);
+        self.postMessage({ id, success: true, result });
       } else if (type === "unload") {
         if (solver) solver.release();
         self.postMessage({ id, success: true });
@@ -78,6 +82,10 @@ export function setupNoSABWorkerHandler(): void {
       } else if (type === "analyze") {
         if (!solver) throw new Error("Solver not initialized");
         const result = await solver.analyze(payload.position, payload.opts);
+        self.postMessage({ id, success: true, result });
+      } else if (type === "solve") {
+        if (!solver) throw new Error("Solver not initialized");
+        const result = await solver.solve(payload.position, payload.opts);
         self.postMessage({ id, success: true, result });
       } else if (type === "unload") {
         if (solver) solver.release();

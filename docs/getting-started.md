@@ -195,6 +195,23 @@ run();
 
 :::
 
+## High-Speed Best Move Search
+
+If you are building a Connect 4 engine or a hint system, you typically only need the **best move** rather than a full evaluation of every possible column.
+
+The `solve()` method is optimized for this exact use case. It uses a narrow search window and aggressive pruning to find the optimal line up to **5x faster** than a full `analyze()` call.
+
+```typescript
+// Fast search for the best move
+const result = await solver.solve("4424");
+
+console.log(`Best Move (Col): ${result.bestMove + 1}`);
+console.log(`Evaluation: ${result.evaluation?.score}`);
+console.log(`Nodes Searched: ${result.nodes}`);
+
+// Note: result.moveOptions will be empty [] when using solve()
+```
+
 ## Next Steps
 
 - **[Solution Books](/solution-books)** — Required for practical exact solving on 7x6 and larger boards.

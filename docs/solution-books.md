@@ -30,6 +30,16 @@ await solver.analyze("4424", { book });
 book.unload();
 ```
 
+### Weak vs. Strong Solutions
+
+Solution books come in two primary types, depending on how they were generated:
+
+- **Strong Solutions (Perfect):** These books store the exact distance-to-win for every position. The engine uses these to play perfectly and find the shortest possible path to victory.
+- **Weak Solutions:** These books only store the game outcome (Win, Draw, or Loss). While the engine will still play correctly and never lose a won game, it may choose a "slower" winning path because it lacks the move-count data to differentiate between a win in 5 moves vs. a win in 15 moves.
+
+> [!TIP]
+> Loading a **Strong Book** into a **Weak Solver** is perfectly safe. Loading a **Weak Book** into a **Strong Solver** will still preserve outcome, but may cause the solver to choose slower winning paths.
+
 ## Generating Custom Books
 
 You can generate your own Dense or Elias-Fano books for any board size and search depth using the included TypeScript script.

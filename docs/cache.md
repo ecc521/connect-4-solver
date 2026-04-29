@@ -9,13 +9,17 @@ Every time you instantiate a solver (e.g. `NodeConnect4Solver`, `SyncWasmConnect
 ```typescript
 import { NodeConnect4Solver } from "connect-4-solver";
 
-// Implicit Memory Allocation (defaults to 128MB)
-const solver = new NodeConnect4Solver({
+// Implicit Memory Allocation (defaults to 100MB)
+const solver = new StandardConnect4Solver({ width: 7, height: 6 });
+
+// Explicit Memory Allocation
+const solver = new StandardConnect4Solver({
   width: 7,
   height: 6,
-  cacheSizeMb: 128,
+  cacheSizeMb: 100,
 });
-await solver.init(); // Allocates ~128MB of Memory automatically
+
+await solver.init(); // Allocates ~100MB of Memory automatically
 
 // ... run operations ...
 

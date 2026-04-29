@@ -43,7 +43,7 @@
     "install": "node-gyp rebuild || echo 'Native Addon compilation skipped/failed. Falling back to WASM bundle.'",
     "build": "npm run build:wasm && npm run build:ts",
     "build:wasm": "bash build.sh",
-    "build:ts": "tsc",
+    "build:ts": "tsc -p tsconfig.build.json",
     "test": "npm run lint && npm run format:check && jest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

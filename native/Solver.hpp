@@ -28,6 +28,7 @@
 #include "Position.hpp"
 #include "TranspositionTable.hpp"
 #include "OpeningBook.hpp"
+#include "SolverResult.hpp"
 
 namespace GameSolver {
 namespace Connect4 {
@@ -58,14 +59,17 @@ constexpr uint64_t getMinimumTableBytes() {
     return (1ULL << index_bits) * 2 * sizeof(SlotType);
 }
 
+
 class Solver {
  public:
   static const int INVALID_MOVE = -1000;
 
-  virtual int solve(const Position &P, bool weak = false, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
+  virtual SolverResult solve(const Position &P, bool weak = false, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
   virtual std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
   virtual unsigned long long getNodeCount() const = 0;
   virtual void reset() = 0;
+  virtual bool isBusy() const = 0;
+  virtual void setBusy(bool busy) = 0;
 
   virtual ~Solver() {}
 
@@ -110,7 +114,7 @@ class SolverImpl : public Solver {
     }
   }
 
-  int solve(const Position &P, bool weak = false, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
+  SolverResult solve(const Position &P, bool weak = false, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
   std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
 
   unsigned long long getNodeCount() const override {
@@ -124,6 +128,9 @@ class SolverImpl : public Solver {
       history[i] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[i];
     }
   }
+
+  bool isBusy() const override { return isSearching.load(std::memory_order_relaxed); }
+  void setBusy(bool busy) override { isSearching.store(busy, std::memory_order_relaxed); }
 };
 
 } // namespace Connect4

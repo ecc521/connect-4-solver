@@ -66,6 +66,8 @@ export default tseslint.config(
       "native/",
       "data/",
       "test-data/",
+      "test_addon.js",
+      "test_addon.ts",
     ],
   },
 );

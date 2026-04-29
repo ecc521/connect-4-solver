@@ -124,8 +124,8 @@ describe("HeuristicNodeConnect4Solver", () => {
     await exactSolver.init();
 
     const [exactRes, heuristicRes] = await Promise.all([
-      exactSolver.analyze(pos),
-      solver.analyze(pos, { maxDepth: 42, timeoutMs: 5000 }),
+      exactSolver.solve(pos),
+      solver.solve(pos, { maxDepth: 42, timeoutMs: 5000 }),
     ]);
 
     // Heuristic scores are scaled by 1000 for terminal wins

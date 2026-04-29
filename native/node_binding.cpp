@@ -166,7 +166,7 @@ Value DestroyBook(const CallbackInfo& info) {
 }
 
 template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
-std::vector<int> runAnalysisRaw(CoreSolver& solver, const std::string& pos, int threads, void* book_ptr) {
+std::vector<int> runAnalysisRaw(CoreSolver& solver, const std::string& pos, bool weak, int threads, void* book_ptr) {
     CorePosition P;
     std::vector<int> result(2 + W, 0);
     
@@ -178,27 +178,124 @@ std::vector<int> runAnalysisRaw(CoreSolver& solver, const std::string& pos, int 
         result[0] = 0;
         result[1] = P.nbMoves();
         const CoreBook* book = static_cast<const CoreBook*>(book_ptr);
-        std::vector<int> scores = solver.analyze(P, false, threads, book);
+        std::vector<int> scores = solver.analyze(P, weak, threads, book);
         for(int i = 0; i < W; i++) result[2 + i] = scores[i];
     }
     return result;
 }
 
+template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
+std::vector<int> runSolveRaw(CoreSolver& solver, const std::string& pos, bool weak, void* book_ptr) {
+    CorePosition P;
+    std::vector<int> result(7, 0);
+    
+    if(P.play(pos) != pos.size()) {
+        int lastColPlayed = pos[P.nbMoves()] - '1';
+        result[0] = P.isWinningMove(lastColPlayed) ? 1 : 2;
+        result[1] = P.nbMoves();
+    } else {
+        result[0] = 0;
+        result[1] = P.nbMoves();
+        const CoreBook* book = static_cast<const CoreBook*>(book_ptr);
+        auto res = solver.solve(P, weak, book);
+        result[2] = res.score;
+        result[3] = res.bestMove;
+        result[4] = res.depth;
+        result[5] = (int)(res.nodes & 0xFFFFFFFF);
+        result[6] = (int)(res.nodes >> 32);
+    }
+    return result;
+}
+
+template <typename CoreSolver, typename CorePosition, int W>
+std::vector<int> runSolveHeuristicRaw(CoreSolver& solver, const std::string& pos, int max_depth, double timeout_ms) {
+    CorePosition P;
+    std::vector<int> result(7, 0);
+    if(P.play(pos) != pos.size()) {
+        int lastColPlayed = pos[P.nbMoves()] - '1';
+        result[0] = P.isWinningMove(lastColPlayed) ? 1 : 2;
+        result[1] = P.nbMoves();
+    } else {
+        result[0] = 0;
+        result[1] = P.nbMoves();
+        auto res = solver.solve_heuristic(P, max_depth, timeout_ms);
+        result[2] = res.score;
+        result[3] = res.bestMove;
+        result[4] = res.depth;
+        result[5] = (int)(res.nodes & 0xFFFFFFFF);
+        result[6] = (int)(res.nodes >> 32);
+    }
+    return result;
+}
+
+bool IsSolverBusy(int w, int h, void* solver, bool is_heuristic) {
+    if (is_heuristic) {
+        if (w == 6 && h == 5) return static_cast<GameSolver::Connect4::HeuristicSolver<6, 5>*>(solver)->isBusy();
+        else if (w == 6 && h == 6) return static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver)->isBusy();
+        else if (w == 7 && h == 6) return static_cast<GameSolver::Connect4::HeuristicSolver<7, 6>*>(solver)->isBusy();
+        else if (w == 7 && h == 7) return static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver)->isBusy();
+        else if (w == 8 && h == 6) return static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver)->isBusy();
+        else if (w == 9 && h == 7) return static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver)->isBusy();
+        else if (w == 8 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver)->isBusy();
+        else if (w == 10 && h == 7) return static_cast<GameSolver::Connect4::HeuristicSolver<10, 7>*>(solver)->isBusy();
+        else if (w == 9 && h == 9) return static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver)->isBusy();
+        else if (w == 10 && h == 10) return static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver)->isBusy();
+        else if (w == 9 && h == 6) return static_cast<GameSolver::Connect4::HeuristicSolver<9, 6>*>(solver)->isBusy();
+        else if (w == 11 && h == 4) return static_cast<GameSolver::Connect4::HeuristicSolver<11, 4>*>(solver)->isBusy();
+    } else {
+        if (w == 6 && h == 5) return static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver)->isBusy();
+        else if (w == 6 && h == 6) return static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver)->isBusy();
+        else if (w == 7 && h == 6) return static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver)->isBusy();
+        else if (w == 7 && h == 7) return static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver)->isBusy();
+        else if (w == 8 && h == 6) return static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver)->isBusy();
+        else if (w == 9 && h == 7) return static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver)->isBusy();
+        else if (w == 9 && h == 6) return static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver)->isBusy();
+        else if (w == 11 && h == 4) return static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver)->isBusy();
+    }
+    return false;
+}
+
+void SetSolverBusy(int w, int h, void* solver, bool is_heuristic, bool busy) {
+    if (is_heuristic) {
+        if (w == 6 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<6, 5>*>(solver)->setBusy(busy);
+        else if (w == 6 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver)->setBusy(busy);
+        else if (w == 7 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<7, 6>*>(solver)->setBusy(busy);
+        else if (w == 7 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver)->setBusy(busy);
+        else if (w == 8 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver)->setBusy(busy);
+        else if (w == 9 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver)->setBusy(busy);
+        else if (w == 8 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver)->setBusy(busy);
+        else if (w == 10 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<10, 7>*>(solver)->setBusy(busy);
+        else if (w == 9 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver)->setBusy(busy);
+        else if (w == 10 && h == 10) static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver)->setBusy(busy);
+        else if (w == 9 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<9, 6>*>(solver)->setBusy(busy);
+        else if (w == 11 && h == 4) static_cast<GameSolver::Connect4::HeuristicSolver<11, 4>*>(solver)->setBusy(busy);
+    } else {
+        if (w == 6 && h == 5) static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
+        else if (w == 6 && h == 6) static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
+        else if (w == 7 && h == 6) static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
+        else if (w == 7 && h == 7) static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
+        else if (w == 8 && h == 6) static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
+        else if (w == 9 && h == 7) static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
+        else if (w == 9 && h == 6) static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
+        else if (w == 11 && h == 4) static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver)->setBusy(busy);
+    }
+}
+
 class AnalyzeExactWorker : public Napi::AsyncWorker {
 public:
-    AnalyzeExactWorker(Napi::Env& env, Napi::Promise::Deferred deferred, int w, int h, void* solver, const std::string& pos, int threads, void* book_ptr)
-        : Napi::AsyncWorker(env), deferred(deferred), w(w), h(h), solver(solver), pos(pos), threads(threads), book_ptr(book_ptr) {}
+    AnalyzeExactWorker(Napi::Env& env, Napi::Promise::Deferred deferred, int w, int h, void* solver, const std::string& pos, bool is_weak, int threads, void* book_ptr)
+        : Napi::AsyncWorker(env), deferred(deferred), w(w), h(h), solver(solver), pos(pos), is_weak(is_weak), threads(threads), book_ptr(book_ptr) {}
     
     void Execute() override {
         try {
-            if (w == 6 && h == 5) result_data = runAnalysisRaw<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6, 5, C4_6x5::GameSolver::Connect4::OpeningBookBase<6, 5>>(*static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-            else if (w == 6 && h == 6) result_data = runAnalysisRaw<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6, 6, C4_6x6::GameSolver::Connect4::OpeningBookBase<6, 6>>(*static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-            else if (w == 7 && h == 6) result_data = runAnalysisRaw<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7, 6, C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>>(*static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-            else if (w == 7 && h == 7) result_data = runAnalysisRaw<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7, 7, C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>>(*static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-            else if (w == 8 && h == 6) result_data = runAnalysisRaw<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8, 6, C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>>(*static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-            else if (w == 9 && h == 7) result_data = runAnalysisRaw<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9, 7, C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>>(*static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-            else if (w == 9 && h == 6) result_data = runAnalysisRaw<C4_9x6::GameSolver::Connect4::Solver, C4_9x6::GameSolver::Connect4::Position, 9, 6, C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>>(*static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
-            else if (w == 11 && h == 4) result_data = runAnalysisRaw<C4_11x4::GameSolver::Connect4::Solver, C4_11x4::GameSolver::Connect4::Position, 11, 4, C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>>(*static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver), pos, threads, book_ptr);
+            if (w == 6 && h == 5) result_data = runAnalysisRaw<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6, 5, C4_6x5::GameSolver::Connect4::OpeningBookBase<6, 5>>(*static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 6 && h == 6) result_data = runAnalysisRaw<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6, 6, C4_6x6::GameSolver::Connect4::OpeningBookBase<6, 6>>(*static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 7 && h == 6) result_data = runAnalysisRaw<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7, 6, C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>>(*static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 7 && h == 7) result_data = runAnalysisRaw<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7, 7, C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>>(*static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 8 && h == 6) result_data = runAnalysisRaw<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8, 6, C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>>(*static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 9 && h == 7) result_data = runAnalysisRaw<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9, 7, C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>>(*static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 9 && h == 6) result_data = runAnalysisRaw<C4_9x6::GameSolver::Connect4::Solver, C4_9x6::GameSolver::Connect4::Position, 9, 6, C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>>(*static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 11 && h == 4) result_data = runAnalysisRaw<C4_11x4::GameSolver::Connect4::Solver, C4_11x4::GameSolver::Connect4::Position, 11, 4, C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>>(*static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else SetError("Unsupported board size for AnalyzeExact");
         } catch (const std::exception& e) {
             SetError(e.what());
@@ -207,12 +304,14 @@ public:
 
     void OnOK() override {
         Napi::Env env = Env();
+        SetSolverBusy(w, h, solver, false, false);
         Napi::Int32Array js_result = Napi::Int32Array::New(env, result_data.size());
         for (size_t i = 0; i < result_data.size(); ++i) js_result[i] = result_data[i];
         deferred.Resolve(js_result);
     }
 
     void OnError(const Napi::Error& e) override {
+        SetSolverBusy(w, h, solver, false, false);
         deferred.Reject(e.Value());
     }
 
@@ -221,10 +320,76 @@ private:
     int w, h;
     void* solver;
     std::string pos;
+    bool is_weak;
     int threads;
     void* book_ptr;
     std::vector<int> result_data;
 };
+
+class SolveExactWorker : public Napi::AsyncWorker {
+public:
+    SolveExactWorker(Napi::Env& env, Napi::Promise::Deferred deferred, int w, int h, void* solver, const std::string& pos, bool is_weak, void* book_ptr)
+        : Napi::AsyncWorker(env), deferred(deferred), w(w), h(h), solver(solver), pos(pos), is_weak(is_weak), book_ptr(book_ptr) {}
+    
+    void Execute() override {
+        try {
+            if (w == 6 && h == 5) result_data = runSolveRaw<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6, 5, C4_6x5::GameSolver::Connect4::OpeningBookBase<6, 5>>(*static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 6 && h == 6) result_data = runSolveRaw<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6, 6, C4_6x6::GameSolver::Connect4::OpeningBookBase<6, 6>>(*static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 7 && h == 6) result_data = runSolveRaw<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7, 6, C4_7x6::GameSolver::Connect4::OpeningBookBase<7, 6>>(*static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 7 && h == 7) result_data = runSolveRaw<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7, 7, C4_7x7::GameSolver::Connect4::OpeningBookBase<7, 7>>(*static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 8 && h == 6) result_data = runSolveRaw<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8, 6, C4_8x6::GameSolver::Connect4::OpeningBookBase<8, 6>>(*static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 9 && h == 7) result_data = runSolveRaw<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9, 7, C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>>(*static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 9 && h == 6) result_data = runSolveRaw<C4_9x6::GameSolver::Connect4::Solver, C4_9x6::GameSolver::Connect4::Position, 9, 6, C4_9x6::GameSolver::Connect4::OpeningBookBase<9, 6>>(*static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 11 && h == 4) result_data = runSolveRaw<C4_11x4::GameSolver::Connect4::Solver, C4_11x4::GameSolver::Connect4::Position, 11, 4, C4_11x4::GameSolver::Connect4::OpeningBookBase<11, 4>>(*static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else SetError("Unsupported board size for SolveExact");
+        } catch (const std::exception& e) {
+            SetError(e.what());
+        }
+    }
+
+    void OnOK() override {
+        Napi::Env env = Env();
+        SetSolverBusy(w, h, solver, false, false);
+        Napi::Int32Array js_result = Napi::Int32Array::New(env, result_data.size());
+        for (size_t i = 0; i < result_data.size(); ++i) js_result[i] = result_data[i];
+        deferred.Resolve(js_result);
+    }
+
+    void OnError(const Napi::Error& e) override {
+        SetSolverBusy(w, h, solver, false, false);
+        deferred.Reject(e.Value());
+    }
+
+private:
+    Napi::Promise::Deferred deferred;
+    int w, h;
+    void* solver;
+    std::string pos;
+    bool is_weak;
+    void* book_ptr;
+    std::vector<int> result_data;
+};
+
+Value SolveExact(const CallbackInfo& info) {
+    Env env = info.Env();
+    int w = info[0].As<Number>().Int32Value();
+    int h = info[1].As<Number>().Int32Value();
+    void* solver = UnwrapPointer<void>(info[2]);
+    std::string pos = info[3].As<String>().Utf8Value();
+    bool weak = info[4].As<Boolean>().Value();
+    void* book_ptr = UnwrapPointer<void>(info[5]);
+
+    if (IsSolverBusy(w, h, solver, false)) {
+        throw Error::New(env, "Solver is already busy");
+    }
+    SetSolverBusy(w, h, solver, false, true);
+
+    Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
+    SolveExactWorker* worker = new SolveExactWorker(env, deferred, w, h, solver, pos, weak, book_ptr);
+    worker->Queue();
+    
+    return deferred.Promise();
+}
 
 Value AnalyzeExact(const CallbackInfo& info) {
     Env env = info.Env();
@@ -232,11 +397,17 @@ Value AnalyzeExact(const CallbackInfo& info) {
     int h = info[1].As<Number>().Int32Value();
     void* solver = UnwrapPointer<void>(info[2]);
     std::string pos = info[3].As<String>().Utf8Value();
-    int threads = info[4].As<Number>().Int32Value();
-    void* book_ptr = UnwrapPointer<void>(info[5]);
+    bool weak = info[4].As<Boolean>().Value();
+    int threads = info[5].As<Number>().Int32Value();
+    void* book_ptr = UnwrapPointer<void>(info[6]);
+
+    if (IsSolverBusy(w, h, solver, false)) {
+        throw Error::New(env, "Solver is already busy");
+    }
+    SetSolverBusy(w, h, solver, false, true);
 
     Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
-    AnalyzeExactWorker* worker = new AnalyzeExactWorker(env, deferred, w, h, solver, pos, threads, book_ptr);
+    AnalyzeExactWorker* worker = new AnalyzeExactWorker(env, deferred, w, h, solver, pos, weak, threads, book_ptr);
     worker->Queue();
     
     return deferred.Promise();
@@ -289,6 +460,7 @@ public:
 
     void OnOK() override {
         Napi::Env env = Env();
+        SetSolverBusy(w, h, solver, true, false);
         Napi::Int32Array js_result = Napi::Int32Array::New(env, result_data.size());
         for (size_t i = 0; i < result_data.size(); ++i) js_result[i] = result_data[i];
         deferred.Resolve(js_result);
@@ -296,6 +468,7 @@ public:
 
     void OnError(const Napi::Error& e) override {
         deferred.Reject(e.Value());
+        SetSolverBusy(w, h, solver, true, false);
     }
 
 private:
@@ -309,6 +482,75 @@ private:
     std::vector<int> result_data;
 };
 
+class SolveHeuristicWorker : public Napi::AsyncWorker {
+public:
+    SolveHeuristicWorker(Napi::Env& env, Napi::Promise::Deferred deferred, int w, int h, void* solver, const std::string& pos, int max_depth, double timeout_ms)
+        : Napi::AsyncWorker(env), deferred(deferred), w(w), h(h), solver(solver), pos(pos), max_depth(max_depth), timeout_ms(timeout_ms) {}
+    
+    void Execute() override {
+        try {
+            if (w == 6 && h == 5) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<6, 5>, GameSolver::Connect4::GenericPosition<6, 5>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 5>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 6 && h == 6) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<6, 6>, GameSolver::Connect4::GenericPosition<6, 6>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 7 && h == 6) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<7, 6>, GameSolver::Connect4::GenericPosition<7, 6>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 6>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 7 && h == 7) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 8 && h == 6) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<8, 6>, GameSolver::Connect4::GenericPosition<8, 6>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 9 && h == 7) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<9, 7>, GameSolver::Connect4::GenericPosition<9, 7>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 8 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<8, 8>, GameSolver::Connect4::GenericPosition<8, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 10 && h == 7) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<10, 7>, GameSolver::Connect4::GenericPosition<10, 7>, 10>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 7>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 9 && h == 9) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<9, 9>, GameSolver::Connect4::GenericPosition<9, 9>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 10 && h == 10) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<10, 10>, GameSolver::Connect4::GenericPosition<10, 10>, 10>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 9 && h == 6) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<9, 6>, GameSolver::Connect4::GenericPosition<9, 6>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 6>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 11 && h == 4) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 4>, GameSolver::Connect4::GenericPosition<11, 4>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 4>*>(solver), pos, max_depth, timeout_ms);
+            else SetError("Unsupported board size for SolveHeuristic");
+        } catch (const std::exception& e) {
+            SetError(e.what());
+        }
+    }
+
+    void OnOK() override {
+        Napi::Env env = Env();
+        SetSolverBusy(w, h, solver, true, false);
+        Napi::Int32Array js_result = Napi::Int32Array::New(env, result_data.size());
+        for (size_t i = 0; i < result_data.size(); ++i) js_result[i] = result_data[i];
+        deferred.Resolve(js_result);
+    }
+
+    void OnError(const Napi::Error& e) override {
+        SetSolverBusy(w, h, solver, true, false);
+        deferred.Reject(e.Value());
+    }
+
+private:
+    Napi::Promise::Deferred deferred;
+    int w, h;
+    void* solver;
+    std::string pos;
+    int max_depth;
+    double timeout_ms;
+    std::vector<int> result_data;
+};
+
+Value SolveHeuristic(const CallbackInfo& info) {
+    Env env = info.Env();
+    int w = info[0].As<Number>().Int32Value();
+    int h = info[1].As<Number>().Int32Value();
+    void* solver = UnwrapPointer<void>(info[2]);
+    std::string pos = info[3].As<String>().Utf8Value();
+    int max_depth = info[4].As<Number>().Int32Value();
+    double timeout_ms = info[5].As<Number>().DoubleValue();
+
+    if (IsSolverBusy(w, h, solver, true)) {
+        throw Error::New(env, "Solver is already busy");
+    }
+    SetSolverBusy(w, h, solver, true, true);
+
+    Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
+    SolveHeuristicWorker* worker = new SolveHeuristicWorker(env, deferred, w, h, solver, pos, max_depth, timeout_ms);
+    worker->Queue();
+    
+    return deferred.Promise();
+}
+
 Value AnalyzeHeuristic(const CallbackInfo& info) {
     Env env = info.Env();
     int w = info[0].As<Number>().Int32Value();
@@ -318,6 +560,11 @@ Value AnalyzeHeuristic(const CallbackInfo& info) {
     int threads = info[4].As<Number>().Int32Value();
     int max_depth = info[5].As<Number>().Int32Value();
     double timeout_ms = info[6].As<Number>().DoubleValue();
+
+    if (IsSolverBusy(w, h, solver, true)) {
+        throw Error::New(env, "Solver is already busy");
+    }
+    SetSolverBusy(w, h, solver, true, true);
 
     Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
     AnalyzeHeuristicWorker* worker = new AnalyzeHeuristicWorker(env, deferred, w, h, solver, pos, threads, max_depth, timeout_ms);
@@ -518,6 +765,8 @@ Object Init(Env env, Object exports) {
     exports.Set(String::New(env, "_destroyCache"), Function::New(env, DestroyCache));
     exports.Set(String::New(env, "_analyzeExact"), Function::New(env, AnalyzeExact));
     exports.Set(String::New(env, "_analyzeHeuristic"), Function::New(env, AnalyzeHeuristic));
+    exports.Set(String::New(env, "_solveExact"), Function::New(env, SolveExact));
+    exports.Set(String::New(env, "_solveHeuristic"), Function::New(env, SolveHeuristic));
     exports.Set(String::New(env, "_createBook"), Function::New(env, CreateBook));
     exports.Set(String::New(env, "_destroyBook"), Function::New(env, DestroyBook));
     exports.Set(String::New(env, "_getNodeCount"), Function::New(env, GetNodeCount));

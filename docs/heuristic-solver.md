@@ -43,6 +43,16 @@ const result = await solver.analyze("1122", {
 console.log(`The solver successfully reached depth: ${result.depthReached}`);
 ```
 
+### High-Performance AI Play (`solve`)
+
+When building an AI opponent, you typically only need the best move rather than a breakdown of every column. In these cases, use the `.solve()` method instead of `.analyze()`. It uses the same iterative deepening logic but is optimized for speed, often returning results even faster by narrowing the search focus.
+
+```typescript
+// Recommended for AI move generation
+const move = await solver.solve("1122", { timeoutMs: 50 });
+console.log(`Best Move: ${move.bestMove}`);
+```
+
 ### Depth vs. Timeout
 
 Because the heuristic solver uses iterative deepening, it always has a "best guess" available. If it hits the `timeoutMs` limit while searching depth 14, it will gracefully abort the depth 14 search and return the completed evaluation from depth 13.

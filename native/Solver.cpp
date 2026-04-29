@@ -32,18 +32,6 @@ namespace Connect4 {
 
 namespace {
   thread_local uint32_t solverTlNodeCount = 0;
-
-  struct SearchGuard {
-    std::atomic<bool>& flag;
-    SearchGuard(std::atomic<bool>& f) : flag(f) {
-      if (flag.exchange(true)) {
-        throw std::runtime_error("Solver is already busy");
-      }
-    }
-    ~SearchGuard() {
-      flag.store(false, std::memory_order_relaxed);
-    }
-  };
 }
 
 /**
@@ -169,13 +157,17 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
 }
 
 template <typename SlotType>
-int SolverImpl<SlotType>::solve(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
-  SearchGuard guard(isSearching);
-  if(P.canWinNext()) 
-    return (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
+SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+  if(P.canWinNext()) {
+    int score = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
+    for (int i = 0; i < Position::WIDTH; i++) {
+        if (P.canPlay(i) && P.isWinningMove(i)) return {score, i, (int)P.nbMoves(), getNodeCount()};
+    }
+    return {score, -1, (int)P.nbMoves(), getNodeCount()};
+  }
   
   if(book) {
-    if(int val = book->get(P)) return val + Position::MIN_SCORE - 1;
+    if(int val = book->get(P))      return {val + Position::MIN_SCORE - 1, -1, (int)P.nbMoves(), getNodeCount()};
   }
   
   int min = -(Position::WIDTH * Position::HEIGHT - P.nbMoves()) / 2;
@@ -195,12 +187,28 @@ int SolverImpl<SlotType>::solve(const Position &P, bool weak, const OpeningBookB
   }
   nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
   solverTlNodeCount = 0;
-  return min;
+
+  int score = min;
+  int bestMove = -1;
+
+  // Quick pass to find best move using the hot TT
+  for (int i = 0; i < Position::WIDTH; i++) {
+      int col = columnOrder[i];
+      if (P.canPlay(col)) {
+          Position P2(P);
+          P2.playCol(col);
+          if (negamax(P2, -score, -score + 1, book) == -score) {
+              bestMove = col;
+              break;
+          }
+      }
+  }
+
+  return {score, bestMove, (int)P.nbMoves(), getNodeCount()};
 }
 
 template <typename SlotType>
 std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
-  SearchGuard guard(isSearching);
   std::vector<int> scores(Position::WIDTH, -1000);
 
 #ifdef USE_PTHREADS
@@ -217,7 +225,7 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
         } else {
           Position P2(P);
           P2.playCol(col);
-          scores[col] = -solve(P2, weak, book);
+          scores[col] = -solve(P2, weak, book).score;
         }
       }
       nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
@@ -251,7 +259,7 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
       else {
         Position P2(P);
         P2.playCol(col);
-        scores[col] = -solve(P2, weak, book);
+        scores[col] = -solve(P2, weak, book).score;
       }
     }
   }

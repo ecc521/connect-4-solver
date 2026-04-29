@@ -46,6 +46,7 @@ interface NativeModuleType {
     h: number,
     solver: unknown,
     pos: string,
+    weak: boolean,
     threads: number,
     book: unknown,
   ): Promise<Int32Array>;
@@ -58,6 +59,22 @@ interface NativeModuleType {
     depth: number,
     timeout: number,
   ): Promise<Int32Array>;
+  _solveExact(
+    w: number,
+    h: number,
+    solver: unknown,
+    pos: string,
+    weak: boolean,
+    book: unknown,
+  ): Promise<Int32Array>;
+  _solveHeuristic(
+    w: number,
+    h: number,
+    solver: unknown,
+    pos: string,
+    depth: number,
+    timeout: number,
+  ): Promise<Int32Array>;
   _createBook(w: number, h: number, path: string): unknown;
   _destroyBook(w: number, h: number, book: unknown): void;
   _getNodeCount(
@@ -67,6 +84,15 @@ interface NativeModuleType {
     heuristic: boolean,
   ): number;
   _generatePositions(w: number, h: number, depth: number): string[];
+  BookBuilder: new (
+    w: number,
+    h: number,
+    depth: number,
+  ) => {
+    addPosition(pos: string, score: number): void;
+    saveDense(path: string): void;
+    saveEliasFano(path: string): void;
+  };
 }
 
 let NativeModule: NativeModuleType | null = null;
@@ -77,9 +103,11 @@ export function getNativeModule(): NativeModuleType | null {
     nativeModuleAttempted = true;
     try {
       if (typeof process !== "undefined" && process?.versions?.node) {
-        const req = (typeof module !== "undefined" && module.require
-          ? module.require.bind(module)
-          : require) as (id: string) => unknown;
+        const req = (
+          typeof module !== "undefined" && module.require
+            ? module.require.bind(module)
+            : require
+        ) as (id: string) => unknown;
         const path = req("path") as { join: (...args: string[]) => string };
         const nodePath = path.join(
           __dirname,
@@ -148,7 +176,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
 
   constructor(opts?: Connect4SolverOptions | number, heightOpt?: number) {
     super(opts as Connect4SolverOptions, heightOpt);
-    let cacheSizeMb = 128;
+    let cacheSizeMb = 100;
     let heuristic = false;
 
     if (opts && typeof opts === "object") {
@@ -158,6 +186,13 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
 
     this.cacheSizeMb = cacheSizeMb;
     this.isHeuristic = heuristic;
+  }
+
+  solve(
+    _positionStr: string,
+    _opts?: AnalyzeOptions & { weak?: boolean },
+  ): PositionAnalysis | Promise<PositionAnalysis> {
+    throw new Error("solve() is not implemented for this solver.");
   }
 
   protected getPlayerAt(nbMoves: number): Player {
@@ -295,17 +330,107 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     };
   }
 
+  protected parseSolveResArr(
+    resArr: Int32Array | number[],
+    positionStr: string,
+  ): PositionAnalysis {
+    const originalPosition = positionStr;
+    const status = resArr[0];
+    const nbMoves = resArr[1];
+    let currentPosition = positionStr;
+    const currentPlayer = this.getPlayerAt(nbMoves);
+    let evaluation: Evaluation | null = null;
+    const bestMove = resArr[3] === -1 ? undefined : resArr[3];
+    const depthReached = resArr[4];
+    const nodes_low = resArr[5];
+    const nodes_high = resArr[6];
+    const nodes = (nodes_high >>> 0) * 4294967296 + (nodes_low >>> 0);
+
+    if (status === STATUS_INVALID) {
+      currentPosition = positionStr.slice(0, nbMoves);
+    } else if (status === STATUS_WIN) {
+      currentPosition = positionStr.slice(0, nbMoves + 1);
+      const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
+      const score = Math.floor((this.width * this.height + 1 - nbMoves) / 2);
+      evaluation = {
+        eval: {
+          value: Number.POSITIVE_INFINITY,
+          wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
+        },
+        outcome: Outcome.Win,
+        winner: winner,
+        movesToEnd: 0,
+        score: score,
+      };
+    } else {
+      const score = resArr[2];
+      evaluation = this.createEvaluation(score, nbMoves);
+    }
+
+    if (evaluation) {
+      evaluation.bestMove = bestMove;
+      evaluation.nodes = nodes;
+    }
+
+    return {
+      position: currentPosition,
+      originalPosition,
+      currentPlayer,
+      evaluation,
+      moveOptions: [],
+      depthReached,
+      isHeuristic: this.isHeuristic,
+      bestMove,
+      nodes,
+    };
+  }
+
+  protected executeWasmSolve(
+    mod: SolverModule,
+    positionStr: string,
+    opts?: AnalyzeOptions & { weak?: boolean },
+  ): Int32Array {
+    const { maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
+    const weak = opts?.weak ?? false;
+
+    const allocatedMemory = mod.stringToNewUTF8(positionStr);
+    let outputPointer: number;
+    if (this.isHeuristic)
+      outputPointer = mod._solveHeuristic(
+        this.width,
+        this.height,
+        this._solverPtr,
+        allocatedMemory,
+        maxDepth,
+        timeoutMs,
+      );
+    else
+      outputPointer = mod._solveExact(
+        this.width,
+        this.height,
+        this._solverPtr,
+        allocatedMemory,
+        weak,
+        bookPtr,
+      );
+
+    const dataLength = 7;
+    const finalData = new Int32Array(dataLength);
+    for (let i = 0; i < dataLength; i++) {
+      finalData[i] = mod.getValue(outputPointer + i * INT32_SIZE, "i32");
+    }
+    mod._free(allocatedMemory);
+    mod._free(outputPointer);
+    return finalData;
+  }
+
   protected executeWasmAnalyze(
     mod: SolverModule,
     positionStr: string,
-    opts?: {
-      threads?: number;
-      maxDepth?: number;
-      timeoutMs?: number;
-      book?: { ptr: number };
-    },
+    opts?: AnalyzeOptions,
   ): Int32Array {
-    const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
+    const { threads, maxDepth, timeoutMs, bookPtr, weak } =
+      this.sanitizeOpts(opts);
 
     const allocatedMemory = mod.stringToNewUTF8(positionStr);
     let outputPointer: number;
@@ -325,6 +450,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         this.height,
         this._solverPtr,
         allocatedMemory,
+        weak,
         threads,
         bookPtr,
       );
@@ -373,25 +499,20 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       this.height,
       this.cacheSizeMb * 1024 * 1024,
       this.isHeuristic,
-    );
+    ) as number;
     this._solverPtr = native._createSolver(
       this.width,
       this.height,
       this._cachePtr,
       this.isHeuristic,
-    );
+    ) as number;
     this.initialized = true;
     return Promise.resolve();
   }
 
   async analyze(
     positionStr: string,
-    opts?: {
-      threads?: number;
-      maxDepth?: number;
-      timeoutMs?: number;
-      book?: { ptr: number };
-    },
+    opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
 
@@ -404,7 +525,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
           try {
             const native = getNativeModule();
             if (!native) throw new Error("Native module not loaded");
-            const { threads, maxDepth, timeoutMs, bookPtr } =
+            const { threads, maxDepth, timeoutMs, bookPtr, weak } =
               this.sanitizeOpts(opts);
 
             let resArr: Int32Array | number[];
@@ -424,11 +545,58 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
                 this.height,
                 this._solverPtr,
                 positionStr,
+                weak,
                 threads,
                 bookPtr === 0 ? null : bookPtr,
               );
 
             resolve(this.parseResArr(resArr, positionStr));
+          } catch (err: unknown) {
+            reject(err instanceof Error ? err : new Error(String(err)));
+          }
+        });
+    });
+  }
+
+  async solve(
+    positionStr: string,
+    opts?: AnalyzeOptions & { weak?: boolean },
+  ): Promise<PositionAnalysis> {
+    if (!this.initialized) throw new Error("Call init() first.");
+
+    return new Promise<PositionAnalysis>((resolve, reject) => {
+      this._analysisQueue = this._analysisQueue
+        .catch(() => {
+          /* ignore */
+        })
+        .then(async () => {
+          try {
+            const native = getNativeModule();
+            if (!native) throw new Error("Native module not loaded");
+            const { maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
+            const weak = opts?.weak ?? false;
+
+            let resArr: Int32Array | number[];
+            if (this.isHeuristic)
+              resArr = await native._solveHeuristic(
+                this.width,
+                this.height,
+                this._solverPtr,
+                positionStr,
+                maxDepth,
+                timeoutMs,
+              );
+            else
+              resArr = await native._solveExact(
+                this.width,
+                this.height,
+                this._solverPtr,
+                positionStr,
+                weak,
+                bookPtr === 0 ? null : bookPtr,
+              );
+
+            resolve(this.parseSolveResArr(resArr, positionStr));
           } catch (err: unknown) {
             reject(err instanceof Error ? err : new Error(String(err)));
           }
@@ -493,6 +661,16 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     const mod = getThreadedModule();
     const resArr = this.executeWasmAnalyze(mod, positionStr, opts);
     return this.parseResArr(resArr, positionStr);
+  }
+
+  solve(
+    positionStr: string,
+    opts?: AnalyzeOptions & { weak?: boolean },
+  ): PositionAnalysis {
+    if (!this.initialized) throw new Error("Call init() first.");
+    const mod = getThreadedModule();
+    const resArr = this.executeWasmSolve(mod, positionStr, opts);
+    return this.parseSolveResArr(resArr, positionStr);
   }
 
   release(): void {
@@ -568,6 +746,16 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     this._solverPtr = 0;
     this._cachePtr = 0;
     this.initialized = false;
+  }
+
+  solve(
+    positionStr: string,
+    opts?: AnalyzeOptions & { weak?: boolean },
+  ): Promise<PositionAnalysis> {
+    if (!this.initialized) throw new Error("Call init() first.");
+    const mod = getNoSABModule();
+    const resArr = this.executeWasmSolve(mod, positionStr, opts);
+    return Promise.resolve(this.parseSolveResArr(resArr, positionStr));
   }
 
   getNodeCount(): number {

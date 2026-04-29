@@ -116,32 +116,68 @@ async function run() {
   process.on("SIGINT", saveAndExit);
   process.on("SIGTERM", saveAndExit);
 
-  console.log(`[+] Crunching Alpha-Beta evaluations...`);
+  process.env.UV_THREADPOOL_SIZE = threads.toString();
 
+  const cachePtr = native._createCache(
+    width,
+    height,
+    BigInt(cacheSizeMb) * 1024n * 1024n,
+    false,
+  );
+  const solvers = Array.from({ length: threads }, () =>
+    native._createSolver(width, height, cachePtr, false),
+  );
+
+  console.log(
+    `[+] Created ${threads} independent solvers sharing a ${cacheSizeMb}MB cache.`,
+  );
+  console.log(`[+] Crunching Alpha-Beta evaluations using worker queue...`);
+
+  let totalNodes = 0n;
   const start = Date.now();
-  for (const pos of positions) {
-    // We can just use native._analyzeExact directly to get the raw Int32Array and parse it
-    const bookPtr = bootstrapBook ? (bootstrapBook as any)._bookPtr : null;
-    const resArr = await native._analyzeExact(
-      width,
-      height,
-      (solver as any)._solverPtr,
-      pos,
-      threads,
-      bookPtr,
-    );
-    const score = getRawScore(resArr, width, height);
+  const queue = [...positions];
 
-    // Accumulate into the builder using the 1-indexed uint8_t byte format
-    builder.addPosition(pos, score - minScore + 1);
+  const worker = async (solverPtr: any, id: number) => {
+    while (true) {
+      const pos = queue.pop();
+      if (pos === undefined) break;
 
-    processed++;
-    const elapsed = (Date.now() - start) / 1000;
-    const rate = Math.floor(processed / elapsed);
-    console.log(
-      `[${processed}/${positions.length}] Evaluated ${pos} -> Score: ${score} (${rate} pos/sec)`,
-    );
-  }
+      const bookPtr = bootstrapBook ? (bootstrapBook as any)._bookPtr : null;
+      const resArr = await native._analyzeExact(
+        width,
+        height,
+        solverPtr,
+        pos,
+        1, // 1 thread per solver (External Parallelism)
+        bookPtr,
+      );
+
+      const score = getRawScore(resArr, width, height);
+      const nodes = native._getNodeCount(width, height, solverPtr, false);
+
+      // Node count is reset per analysis in the C++ side now, so we sum it up
+      totalNodes += BigInt(nodes);
+
+      // Accumulate into the builder using the 1-indexed uint8_t byte format
+      builder.addPosition(pos, score - minScore + 1);
+
+      processed++;
+
+      // Log progress occasionally or every X positions to avoid console spam
+      if (processed % threads === 0 || processed === positions.length) {
+        const elapsed = (Date.now() - start) / 1000;
+        const pct = ((processed / positions.length) * 100).toFixed(1);
+        const nps = (Number(totalNodes) / elapsed / 1000000).toFixed(1);
+        process.stdout.write(
+          `\r[${processed}/${positions.length}] (${pct}%) | ${nps} MN/s | Total Nodes: ${totalNodes.toLocaleString()} | Current: ${pos}      `,
+        );
+      }
+    }
+  };
+
+  // Start all workers
+  await Promise.all(solvers.map((s, i) => worker(s, i)));
+  console.log(""); // Final newline
 
   const elapsed = (Date.now() - start) / 1000;
   console.log(`\n[+] Finished evaluation in ${elapsed.toFixed(1)}s.`);
@@ -156,7 +192,10 @@ async function run() {
   }
   console.log(`[+] Book successfully saved to ${outputFile}`);
   if (bootstrapBook) bootstrapBook.unload();
-  solver.unload();
+  for (const s of solvers) {
+    native._destroySolver(width, height, s, false);
+  }
+  native._destroyCache(cachePtr);
   process.exit(0);
 }
 

@@ -16,9 +16,12 @@
 #include "Cache.hpp"
 #include "NNUEAccumulator.hpp"
 #include "NNUE.hpp"
+#include "SolverResult.hpp"
 
 namespace GameSolver {
 namespace Connect4 {
+
+
 
 class HeuristicCache : public Cache {
  public:
@@ -52,7 +55,7 @@ class HeuristicSolver {
   static const int INVALID_MOVE = -1000000;
 
   // Returns the heuristic score of a position via iterative deepening
-  std::pair<int, int> solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms = 0.0, bool reset_tt = true, NNUEAccumulator<WIDTH, HEIGHT>* acc = nullptr, int threads = 1);
+  SolverResult solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms = 0.0, bool reset_tt = true, NNUEAccumulator<WIDTH, HEIGHT>* acc = nullptr, int threads = 1);
 
   /**
    * Evaluate possible heuristic moves for current player
@@ -72,6 +75,9 @@ class HeuristicSolver {
       history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
     }
   }
+
+  bool isBusy() const { return isSearching.load(std::memory_order_relaxed); }
+  void setBusy(bool busy) { isSearching.store(busy, std::memory_order_relaxed); }
 
   HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache); // Constructor
 

@@ -36,7 +36,7 @@ export abstract class AbstractAsyncWebWorkerSolver {
 
     let width = 7;
     let height = 6;
-    let cacheSizeMb = 128;
+    let cacheSizeMb = 100;
     let heuristic = false;
 
     if (typeof opts === "number") {
@@ -85,6 +85,21 @@ export abstract class AbstractAsyncWebWorkerSolver {
     },
   ): Promise<PositionAnalysis> {
     return this.sendMessage("analyze", {
+      position: positionStr,
+      opts,
+    }) as Promise<PositionAnalysis>;
+  }
+
+  async solve(
+    positionStr: string,
+    opts?: {
+      weak?: boolean;
+      maxDepth?: number;
+      timeoutMs?: number;
+      book?: unknown;
+    },
+  ): Promise<PositionAnalysis> {
+    return this.sendMessage("solve", {
       position: positionStr,
       opts,
     }) as Promise<PositionAnalysis>;
