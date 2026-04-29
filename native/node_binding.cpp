@@ -26,7 +26,6 @@ T* UnwrapPointer(Value val) {
 }
 
 Value CreateCache(const CallbackInfo& info) {
-    Env env = info.Env();
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     size_t bytes = info[2].As<Number>().Int64Value();
@@ -67,7 +66,6 @@ Value DestroyCache(const CallbackInfo& info) {
 }
 
 Value CreateSolver(const CallbackInfo& info) {
-    Env env = info.Env();
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     auto cache = UnwrapPointer<GameSolver::Connect4::Cache>(info[2]);
