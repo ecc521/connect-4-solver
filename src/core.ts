@@ -189,11 +189,15 @@ export abstract class BaseConnect4Solver {
     }
 
     if (width < 4 || width > 12 || height < 4 || height > 12) {
-      throw new Error(`Board size ${width}x${height} is outside the supported range (4x4 to 12x12).`);
+      throw new Error(
+        `Board size ${width}x${height} is outside the supported range (4x4 to 12x12).`,
+      );
     }
 
     if (width * (height + 1) > 128) {
-      throw new Error(`Board size ${width}x${height} exceeds the maximum supported 128-bit position mask.`);
+      throw new Error(
+        `Board size ${width}x${height} exceeds the maximum supported 128-bit position mask.`,
+      );
     }
     this.width = width;
     this.height = height;

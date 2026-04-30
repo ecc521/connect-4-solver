@@ -69,7 +69,7 @@ describe("HeuristicNodeConnect4Solver", () => {
         exactSolver.analyze(pos, { book }),
         solver.analyze(pos, { timeoutMs: 25 }),
       ]);
-      totalTimeMs += (performance.now() - start);
+      totalTimeMs += performance.now() - start;
 
       // 1. Find the best possible score outcome from the exact solver
       let maxExactScore = -100;
@@ -109,14 +109,14 @@ describe("HeuristicNodeConnect4Solver", () => {
     exactSolver.release();
 
     const successRate = successCount / lines.length;
-    
+
     const totalNodes = solver.getNodeCount();
     const timeSecs = totalTimeMs / 1000;
     const mn_s = (Number(totalNodes) / 1_000_000 / timeSecs).toFixed(3);
 
     console.log(
       `Heuristic Deep Position Accuracy (25ms): ${(successRate * 100).toFixed(1)}% (${successCount}/${lines.length})\n` +
-      `Test Throughput: ${totalNodes.toLocaleString()} nodes in ${totalTimeMs.toFixed(2)}ms (${mn_s} MN/s)`
+        `Test Throughput: ${totalNodes.toLocaleString()} nodes in ${totalTimeMs.toFixed(2)}ms (${mn_s} MN/s)`,
     );
     if (successRate < 0.65) {
       console.log("Top Failures:\n" + failures.slice(0, 5).join("\n"));
