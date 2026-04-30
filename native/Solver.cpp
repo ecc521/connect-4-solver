@@ -365,6 +365,7 @@ class TypedCache : public Cache {
           if (index_bits < 64) {
               uint64_t required_buckets = 1ULL << index_bits;
               if (transTable->getSize() / 2 < required_buckets) {
+                  fprintf(stderr, "Throwing CRT Error! board_bits=%d, available_bits=%d, index_bits=%d, required_buckets=%llu, getSize=%zu, table_bytes=%zu, slot_size=%zu\n", board_bits, available_bits, index_bits, (unsigned long long)required_buckets, transTable->getSize(), table_bytes, sizeof(SlotType));
                   throw std::runtime_error("TranspositionTable allocated memory is mathematically too small to guarantee collision-free CRT for this board size.");
               }
           }

@@ -156,3 +156,885 @@ namespace C4_11x4 {
 #include <memory>
 
 
+
+#define BOARD_WIDTH_MACRO 4
+#define BOARD_HEIGHT_MACRO 4
+namespace C4_4x4 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 4
+#define BOARD_HEIGHT_MACRO 5
+namespace C4_4x5 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 4
+#define BOARD_HEIGHT_MACRO 6
+namespace C4_4x6 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 4
+#define BOARD_HEIGHT_MACRO 7
+namespace C4_4x7 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 4
+#define BOARD_HEIGHT_MACRO 8
+namespace C4_4x8 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 4
+#define BOARD_HEIGHT_MACRO 9
+namespace C4_4x9 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 4
+#define BOARD_HEIGHT_MACRO 10
+namespace C4_4x10 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 4
+#define BOARD_HEIGHT_MACRO 11
+namespace C4_4x11 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 4
+#define BOARD_HEIGHT_MACRO 12
+namespace C4_4x12 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 5
+#define BOARD_HEIGHT_MACRO 4
+namespace C4_5x4 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 5
+#define BOARD_HEIGHT_MACRO 5
+namespace C4_5x5 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 5
+#define BOARD_HEIGHT_MACRO 6
+namespace C4_5x6 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 5
+#define BOARD_HEIGHT_MACRO 7
+namespace C4_5x7 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 5
+#define BOARD_HEIGHT_MACRO 8
+namespace C4_5x8 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 5
+#define BOARD_HEIGHT_MACRO 9
+namespace C4_5x9 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 5
+#define BOARD_HEIGHT_MACRO 10
+namespace C4_5x10 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 5
+#define BOARD_HEIGHT_MACRO 11
+namespace C4_5x11 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 5
+#define BOARD_HEIGHT_MACRO 12
+namespace C4_5x12 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 6
+#define BOARD_HEIGHT_MACRO 4
+namespace C4_6x4 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 6
+#define BOARD_HEIGHT_MACRO 7
+namespace C4_6x7 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 6
+#define BOARD_HEIGHT_MACRO 8
+namespace C4_6x8 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 6
+#define BOARD_HEIGHT_MACRO 9
+namespace C4_6x9 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 6
+#define BOARD_HEIGHT_MACRO 10
+namespace C4_6x10 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 6
+#define BOARD_HEIGHT_MACRO 11
+namespace C4_6x11 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 6
+#define BOARD_HEIGHT_MACRO 12
+namespace C4_6x12 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 7
+#define BOARD_HEIGHT_MACRO 4
+namespace C4_7x4 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 7
+#define BOARD_HEIGHT_MACRO 5
+namespace C4_7x5 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 7
+#define BOARD_HEIGHT_MACRO 8
+namespace C4_7x8 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 7
+#define BOARD_HEIGHT_MACRO 9
+namespace C4_7x9 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 7
+#define BOARD_HEIGHT_MACRO 10
+namespace C4_7x10 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 7
+#define BOARD_HEIGHT_MACRO 11
+namespace C4_7x11 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 7
+#define BOARD_HEIGHT_MACRO 12
+namespace C4_7x12 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 8
+#define BOARD_HEIGHT_MACRO 4
+namespace C4_8x4 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 8
+#define BOARD_HEIGHT_MACRO 5
+namespace C4_8x5 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 8
+#define BOARD_HEIGHT_MACRO 7
+namespace C4_8x7 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 8
+#define BOARD_HEIGHT_MACRO 9
+namespace C4_8x9 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 8
+#define BOARD_HEIGHT_MACRO 10
+namespace C4_8x10 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 8
+#define BOARD_HEIGHT_MACRO 11
+namespace C4_8x11 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 8
+#define BOARD_HEIGHT_MACRO 12
+namespace C4_8x12 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 9
+#define BOARD_HEIGHT_MACRO 4
+namespace C4_9x4 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 9
+#define BOARD_HEIGHT_MACRO 5
+namespace C4_9x5 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 9
+#define BOARD_HEIGHT_MACRO 8
+namespace C4_9x8 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 9
+#define BOARD_HEIGHT_MACRO 10
+namespace C4_9x10 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 9
+#define BOARD_HEIGHT_MACRO 11
+namespace C4_9x11 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 9
+#define BOARD_HEIGHT_MACRO 12
+namespace C4_9x12 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 10
+#define BOARD_HEIGHT_MACRO 4
+namespace C4_10x4 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 10
+#define BOARD_HEIGHT_MACRO 5
+namespace C4_10x5 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 10
+#define BOARD_HEIGHT_MACRO 6
+namespace C4_10x6 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 10
+#define BOARD_HEIGHT_MACRO 8
+namespace C4_10x8 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 10
+#define BOARD_HEIGHT_MACRO 9
+namespace C4_10x9 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 10
+#define BOARD_HEIGHT_MACRO 11
+namespace C4_10x11 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 11
+#define BOARD_HEIGHT_MACRO 5
+namespace C4_11x5 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 11
+#define BOARD_HEIGHT_MACRO 6
+namespace C4_11x6 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 11
+#define BOARD_HEIGHT_MACRO 7
+namespace C4_11x7 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 11
+#define BOARD_HEIGHT_MACRO 8
+namespace C4_11x8 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 11
+#define BOARD_HEIGHT_MACRO 9
+namespace C4_11x9 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 11
+#define BOARD_HEIGHT_MACRO 10
+namespace C4_11x10 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 12
+#define BOARD_HEIGHT_MACRO 4
+namespace C4_12x4 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 12
+#define BOARD_HEIGHT_MACRO 5
+namespace C4_12x5 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 12
+#define BOARD_HEIGHT_MACRO 6
+namespace C4_12x6 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 12
+#define BOARD_HEIGHT_MACRO 7
+namespace C4_12x7 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 12
+#define BOARD_HEIGHT_MACRO 8
+namespace C4_12x8 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP
+
+#define BOARD_WIDTH_MACRO 12
+#define BOARD_HEIGHT_MACRO 9
+namespace C4_12x9 {
+#include "Solver.cpp"
+}
+#undef BOARD_WIDTH_MACRO
+#undef BOARD_HEIGHT_MACRO
+#undef POSITION_HPP
+#undef SOLVER_HPP
+#undef TRANSPOSITION_TABLE_HPP
+#undef CUCKOO_TABLE_HPP
+#undef OPENING_BOOK_HPP
+#undef MOVE_SORTER_HPP

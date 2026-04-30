@@ -353,7 +353,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 }
 
 template <int WIDTH, int HEIGHT>
-HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache) : transTable(cache), nodeCount{0}, isSearching{false}, pool(std::make_unique<ThreadPool>()) {
+HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int32_t, 32>> cache) : transTable(cache), nodeCount{0}, isSearching{false}, pool(std::make_unique<ThreadPool>()) {
   for(int i = 0; i < WIDTH; i++) 
     columnOrder[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; 
   for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {

@@ -26,8 +26,9 @@ namespace Connect4 {
 
 class HeuristicCache : public Cache {
  public:
-  std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> transTable;
-  HeuristicCache(size_t table_bytes) : transTable(std::make_shared<TranspositionTable<uint64_t, uint32_t, 32>>(table_bytes)) {}
+  std::shared_ptr<TranspositionTable<unsigned __int128, int32_t, 32>> transTable;
+  
+  HeuristicCache(size_t table_bytes) : transTable(std::make_shared<TranspositionTable<unsigned __int128, int32_t, 32>>(table_bytes)) {}
   void reset() override { transTable->reset(); }
 };
 
@@ -40,7 +41,7 @@ class HeuristicSolver {
  private:
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
   
-  std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> transTable;
+  std::shared_ptr<TranspositionTable<unsigned __int128, int32_t, 32>> transTable;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
   std::atomic<bool> isSearching{false};
   std::atomic<bool> stopSearch;
@@ -83,7 +84,7 @@ class HeuristicSolver {
   bool isBusy() const { return isSearching.load(std::memory_order_relaxed); }
   void setBusy(bool busy) { isSearching.store(busy, std::memory_order_relaxed); }
 
-  HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache);
+  HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int32_t, 32>> cache);
 
   static std::unique_ptr<Cache> createCache(size_t table_bytes) {
     return std::make_unique<HeuristicCache>(table_bytes);
