@@ -68,7 +68,8 @@ void run_throughput(const std::vector<BenchPos>& positions, bool is_heuristic, i
         p.play(bp.pos);
         
         if (is_heuristic) {
-            auto res = heuristic_solver->analyze_heuristic(p, depth, threads, 999999);
+            auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()).time_since_epoch().count();
+            auto res = heuristic_solver->analyze_heuristic(p, 42, threads, now + 20);
             
             int score = res.first.empty() ? 0 : res.first[0];
             int reached_depth = res.second;
