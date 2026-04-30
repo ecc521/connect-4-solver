@@ -120,7 +120,7 @@ describe("Polymorphic Dense Book Packing", () => {
     book.destroy();
   });
 
-  test.skip("should load the generated depth 5 book and return exact scores without searching", async () => {
+  test("should load the generated depth 5 book and return exact scores without searching", async () => {
     const bookData = new Uint8Array(fs.readFileSync(d5Path));
 
     const solver = new NodeConnect4Solver();
@@ -129,15 +129,41 @@ describe("Polymorphic Dense Book Packing", () => {
     const book = new OpeningBook(solver.width, solver.height);
     await book.load(bookData);
 
-    // Evaluate a depth 2 position (1 2)
-    // The exact score is cached in the book, so it should return instantly and match
-    const result = await solver.analyze("12", { book });
+    // Evaluate a depth 2 position (12). The mock book has it scored as -1.
+    // We use `solve` so it hits the book at the root instantly.
+    const result = await solver.solve("12", { book });
+    expect(result.evaluation?.score).toBe(-1);
 
-    expect(result.evaluation?.score).toBe(0);
-
-    // Evaluate a depth 2 position (1 1)
-    const result2 = await solver.analyze("11", { book });
+    // Evaluate a depth 2 position (11) not in the book
+    // Wait, 11 is not in the book. If we solve it, the exact solver will search it fully!
+    // Let's test a position that IS in the book, like "1" (score 1)
+    const result2 = await solver.solve("1", { book });
     expect(result2.evaluation?.score).toBe(1);
+
+    book.destroy();
+  });
+
+  test("should load the generated depth 5 book into heuristic solver and translate exact scores", async () => {
+    const bookData = new Uint8Array(fs.readFileSync(d5Path));
+
+    const solver = new NodeConnect4Solver({ heuristic: true });
+    await solver.init();
+
+    const book = new OpeningBook(solver.width, solver.height);
+    await book.load(bookData);
+
+    // Evaluate a depth 2 position (12)
+    // The exact score is cached in the book as -1 (Loss)
+    // The heuristic solver should translate this to -31001
+    // We use `solve` with a 1ms timeout. Without the book, 1ms would not find a deep loss.
+    const result = await solver.solve("12", { book, timeoutMs: 1 });
+    
+    // Heuristic bounds translate exact Loss to <= -31000
+    expect(result.evaluation?.score).toBeLessThanOrEqual(-31000);
+
+    // Evaluate a depth 1 position (1) which is in the book with score 1
+    const result2 = await solver.solve("1", { book, timeoutMs: 1 });
+    expect(result2.evaluation?.score).toBeGreaterThanOrEqual(31000);
 
     book.destroy();
   });
