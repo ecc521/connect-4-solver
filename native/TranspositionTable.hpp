@@ -105,9 +105,10 @@ class TranspositionTable {
       int shift_amount = ValueBits + WorkBits + MoveBits;
       int available_bits = sizeof(SlotType) * 8 - shift_amount;
       
+      // Fold the upper bits down to prevent collision when truncating CRT keys
+      // that are too large to fit in the available_bits hash space
+      partial ^= (partial >> available_bits);
       if constexpr (sizeof(KeyType) > 8) {
-          // For 128-bit keys, fold the upper bits down to prevent collision when truncating
-          partial ^= (partial >> available_bits);
           partial ^= (partial >> (available_bits * 2));
       }
       

@@ -115,6 +115,39 @@ int SolverImpl::negamax(const Position &P, int alpha, int beta, const OpeningBoo
     }
   }
 
+  static int tt_probe_depth = -1;
+  if (tt_probe_depth == -1) {
+    if (const char* env_p = std::getenv("TT_PROBE_DEPTH")) {
+      tt_probe_depth = std::stoi(env_p);
+    } else {
+      tt_probe_depth = 15;
+    }
+  }
+
+  // 1-ply TT lookahead (Child Probing) to prune early before deep searches
+  if (P.nbMoves() < (Position::WIDTH * Position::HEIGHT) - tt_probe_depth) {
+    for (int i = 0; i < Position::WIDTH; i++) {
+      int col = columnOrder[i];
+      if (Position::position_t move = possible & Position::column_mask(col)) {
+        Position child(P);
+        child.play(move);
+        if (auto child_packed = transTable->getPacked(child.key()); child_packed.value) {
+          uint8_t child_val = child_packed.value;
+          if (child_val <= Position::MAX_SCORE - Position::MIN_SCORE + 1) { 
+            // child upper bound means child_score <= child_max
+            // so our_score >= -child_max. This is a lower bound for us!
+            int child_max = child_val + Position::MIN_SCORE - 1;
+            int our_min = -child_max;
+            if (alpha < our_min) {
+              alpha = our_min;
+              if (alpha >= beta) return alpha;
+            }
+          }
+        }
+      }
+    }
+  }
+
   if(book) {
     if(int val = book->get(P)) return val + Position::MIN_SCORE - 1; // look for solutions stored in opening book
   }
@@ -316,7 +349,26 @@ class TypedCache : public Cache {
   std::shared_ptr<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>> transTable;
 
   TypedCache(size_t table_bytes) 
-    : transTable(std::make_shared<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>>(table_bytes)) {}
+    : transTable(std::make_shared<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>>(table_bytes)) {
+      
+      // Calculate CRT safety
+      int shift_amount = VALUE_BITS + 7 + 4; // ValueBits + WorkBits + MoveBits
+      int available_bits = 64 - shift_amount;
+      int board_bits = Position::WIDTH * (Position::HEIGHT + 1);
+      
+      if (board_bits > available_bits) {
+          int index_bits = board_bits - available_bits;
+          if (index_bits < 64) {
+              uint64_t required_buckets = 1ULL << index_bits;
+              if (transTable->getSize() / 2 < required_buckets) {
+                  std::cerr << "[Warning] TranspositionTable: Allocated memory (" << table_bytes / (1024*1024) 
+                            << " MB) is too small to fit full board keys mathematically via pure CRT (requires " 
+                            << (required_buckets * 16) / (1024*1024) << " MB). "
+                            << "Falling back to XOR-folded hashing." << std::endl;
+              }
+          }
+      }
+    }
     
   void reset() override {
     transTable->reset();
