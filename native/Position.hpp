@@ -213,14 +213,54 @@ class GenericPosition {
   * as the last digit is always 0, we omit it and a base 3 key
   * uses N = (nbMoves + nbColumns - 1) base 3 digits or N*log2(3) bits.
   */
-  uint64_t key3() const {
+  position_t mirror_key() const {
+      position_t k = key();
+      position_t res = 0;
+      for (int i = 0; i < WIDTH; i++) {
+          position_t col_mask = ((position_t(1) << (HEIGHT + 1)) - 1) << (i * (HEIGHT + 1));
+          int target_i = WIDTH - 1 - i;
+          if (target_i > i) {
+              res |= (k & col_mask) << ((target_i - i) * (HEIGHT + 1));
+          } else if (target_i < i) {
+              res |= (k & col_mask) >> ((i - target_i) * (HEIGHT + 1));
+          } else {
+              res |= (k & col_mask);
+          }
+      }
+      return res;
+  }
+
+  position_t symmetric_key(bool &is_reverse) const {
+      position_t k_forward = key();
+      position_t k_reverse = mirror_key();
+      if (k_forward < k_reverse) {
+          is_reverse = false;
+          return k_forward;
+      } else {
+          is_reverse = true;
+          return k_reverse;
+      }
+  }
+
+  uint64_t key3(bool &is_reverse) const {
     uint64_t key_forward = 0;
     for(int i = 0; i < WIDTH; i++) partialKey3(key_forward, i);  // compute key in increasing order of columns
 
     uint64_t key_reverse = 0;
     for(int i = WIDTH; i--;) partialKey3(key_reverse, i);  // compute key in decreasing order of columns
 
-    return key_forward < key_reverse ? key_forward / 3 : key_reverse / 3; // take the smallest key and divide per 3 as the last base3 digit is always 0
+    if (key_forward < key_reverse) {
+        is_reverse = false;
+        return key_forward / 3;
+    } else {
+        is_reverse = true;
+        return key_reverse / 3;
+    }
+  }
+
+  uint64_t key3() const {
+      bool is_reverse;
+      return key3(is_reverse);
   }
 
   /**

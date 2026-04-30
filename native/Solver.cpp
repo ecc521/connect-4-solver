@@ -94,24 +94,26 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     }
   }
 
-  const Position::position_t key = P.key();
+  bool is_reverse = false;
+  const Position::position_t key = P.symmetric_key(is_reverse);
   uint8_t table_move = Position::WIDTH;
-  
+
   if(auto packed = transTable->getPacked(key); packed.value) {
     uint8_t val = packed.value;
     table_move = packed.best_move;
-    
+    if (table_move < Position::WIDTH && is_reverse) table_move = Position::WIDTH - 1 - table_move;
+
     if(val > Position::MAX_SCORE - Position::MIN_SCORE + 1) { // we have an lower bound
       min = val + 2 * Position::MIN_SCORE - Position::MAX_SCORE - 2;
       if(alpha < min) {
-        alpha = min;                     
-        if(alpha >= beta) return alpha;  
+        alpha = min;
+        if(alpha >= beta) return alpha;
       }
     } else { // we have an upper bound
       max = val + Position::MIN_SCORE - 1;
       if(beta > max) {
-        beta = max;                     
-        if(alpha >= beta) return beta;  
+        beta = max;
+        if(alpha >= beta) return beta;
       }
     }
   }
@@ -132,9 +134,10 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
       if (Position::position_t move = possible & Position::column_mask(col)) {
         Position child(P);
         child.play(move);
-        if (auto child_packed = transTable->getPacked(child.key()); child_packed.value) {
+        bool dummy;
+        if (auto child_packed = transTable->getPacked(child.symmetric_key(dummy)); child_packed.value) {
           uint8_t child_val = child_packed.value;
-          if (child_val <= Position::MAX_SCORE - Position::MIN_SCORE + 1) { 
+          if (child_val <= Position::MAX_SCORE - Position::MIN_SCORE + 1) {
             // child upper bound means child_score <= child_max
             // so our_score >= -child_max. This is a lower bound for us!
             int child_max = child_val + Position::MIN_SCORE - 1;
@@ -173,7 +176,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
 
   while(Position::position_t next = moves.getNext()) {
     Position P2(P);
-    P2.play(next);  
+    P2.play(next);
     int score = -negamax(P2, -beta, -alpha, book);
 
     if(score > best_score) {
@@ -182,14 +185,18 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     }
 
     if(best_score >= beta) {
-      transTable->put(key, best_score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves()), best_move);  
-      return best_score;  
+      uint8_t stored_move = best_move;
+      if (stored_move < Position::WIDTH && is_reverse) stored_move = Position::WIDTH - 1 - stored_move;
+      transTable->put(key, best_score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves()), stored_move);
+      return best_score;
     }
-    if(best_score > alpha) alpha = best_score; 
+    if(best_score > alpha) alpha = best_score;
   }
 
   uint8_t work = std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves());
-  transTable->put(key, best_score - Position::MIN_SCORE + 1, work, best_move); 
+  uint8_t stored_move = best_move;
+  if (stored_move < Position::WIDTH && is_reverse) stored_move = Position::WIDTH - 1 - stored_move;
+  transTable->put(key, best_score - Position::MIN_SCORE + 1, work, stored_move);
   return best_score;
 }
 
@@ -202,22 +209,22 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const Ope
     }
     return {score, -1, (int)P.nbMoves(), getNodeCount()};
   }
-  
+
   if(book) {
     if(int val = book->get(P))      return {val + Position::MIN_SCORE - 1, -1, (int)P.nbMoves(), getNodeCount()};
   }
-  
+
   int min = -(Position::WIDTH * Position::HEIGHT - P.nbMoves()) / 2;
   int max = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
   int score = 0;
   if (weak) {
     min = -1;
     max = 1;
-    while(min < max) {                    
+    while(min < max) {
       int med = min + (max - min) / 2;
       if(med <= 0 && min / 2 < med) med = min / 2;
       else if(med >= 0 && max / 2 > med) med = max / 2;
-      int r = negamax(P, med, med + 1, book);   
+      int r = negamax(P, med, med + 1, book);
       if(r <= med) max = r;
       else min = r;
     }
@@ -352,14 +359,14 @@ class TypedCache : public Cache {
   static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
   std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
 
-  TypedCache(size_t table_bytes) 
+  TypedCache(size_t table_bytes)
     : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)) {
-      
+
       // Calculate CRT safety
       int shift_amount = VALUE_BITS + 7 + 4; // ValueBits + WorkBits + MoveBits
       int available_bits = sizeof(SlotType) * 8 - shift_amount;
       int board_bits = Position::WIDTH * (Position::HEIGHT + 1);
-      
+
       if (board_bits > available_bits) {
           int index_bits = board_bits - available_bits;
           if (index_bits < 64) {
@@ -371,7 +378,7 @@ class TypedCache : public Cache {
           }
       }
     }
-    
+
   void reset() override {
     transTable->reset();
   }
@@ -382,7 +389,7 @@ std::unique_ptr<Cache> Solver::createCache(size_t table_bytes) {
   constexpr int shift_amount = VALUE_BITS + 7 + 4;
   constexpr int available_bits_64 = 64 - shift_amount;
   constexpr int board_bits = Position::WIDTH * (Position::HEIGHT + 1);
-  
+
   if constexpr (board_bits > available_bits_64) {
       constexpr int index_bits_64 = board_bits - available_bits_64;
       if constexpr (index_bits_64 < 64) {
@@ -390,7 +397,7 @@ std::unique_ptr<Cache> Solver::createCache(size_t table_bytes) {
           // Calculate approx required bytes (16 bytes per bucket + overhead)
           size_t bucket_size = 16;
           size_t required_bytes_64 = required_buckets_64 * bucket_size;
-          
+
           if (table_bytes < required_bytes_64) {
               // Upgrade to 128-bit slot since memory is too small for 64-bit CRT
               return std::make_unique<TypedCache<unsigned __int128>>(table_bytes);
@@ -400,7 +407,7 @@ std::unique_ptr<Cache> Solver::createCache(size_t table_bytes) {
           return std::make_unique<TypedCache<unsigned __int128>>(table_bytes);
       }
   }
-  
+
   return std::make_unique<TypedCache<uint64_t>>(table_bytes);
 }
 
