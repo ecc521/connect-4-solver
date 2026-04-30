@@ -45,7 +45,7 @@ Multithreaded WASM requires `SharedArrayBuffer`, which is only available when yo
 
 ### WebAssembly Thread Pool
 
-The distributed multithreaded WASM binary (`analyze_threaded.js`) is pre-compiled using Emscripten with a strict `PTHREAD_POOL_SIZE=4` to optimize memory and startup latency. This means that requesting more than 4 threads will automatically be capped by the engine. To increase this limit, you must recompile the C++ source code using `emcc` and explicitly raise the `PTHREAD_POOL_SIZE` flag in `build.sh` and/or enable dynamic worker creation (`-s PTHREAD_POOL_SIZE_STRICT=0`).
+The distributed multithreaded WASM binary (`analyze_threaded.js`) is pre-compiled using Emscripten with a `PTHREAD_POOL_SIZE=4` and `PTHREAD_POOL_SIZE_STRICT=0`. This safely provisions 4 workers by default to handle common concurrent workloads without dynamically blocking the JS main thread, while allowing dynamic expansion (`_STRICT=0`) if more threads are requested.
 
 ### Node.js (Native) Persistent Thread Pool
 
