@@ -119,11 +119,13 @@ interface NativeModuleType {
     h: number,
     depth: number,
   ) => {
+    add(key: bigint, score: number): void;
     addPosition(pos: string, score: number): void;
     loadFromBook(bookPtr: number): void;
     saveDense(path: string): void;
     getDenseBuffer(): Uint8Array;
     saveEliasFano(path: string): void;
+    size(): number;
   };
 }
 
@@ -572,7 +574,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
                 threads,
                 maxDepth,
                 timeoutMs,
-                bookPtr,
+                bookPtr === 0 ? null : bookPtr,
               );
             else
               resArr = await native._analyzeExact(
@@ -620,7 +622,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
                 positionStr,
                 maxDepth,
                 timeoutMs,
-                bookPtr,
+                bookPtr === 0 ? null : bookPtr,
               );
             else
               resArr = await native._solveExact(
