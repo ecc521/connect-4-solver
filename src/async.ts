@@ -36,7 +36,7 @@ export abstract class AbstractAsyncWebWorkerSolver {
 
     let width = 7;
     let height = 6;
-    let cacheSizeMb = 100;
+    let cacheSizeMb = 128;
     let heuristic = false;
 
     if (typeof opts === "number") {

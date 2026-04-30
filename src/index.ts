@@ -176,7 +176,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
 
   constructor(opts?: Connect4SolverOptions | number, heightOpt?: number) {
     super(opts as Connect4SolverOptions, heightOpt);
-    let cacheSizeMb = 100;
+    let cacheSizeMb = 128;
     let heuristic = false;
 
     if (opts && typeof opts === "object") {

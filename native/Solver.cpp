@@ -361,10 +361,7 @@ class TypedCache : public Cache {
           if (index_bits < 64) {
               uint64_t required_buckets = 1ULL << index_bits;
               if (transTable->getSize() / 2 < required_buckets) {
-                  std::cerr << "[Warning] TranspositionTable: Allocated memory (" << table_bytes / (1024*1024) 
-                            << " MB) is too small to fit full board keys mathematically via pure CRT (requires " 
-                            << (required_buckets * 16) / (1024*1024) << " MB). "
-                            << "Falling back to XOR-folded hashing." << std::endl;
+                  throw std::runtime_error("TranspositionTable allocated memory is mathematically too small to guarantee collision-free CRT for this board size.");
               }
           }
       }
