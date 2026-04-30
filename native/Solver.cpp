@@ -20,11 +20,9 @@
 #include "MoveSorter.hpp"
 #include <stdexcept>
 #include <iostream>
-#ifdef USE_PTHREADS
 #include <thread>
 #include <algorithm>
 #include <future>
-#endif
 
 using namespace GameSolver::Connect4;
 
@@ -39,13 +37,16 @@ namespace {
  * Reccursively score connect 4 position using negamax variant of alpha-beta algorithm.
  */
 template <typename SlotType>
-int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag, int32_t* thread_history) {
+  if (abort_flag && abort_flag->load(std::memory_order_relaxed)) return 0;
+
   assert(alpha < beta);
   assert(!P.canWinNext());
 
   if (++solverTlNodeCount >= 16384) {
     nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
     solverTlNodeCount = 0;
+    if (abort_flag && abort_flag->load(std::memory_order_relaxed)) return 0;
   }
 
   Position::position_t possible = P.possibleNonLosingMoves();
@@ -63,7 +64,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     } else {
       nodeCount.fetch_sub(1, std::memory_order_relaxed);
     }
-    return -negamax(P2, -beta, -alpha, book);
+    return -negamax(P2, -beta, -alpha, book, abort_flag, thread_history);
   }
 
   int min = -(Position::WIDTH * Position::HEIGHT - 2 - P.nbMoves()) / 2;	// lower bound of score as opponent cannot win next move
@@ -169,6 +170,11 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
       if (Position::COLUMN_ORDER[i] == table_move) {
         score += 100000000; // Heavily prioritize table move
       }
+      // Use thread-local history for move ordering if provided
+      if (thread_history) {
+        int col = Position::ctz_impl(move) / (Position::HEIGHT + 1);
+        score += thread_history[col * (Position::HEIGHT + 1)] * 100;
+      }
       moves.add(move, score);
     }
   }
@@ -182,7 +188,9 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   while(Position::position_t next = moves.getNext()) {
     Position P2(P);
     P2.play(next);
-    int score = -negamax(P2, -beta, -alpha, book);
+    int score = -negamax(P2, -beta, -alpha, book, abort_flag, thread_history);
+
+    if (abort_flag && abort_flag->load(std::memory_order_relaxed)) return 0;
 
     if(score > best_score) {
       best_score = score;
@@ -205,8 +213,12 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   return best_score;
 }
 
+/**
+ * Serial solve implementation. Can be called with an abort_flag for Lazy SMP
+ * and an optional private history table for search diversity.
+ */
 template <typename SlotType>
-SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+SolverResult SolverImpl<SlotType>::solve_single(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag, int32_t* thread_history) {
   if(P.canWinNext()) {
     int score = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
     for (int i = 0; i < Position::WIDTH; i++) {
@@ -226,20 +238,24 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const Ope
     min = -1;
     max = 1;
     while(min < max) {
+      if (abort_flag && abort_flag->load(std::memory_order_relaxed)) { score = min; break; }
       int med = min + (max - min) / 2;
       if(med <= 0 && min / 2 < med) med = min / 2;
       else if(med >= 0 && max / 2 > med) med = max / 2;
-      int r = negamax(P, med, med + 1, book);
+      int r = negamax(P, med, med + 1, book, abort_flag, thread_history);
+      if (abort_flag && abort_flag->load(std::memory_order_relaxed)) { score = min; break; }
       if(r <= med) max = r;
       else min = r;
     }
     score = min;
   } else {
-    int r = negamax(P, -1, 0, book);
+    int r = negamax(P, -1, 0, book, abort_flag, thread_history);
+    if (abort_flag && abort_flag->load(std::memory_order_relaxed)) goto flush;
     if (r <= -1) {
       max = -1;
       for (int i = -2; i >= min; i--) {
-        if (negamax(P, i, i + 1, book) > i) {
+        if (abort_flag && abort_flag->load(std::memory_order_relaxed)) { score = max; goto flush; }
+        if (negamax(P, i, i + 1, book, abort_flag, thread_history) > i) {
           min = max = i + 1;
           break;
         }
@@ -250,13 +266,15 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const Ope
       }
       score = max;
     } else {
-      r = negamax(P, 0, 1, book);
+      r = negamax(P, 0, 1, book, abort_flag, thread_history);
+      if (abort_flag && abort_flag->load(std::memory_order_relaxed)) { score = 0; goto flush; }
       if (r <= 0) {
         score = 0;
       } else {
         min = 1;
         for (int i = 1; i < max; i++) {
-          if (negamax(P, i, i + 1, book) <= i) {
+          if (abort_flag && abort_flag->load(std::memory_order_relaxed)) { score = min; goto flush; }
+          if (negamax(P, i, i + 1, book, abort_flag, thread_history) <= i) {
             min = max = i;
             break;
           }
@@ -269,14 +287,17 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const Ope
       }
     }
   }
+flush:
   nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
   solverTlNodeCount = 0;
 
+  if (abort_flag && abort_flag->load(std::memory_order_relaxed)) {
+    return {score, -1, (int)P.nbMoves(), getNodeCount()};
+  }
+
   int bestMove = -1;
 
-  // 1. PHASE 1: Try to find a move using ONLY the Opening Book (Shortcut for Sparse Books)
-  // This avoids accidentally triggering a deep search on an "unknown" column if a "known" 
-  // winning column is available elsewhere in the book.
+  // PHASE 1: Try to find a move using ONLY the Opening Book (Shortcut for Sparse Books)
   if (book) {
     for (int i = 0; i < Position::WIDTH; i++) {
         int col = Position::COLUMN_ORDER[i];
@@ -294,9 +315,7 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const Ope
     }
   }
 
-  // 2. PHASE 2: Fallback to the existing hot-TT scan
-  // If we haven't found the move in the book, we perform a quick negamax pass.
-  // Because we just called solve(), the TT is "hot" and most of these calls will be instant.
+  // PHASE 2: Fallback to hot-TT scan for best move
   if (bestMove == -1) {
     for (int i = 0; i < Position::WIDTH; i++) {
         int col = Position::COLUMN_ORDER[i];
@@ -312,6 +331,71 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const Ope
   }
 
   return {score, bestMove, (int)P.nbMoves(), getNodeCount()};
+}
+
+/**
+ * Public solve() entry point. When threads > 1, uses Lazy SMP:
+ * N threads search the same position with the same aspiration windows,
+ * sharing the transposition table but using private history tables.
+ * First thread to complete determines the result; others are aborted.
+ */
+template <typename SlotType>
+SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+  if (threads <= 1) {
+    return solve_single(P, weak, book);
+  }
+
+  // --- True Lazy SMP ---
+  pool->ensureCapacity(threads - 1);
+  
+  std::atomic<bool> done{false};
+  SolverResult final_result{0, -1, (int)P.nbMoves(), 0};
+  std::mutex result_mutex;
+  
+  std::atomic<int> remaining(threads - 1);
+  std::promise<void> prom;
+  auto fut = prom.get_future();
+
+  // Launch helper threads with private history copies
+  for (int t = 1; t < threads; t++) {
+    pool->enqueue([&, t]() {
+      // Private history copy with thread-indexed perturbation for search diversity
+      int32_t local_history[Position::WIDTH * (Position::HEIGHT + 1)];
+      for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
+        local_history[i] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[i];
+        // Add small per-thread perturbation to create move ordering diversity
+        local_history[i] += (t * 7 + i * 3) % 5;
+      }
+      
+      solverTlNodeCount = 0;
+      SolverResult r = solve_single(P, weak, book, &done, local_history);
+      nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+      solverTlNodeCount = 0;
+      
+      if (!done.exchange(true)) {
+        std::lock_guard<std::mutex> lock(result_mutex);
+        final_result = r;
+      }
+      if (remaining.fetch_sub(1) == 1) {
+        prom.set_value();
+      }
+    });
+  }
+
+  // Main thread also searches (thread 0, no perturbation)
+  solverTlNodeCount = 0;
+  SolverResult r = solve_single(P, weak, book, &done);
+  nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+  solverTlNodeCount = 0;
+  
+  if (!done.exchange(true)) {
+    std::lock_guard<std::mutex> lock(result_mutex);
+    final_result = r;
+  }
+
+  fut.wait();
+  final_result.nodes = getNodeCount();
+  return final_result;
 }
 
 template <typename SlotType>
@@ -333,7 +417,7 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
         } else {
           Position P2(P);
           P2.playCol(col);
-          scores[col] = -solve(P2, weak, book).score;
+          scores[col] = -solve(P2, weak, 1, book).score;
         }
       }
       nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
@@ -370,7 +454,7 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
       else {
         Position P2(P);
         P2.playCol(col);
-        scores[col] = -solve(P2, weak, book).score;
+        scores[col] = -solve(P2, weak, 1, book).score;
       }
     }
   }

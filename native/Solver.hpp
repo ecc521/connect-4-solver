@@ -29,6 +29,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <future>
 #include "Cache.hpp"
 #include "Position.hpp"
 #include "TranspositionTable.hpp"
@@ -54,7 +55,7 @@ class Solver {
  public:
   static const int INVALID_MOVE = -1000;
 
-  virtual SolverResult solve(const Position &P, bool weak = false, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
+  virtual SolverResult solve(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
   virtual std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
   virtual unsigned long long getNodeCount() const = 0;
   virtual void reset() = 0;
@@ -68,57 +69,7 @@ class Solver {
   static std::unique_ptr<Solver> create(size_t table_bytes);
 };
 
-class SolverImplBase {
- public:
-  class ThreadPool {
-   public:
-    std::vector<std::thread> workers;
-    std::queue<std::function<void()>> tasks;
-    std::mutex queue_mutex;
-    std::condition_variable condition;
-    std::atomic<bool> stop{false};
-    int current_threads{0};
 
-    ThreadPool() : stop(false), current_threads(0) {}
-
-    ~ThreadPool() {
-      stop = true;
-      condition.notify_all();
-      for (std::thread &worker : workers) {
-        if (worker.joinable()) worker.join();
-      }
-    }
-
-    void ensureCapacity(int n) {
-      if (n <= current_threads) return;
-      std::unique_lock<std::mutex> lock(queue_mutex);
-      for (int i = current_threads; i < n; ++i) {
-        workers.emplace_back([this] {
-          for (;;) {
-            std::function<void()> task;
-            {
-              std::unique_lock<std::mutex> lock(this->queue_mutex);
-              this->condition.wait(lock, [this] { return this->stop || !this->tasks.empty(); });
-              if (this->stop && this->tasks.empty()) return;
-              task = std::move(this->tasks.front());
-              this->tasks.pop();
-            }
-            task();
-          }
-        });
-      }
-      current_threads = n;
-    }
-
-    void enqueue(std::function<void()> task) {
-      {
-        std::unique_lock<std::mutex> lock(queue_mutex);
-        tasks.push(std::move(task));
-      }
-      condition.notify_one();
-    }
-  };
-};
 
 template <typename SlotType>
 class SolverImpl : public Solver {
@@ -131,7 +82,7 @@ class SolverImpl : public Solver {
  private:
   mutable int32_t history[Position::WIDTH * (Position::HEIGHT + 1)];
 
-  int negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book);
+  int negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
 
  public:
 
@@ -149,8 +100,11 @@ class SolverImpl : public Solver {
     }
   }
 
-  SolverResult solve(const Position &P, bool weak = false, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
+  SolverResult solve(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
   std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
+
+ private:
+  SolverResult solve_single(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
 
   unsigned long long getNodeCount() const override {
     return nodeCount;

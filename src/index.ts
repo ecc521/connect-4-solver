@@ -66,6 +66,7 @@ interface NativeModuleType {
     solver: unknown,
     pos: string,
     weak: boolean,
+    threads: number,
     book: unknown,
   ): Promise<Int32Array>;
   _solveHeuristic(
@@ -446,6 +447,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         this._solverPtr,
         allocatedMemory,
         weak,
+        1,
         bookPtr,
       );
 
@@ -610,7 +612,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
           try {
             const native = getNativeModule();
             if (!native) throw new Error("Native module not loaded");
-            const { maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
+            const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
             const weak = opts?.weak ?? false;
 
             let resArr: Int32Array | number[];
@@ -631,6 +633,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
                 this._solverPtr,
                 positionStr,
                 weak,
+                threads,
                 bookPtr === 0 ? null : bookPtr,
               );
 

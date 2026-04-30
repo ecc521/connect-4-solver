@@ -146,6 +146,7 @@ export interface SolverModule {
     solverPtr: number,
     posPtr: number,
     weak: boolean,
+    threads: number,
     bookPtr: number,
   ) => number;
   _solveHeuristic: (
