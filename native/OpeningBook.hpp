@@ -73,9 +73,14 @@ public:
     virtual ~OpeningBookBase() = default;
     
     static std::unique_ptr<OpeningBookBase<W, H>> load(std::string filename, int width, int height);
+    static std::unique_ptr<OpeningBookBase<W, H>> load(std::istream& ifs, int width, int height, size_t stream_size);
+    static std::unique_ptr<OpeningBookBase<W, H>> load_from_memory(const uint8_t* data, size_t size, int width, int height);
     
     static void save_dense(const std::string& filename, int depth, EntryList items);
     static void save_elias_fano(const std::string& filename, int depth, EntryList items);
+    
+    static std::vector<uint8_t> serialize_dense(int depth, EntryList items);
+    static std::vector<uint8_t> serialize_elias_fano(int depth, EntryList items);
 };
 
 template <int W, int H>
@@ -134,7 +139,7 @@ class EliasFanoBook : public OpeningBookBase<W, H> {
   int getDepth() const override { return depth; }
 
  public:
-  EliasFanoBook(uint64_t n, uint64_t U, uint8_t L, int depth, std::vector<uint64_t> ub, std::vector<uint64_t> lb, std::vector<uint8_t> v)
+  EliasFanoBook(uint64_t n, uint64_t /*U*/, uint8_t L, int depth, std::vector<uint64_t> ub, std::vector<uint64_t> lb, std::vector<uint8_t> v)
     : num_entries{n}, L{L}, depth{depth}, upper_bits(std::move(ub)), lower_bits(std::move(lb)), values(std::move(v)) {
       build_index();
     }
@@ -158,9 +163,23 @@ class EliasFanoBook : public OpeningBookBase<W, H> {
   typename OpeningBookBase<W, H>::EntryList dump() const override {
     typename OpeningBookBase<W, H>::EntryList res;
     res.reserve(num_entries);
-    for (uint64_t i = 0; i < num_entries; i++) {
-        res.push_back({static_cast<typename GenericPosition<W, H>::position_t>(get_key(i)), values[i]});
+    
+    uint64_t y = 0;
+    uint64_t i = 0;
+    for (size_t block = 0; block < upper_bits.size(); block++) {
+        uint64_t val = upper_bits[block];
+        for (int bit = 0; bit < 64; bit++) {
+            if (i >= num_entries) break;
+            if ((val >> bit) & 1) {
+                res.push_back({static_cast<typename GenericPosition<W, H>::position_t>((y << L) | get_lower(i)), values[i]});
+                i++;
+            } else {
+                y++;
+            }
+        }
+        if (i >= num_entries) break;
     }
+    
     return res;
   }
 };
@@ -183,6 +202,12 @@ class DenseBook : public OpeningBookBase<W, H> {
     if(P.nbMoves() > depth || keys.empty()) return 0;
     
     typename GenericPosition<W, H>::position_t target = P.key3();
+    
+    // Mask the target key to match the truncated keys stored in the book
+    if (sizeof(KeyT) < sizeof(target)) {
+        target &= (typename GenericPosition<W, H>::position_t(1) << (sizeof(KeyT) * 8)) - 1;
+    }
+
     auto it = std::lower_bound(keys.begin(), keys.end(), target);
     
     if (it != keys.end() && *it == target) {
@@ -203,7 +228,7 @@ class DenseBook : public OpeningBookBase<W, H> {
 };
 
 template<int W, int H, int N>
-std::unique_ptr<OpeningBookBase<W, H>> load_dense_book_n(std::ifstream& ifs, size_t file_size, int depth) {
+std::unique_ptr<OpeningBookBase<W, H>> load_dense_book_n(std::istream& ifs, size_t file_size, int depth) {
     size_t num_entries = (file_size - 6) / (N + 1);
     std::vector<PackedKey<W, H, N>> keys(num_entries);
     std::vector<uint8_t> values(num_entries);
@@ -219,7 +244,7 @@ std::unique_ptr<OpeningBookBase<W, H>> load_dense_book_n(std::ifstream& ifs, siz
 }
 
 template<int W, int H>
-std::unique_ptr<OpeningBookBase<W, H>> load_elias_fano_book(std::ifstream& ifs, int depth) {
+std::unique_ptr<OpeningBookBase<W, H>> load_elias_fano_book(std::istream& ifs, int depth) {
     uint64_t num_entries, U;
     uint8_t L;
     ifs.read(reinterpret_cast<char*>(&num_entries), 8);
@@ -243,11 +268,30 @@ std::unique_ptr<OpeningBookBase<W, H>> load_elias_fano_book(std::ifstream& ifs, 
 template<int W, int H>
 inline std::unique_ptr<OpeningBookBase<W, H>> OpeningBookBase<W, H>::load(std::string filename, int width, int height) {
     std::ifstream ifs(filename, std::ios::binary);
-
     if(ifs.fail()) {
       throw std::runtime_error("Failed to open Connect 4 opening book file: " + filename);
     }
+    ifs.seekg(0, std::ios::end);
+    size_t file_size = ifs.tellg();
+    ifs.seekg(0, std::ios::beg);
+    return load(ifs, width, height, file_size);
+}
 
+struct MemBuf : std::streambuf {
+    MemBuf(char* begin, char* end) {
+        this->setg(begin, begin, end);
+    }
+};
+
+template<int W, int H>
+inline std::unique_ptr<OpeningBookBase<W, H>> OpeningBookBase<W, H>::load_from_memory(const uint8_t* data, size_t size, int width, int height) {
+    MemBuf sbuf(const_cast<char*>(reinterpret_cast<const char*>(data)), const_cast<char*>(reinterpret_cast<const char*>(data)) + size);
+    std::istream is(&sbuf);
+    return load(is, width, height, size);
+}
+
+template<int W, int H>
+inline std::unique_ptr<OpeningBookBase<W, H>> OpeningBookBase<W, H>::load(std::istream& ifs, int width, int height, size_t stream_size) {
     char _width, _height, _depth, value_bytes, partial_key_bytes, log_size;
 
     ifs.read(&_width, 1);
@@ -277,9 +321,7 @@ inline std::unique_ptr<OpeningBookBase<W, H>> OpeningBookBase<W, H>::load(std::s
       return load_elias_fano_book<W, H>(ifs, _depth);
     }
 
-    ifs.seekg(0, std::ios::end);
-    size_t file_size = ifs.tellg();
-    ifs.seekg(6, std::ios::beg);
+    size_t file_size = stream_size;
 
     switch(partial_key_bytes) {
         case 1: return load_dense_book_n<W, H, 1>(ifs, file_size, _depth);
@@ -304,49 +346,67 @@ inline std::unique_ptr<OpeningBookBase<W, H>> OpeningBookBase<W, H>::load(std::s
 
 template<int W, int H>
 inline void OpeningBookBase<W, H>::save_dense(const std::string& filename, int depth, EntryList items) {
+    auto buf = serialize_dense(depth, items);
+    std::ofstream ofs(filename, std::ios::binary);
+    if(ofs.fail()) throw std::runtime_error("Failed to open book file for writing: " + filename);
+    ofs.write(reinterpret_cast<const char*>(buf.data()), buf.size());
+}
+
+template<int W, int H>
+inline std::vector<uint8_t> OpeningBookBase<W, H>::serialize_dense(int depth, EntryList items) {
     std::sort(items.begin(), items.end());
     items.erase(std::unique(items.begin(), items.end(), 
       [](const auto& a, const auto& b) { return a.first == b.first; }), items.end());
 
-    std::ofstream ofs(filename, std::ios::binary);
+    std::vector<uint8_t> buf;
     int key_bytes = std::ceil(((depth + W - 1) * 1.58496250072) / 8.0);
     if(key_bytes < 1) key_bytes = 1;
     if(key_bytes > 16) key_bytes = 16;
 
     char header[6] = {(char)W, (char)H, (char)depth, (char)key_bytes, 1, 0};
-    ofs.write(header, 6);
+    buf.insert(buf.end(), header, header + 6);
 
     for (size_t i = 0; i < items.size(); i++) {
       pos_t key = items[i].first;
       for (int b = 0; b < key_bytes; b++) {
-        char tmp = (key >> (b * 8)) & 0xFF;
-        ofs.write(&tmp, 1);
+        uint8_t tmp = (key >> (b * 8)) & 0xFF;
+        buf.push_back(tmp);
       }
     }
     for (size_t i = 0; i < items.size(); i++) {
-      char tmp = items[i].second;
-      ofs.write(&tmp, 1);
+      buf.push_back(items[i].second);
     }
-    ofs.close();
+    return buf;
 }
 
 template<int W, int H>
 inline void OpeningBookBase<W, H>::save_elias_fano(const std::string& filename, int depth, EntryList items) {
+    auto buf = serialize_elias_fano(depth, items);
+    std::ofstream ofs(filename, std::ios::binary);
+    if(ofs.fail()) throw std::runtime_error("Failed to open book file for writing: " + filename);
+    ofs.write(reinterpret_cast<const char*>(buf.data()), buf.size());
+}
+
+template<int W, int H>
+inline std::vector<uint8_t> OpeningBookBase<W, H>::serialize_elias_fano(int depth, EntryList items) {
     std::sort(items.begin(), items.end());
     items.erase(std::unique(items.begin(), items.end(), 
       [](const auto& a, const auto& b) { return a.first == b.first; }), items.end());
 
-    std::ofstream ofs(filename, std::ios::binary);
+    std::vector<uint8_t> buf;
     uint64_t n = items.size();
     uint64_t max_key = n > 0 ? items.back().first : 0;
     uint64_t U = max_key + 1;
     uint8_t L = n > 0 ? (uint8_t)std::max(0, (int)std::floor(std::log2((double)U / n))) : 0;
 
     char header[6] = {(char)W, (char)H, (char)depth, 0, 1, (char)0xFF};
-    ofs.write(header, 6);
-    ofs.write(reinterpret_cast<char*>(&n), 8);
-    ofs.write(reinterpret_cast<char*>(&U), 8);
-    ofs.write(reinterpret_cast<char*>(&L), 1);
+    buf.insert(buf.end(), header, header + 6);
+    
+    uint8_t* n_ptr = reinterpret_cast<uint8_t*>(&n);
+    buf.insert(buf.end(), n_ptr, n_ptr + 8);
+    uint8_t* u_ptr = reinterpret_cast<uint8_t*>(&U);
+    buf.insert(buf.end(), u_ptr, u_ptr + 8);
+    buf.push_back(L);
 
     uint64_t ub_size = (n + (U >> L) + 64) / 64;
     std::vector<uint64_t> ub(ub_size, 0);
@@ -354,7 +414,8 @@ inline void OpeningBookBase<W, H>::save_elias_fano(const std::string& filename, 
         uint64_t y = items[i].first >> L;
         ub[(y + i) / 64] |= (1ULL << ((y + i) % 64));
     }
-    ofs.write(reinterpret_cast<char*>(ub.data()), ub_size * 8);
+    uint8_t* ub_ptr = reinterpret_cast<uint8_t*>(ub.data());
+    buf.insert(buf.end(), ub_ptr, ub_ptr + ub_size * 8);
 
     uint64_t lb_size = (n * L + 63) / 64;
     std::vector<uint64_t> lb(lb_size, 0);
@@ -365,12 +426,17 @@ inline void OpeningBookBase<W, H>::save_elias_fano(const std::string& filename, 
         uint64_t idx = bit_pos / 64;
         uint64_t shift = bit_pos % 64;
         lb[idx] |= (val << shift);
-        if (shift + L > 64) lb[idx + 1] |= (val >> (64 - shift));
+        if (shift + L > 64) {
+            lb[idx + 1] |= (val >> (64 - shift));
+        }
     }
-    ofs.write(reinterpret_cast<char*>(lb.data()), lb_size * 8);
+    uint8_t* lb_ptr = reinterpret_cast<uint8_t*>(lb.data());
+    buf.insert(buf.end(), lb_ptr, lb_ptr + lb_size * 8);
 
-    for (size_t i = 0; i < n; i++) ofs.write(reinterpret_cast<char*>(&items[i].second), 1);
-    ofs.close();
+    for (size_t i = 0; i < n; i++) {
+      buf.push_back(items[i].second);
+    }
+    return buf;
 }
 
 } // namespace Connect4

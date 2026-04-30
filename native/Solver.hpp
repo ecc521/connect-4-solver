@@ -129,7 +129,6 @@ class SolverImpl : public Solver {
   std::atomic<bool> isSearching{false};
 
  private:
-  int columnOrder[Position::WIDTH];
   mutable int32_t history[Position::WIDTH * (Position::HEIGHT + 1)];
 
   int negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book);
@@ -138,9 +137,6 @@ class SolverImpl : public Solver {
 
   SolverImpl(size_t table_bytes) 
     : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0}, pool(std::make_unique<ThreadPool>()) {
-    for(int i = 0; i < Position::WIDTH; i++) {
-      columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
-    }
     for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
       history[i] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[i];
     }
@@ -148,9 +144,6 @@ class SolverImpl : public Solver {
 
   SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> cache)
     : transTable(cache), nodeCount{0}, pool(std::make_unique<ThreadPool>()) {
-    for(int i = 0; i < Position::WIDTH; i++) {
-      columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
-    }
     for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
       history[i] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[i];
     }

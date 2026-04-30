@@ -56,5 +56,5 @@ If you don't want to install Emscripten locally, you can use the provided Docker
 ## Credits & License
 
 - Published under **AGPL v3** license.
-- Partially based off the work of [Pascal Pons](http://blog.gamesolver.org) and [John Tromp](https://tromp.github.io/c4/c4.html).
+- Partially based off the work of [Pascal Pons](http://blog.gamesolver.org), [John Tromp](https://tromp.github.io/c4/c4.html), and [Christophe Steininger](https://github.com/ChristopheSteininger/c4).
 - Extensively modified to add multi-threaded support, NNUE, tiered-cache tables, and a variety of other optimizations as well as multi-platform support.

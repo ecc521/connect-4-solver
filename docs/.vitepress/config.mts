@@ -24,9 +24,15 @@ export default defineConfig({
         ],
       },
       {
-        text: "Solvers API",
+        text: "Core API",
         items: [
           { text: "BaseConnect4Solver", link: "/api/base-solver" },
+          { text: "OpeningBook", link: "/api/opening-book" },
+        ],
+      },
+      {
+        text: "Packages",
+        items: [
           { text: "NodeConnect4Solver", link: "/api/nodeconnect4solver" },
           {
             text: "SyncWasmConnect4Solver",

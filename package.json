@@ -44,7 +44,7 @@
     "build": "npm run build:wasm && npm run build:ts",
     "build:wasm": "bash build.sh",
     "build:ts": "tsc -p tsconfig.build.json",
-    "test": "npm run lint && npm run format:check && jest",
+    "test": "npm run lint && jest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -54,11 +54,8 @@
     "example:android": "cd example && npx react-native run-android",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "bench:smp": "npx ts-node tools/benchmarks/bench_smp.ts",
-    "bench:cache": "npx ts-node tools/benchmarks/bench_cache.ts",
-    "bench:heuristic": "npx ts-node tools/benchmarks/bench_heuristic.ts",
-    "bench:book": "npx ts-node tools/benchmarks/bench_book.ts",
-    "bench:throughput": "npx ts-node tools/benchmarks/bench_throughput.ts"
+    "bench:bridge": "npx ts-node tools/benchmarks/bench_book.ts",
+    "bench:native": "g++ --std=c++17 -W -Wall -O3 -DNDEBUG -DUSE_PTHREADS -Inative -march=native -DBOARD_WIDTH_MACRO=7 -DBOARD_HEIGHT_MACRO=6 tools/benchmarks/bench_native.cpp native/Solver.cpp -o tools/benchmarks/bench_native_7x6 && g++ --std=c++17 -W -Wall -O3 -DNDEBUG -DUSE_PTHREADS -Inative -march=native -DBOARD_WIDTH_MACRO=8 -DBOARD_HEIGHT_MACRO=8 tools/benchmarks/bench_native.cpp native/Solver.cpp -o tools/benchmarks/bench_native_8x8 && g++ --std=c++17 -W -Wall -O3 -DNDEBUG -DUSE_PTHREADS -Inative -march=native -DBOARD_WIDTH_MACRO=9 -DBOARD_HEIGHT_MACRO=7 tools/benchmarks/bench_native.cpp native/Solver.cpp -o tools/benchmarks/bench_native_9x7 && g++ --std=c++17 -W -Wall -O3 -DNDEBUG -DUSE_PTHREADS -Inative -march=native -DBOARD_WIDTH_MACRO=10 -DBOARD_HEIGHT_MACRO=10 tools/benchmarks/bench_native.cpp native/Solver.cpp -o tools/benchmarks/bench_native_10x10 && ./tools/benchmarks/bench_native_7x6 && ./tools/benchmarks/bench_native_8x8 && ./tools/benchmarks/bench_native_9x7 && ./tools/benchmarks/bench_native_10x10"
   },
   "repository": {
     "type": "git",

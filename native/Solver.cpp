@@ -23,6 +23,7 @@
 #ifdef USE_PTHREADS
 #include <thread>
 #include <algorithm>
+#include <future>
 #endif
 
 using namespace GameSolver::Connect4;
@@ -94,18 +95,11 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     }
   }
 
-  static int tt_probe_depth = -1;
-  if (tt_probe_depth == -1) {
-    if (const char* env_p = std::getenv("TT_PROBE_DEPTH")) {
-      tt_probe_depth = std::stoi(env_p);
-    } else {
-      tt_probe_depth = 15; // default: stop symmetry and child-probing at <= 15 plies from leaf
-    }
-  }
+  constexpr int TT_PROBE_DEPTH = 15; // stop symmetry and child-probing at <= 15 plies from leaf
 
   bool is_reverse = false;
   Position::position_t key;
-  if (Position::WIDTH * Position::HEIGHT - P.nbMoves() <= tt_probe_depth) {
+  if (Position::WIDTH * Position::HEIGHT - P.nbMoves() <= TT_PROBE_DEPTH) {
     key = P.key();
   } else {
     key = P.symmetric_key(is_reverse);
@@ -133,15 +127,15 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   }
 
   // 1-ply TT lookahead (Child Probing) to prune early before deep searches
-  if (P.nbMoves() < (Position::WIDTH * Position::HEIGHT) - tt_probe_depth) {
+  if (P.nbMoves() < (Position::WIDTH * Position::HEIGHT) - TT_PROBE_DEPTH) {
     for (int i = 0; i < Position::WIDTH; i++) {
-      int col = columnOrder[i];
+      int col = Position::COLUMN_ORDER[i];
       if (Position::position_t move = possible & Position::column_mask(col)) {
         Position child(P);
         child.play(move);
         bool dummy = false;
         Position::position_t child_key;
-        if (Position::WIDTH * Position::HEIGHT - child.nbMoves() <= tt_probe_depth) {
+        if (Position::WIDTH * Position::HEIGHT - child.nbMoves() <= TT_PROBE_DEPTH) {
           child_key = child.key();
         } else {
           child_key = child.symmetric_key(dummy);
@@ -170,9 +164,9 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   MoveSorter moves;
 
   for(int i = Position::WIDTH; i--;) {
-    if(Position::position_t move = possible & Position::column_mask(columnOrder[i])) {
+    if(Position::position_t move = possible & Position::column_mask(Position::COLUMN_ORDER[i])) {
       int score = P.moveScore(move) * 1000000;
-      if (columnOrder[i] == table_move) {
+      if (Position::COLUMN_ORDER[i] == table_move) {
         score += 100000000; // Heavily prioritize table move
       }
       moves.add(move, score);
@@ -282,7 +276,7 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const Ope
 
   // Quick pass to find best move using the hot TT
   for (int i = 0; i < Position::WIDTH; i++) {
-      int col = columnOrder[i];
+      int col = Position::COLUMN_ORDER[i];
       if (P.canPlay(col)) {
           Position P2(P);
           P2.playCol(col);
@@ -298,6 +292,7 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const Ope
 
 template <typename SlotType>
 std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+  (void)threads;
   std::vector<int> scores(Position::WIDTH, -1000);
 
 #ifdef USE_PTHREADS
@@ -306,7 +301,7 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
     while (true) {
       int i = next_col.fetch_add(1);
       if (i >= Position::WIDTH) break;
-      int col = columnOrder[i];
+      int col = Position::COLUMN_ORDER[i];
       solverTlNodeCount = 0;
       if (P.canPlay(col)) {
         if(P.isWinningMove(col)) {
@@ -328,26 +323,24 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
   } else {
     pool->ensureCapacity(num_threads - 1);
     std::atomic<int> remaining(num_threads - 1);
-    std::mutex wait_mutex;
-    std::condition_variable wait_cv;
-
+    std::promise<void> prom;
+    auto fut = prom.get_future();
+    
     for (unsigned int i = 0; i < num_threads - 1; i++) {
-      pool->enqueue([&]() {
-        worker();
-        if (remaining.fetch_sub(1) == 1) {
-          std::unique_lock<std::mutex> lock(wait_mutex);
-          wait_cv.notify_all();
-        }
-      });
+        pool->enqueue([&]() {
+            worker();
+            if (remaining.fetch_sub(1) == 1) {
+                prom.set_value();
+            }
+        });
     }
     worker();
-
-    std::unique_lock<std::mutex> lock(wait_mutex);
-    wait_cv.wait(lock, [&] { return remaining == 0; });
+    
+    fut.wait();
   }
 #else
   for (int i = 0; i < Position::WIDTH; i++) {
-    int col = columnOrder[i];
+    int col = Position::COLUMN_ORDER[i];
     if (P.canPlay(col)) {
       if(P.isWinningMove(col)) scores[col] = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
       else {
@@ -393,9 +386,17 @@ class TypedCache : public Cache {
   void reset() override {
     transTable->reset();
   }
+
+  int getSlotWidth() const override {
+    return sizeof(SlotType) * 8;
+  }
 };
 
 std::unique_ptr<Cache> Solver::createCache(size_t table_bytes) {
+  if (std::getenv("FORCE_128_BIT")) {
+      return std::make_unique<TypedCache<unsigned __int128>>(table_bytes);
+  }
+
   constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
   constexpr int shift_amount = VALUE_BITS + 7 + 4;
   constexpr int available_bits_64 = 64 - shift_amount;

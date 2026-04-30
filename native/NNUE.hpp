@@ -17,7 +17,7 @@ class NNUE {
   static int evaluate(const GenericPosition<W, H>& P) {
     return P.getScore();
   }
-  static int evaluate_accumulated(const NNUEAccumulator<W, H>& acc, const GenericPosition<W, H>& P) {
+  static int evaluate_accumulated(const NNUEAccumulator<W, H>& /* acc */, const GenericPosition<W, H>& P) {
     return P.heuristic_evaluate();
   }
 };

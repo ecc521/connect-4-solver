@@ -26,10 +26,12 @@ namespace Connect4 {
 
 class HeuristicCache : public Cache {
  public:
-  std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16>> transTable;
+  using TransTable = TranspositionTable<unsigned __int128, int16_t, 16, 7, 2, uint64_t>;
+  std::shared_ptr<TransTable> transTable;
   
-  HeuristicCache(size_t table_bytes) : transTable(std::make_shared<TranspositionTable<unsigned __int128, int16_t, 16>>(table_bytes)) {}
+  HeuristicCache(size_t table_bytes) : transTable(std::make_shared<TransTable>(table_bytes)) {}
   void reset() override { transTable->reset(); }
+  int getSlotWidth() const override { return 128; }
 };
 
 #ifndef HEURISTIC_TABLE_SIZE
@@ -41,11 +43,10 @@ class HeuristicSolver {
  private:
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
   
-  std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16>> transTable;
+  std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 2, uint64_t>> transTable;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
   std::atomic<bool> isSearching{false};
   std::atomic<bool> stopSearch;
-  int columnOrder[WIDTH]; // column exploration order
   std::unique_ptr<ThreadPool> pool;
 
   // Dynamic history heuristic table
@@ -66,7 +67,7 @@ class HeuristicSolver {
    * Evaluate possible heuristic moves for current player
    * @return a vector of heuristic scores for each column
    */
-  std::pair<std::vector<int>, int> analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads = 1, double timeout_ms = 0.0);
+  std::pair<std::vector<int>, int> analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads = 1, double end_time_ms = 0.0);
 
   unsigned long long getNodeCount() const {
     return nodeCount;
@@ -84,7 +85,7 @@ class HeuristicSolver {
   bool isBusy() const { return isSearching.load(std::memory_order_relaxed); }
   void setBusy(bool busy) { isSearching.store(busy, std::memory_order_relaxed); }
 
-  HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16>> cache);
+  HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 2, uint64_t>> cache);
 
   static std::unique_ptr<Cache> createCache(size_t table_bytes) {
     return std::make_unique<HeuristicCache>(table_bytes);

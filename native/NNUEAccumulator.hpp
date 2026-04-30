@@ -17,10 +17,10 @@ public:
     int32_t hidden[2][256];
     NNUEAccumulator() {}
     inline void reset() {}
-    inline void init(const GenericPosition<W, H>& P) {}
-    inline void addPiece(int player, int col, int row) {}
-    inline void removePiece(int player, int col, int row) {}
-    inline int evaluate(int current_player) const { return 0; }
+    inline void init(const GenericPosition<W, H>& /* P */) {}
+    inline void addPiece(int /* player */, int /* col */, int /* row */) {}
+    inline void removePiece(int /* player */, int /* col */, int /* row */) {}
+    inline int evaluate(int /* current_player */) const { return 0; }
 };
 
 // 8x8 Specialization

@@ -76,6 +76,29 @@ interface NativeModuleType {
     timeout: number,
   ): Promise<Int32Array>;
   _createBook(w: number, h: number, path: string): unknown;
+  _createBookFromBuffer(w: number, h: number, data: Uint8Array): unknown;
+  _convertBookToDense(w: number, h: number, book: unknown): unknown;
+  _convertBookToEF(w: number, h: number, book: unknown): unknown;
+  _saveBookToFile(
+    w: number,
+    h: number,
+    book: unknown,
+    path: string,
+    format: string,
+  ): void;
+  _getBookFormat(w: number, h: number, book: unknown): string;
+  _getBookScore(
+    w: number,
+    h: number,
+    book: unknown,
+    pos: string,
+  ): number | undefined;
+  _getBookBuffer(
+    w: number,
+    h: number,
+    book: unknown,
+    format: string,
+  ): Uint8Array;
   _destroyBook(w: number, h: number, book: unknown): void;
   _getNodeCount(
     w: number,
@@ -90,7 +113,9 @@ interface NativeModuleType {
     depth: number,
   ) => {
     addPosition(pos: string, score: number): void;
+    loadFromBook(bookPtr: number): void;
     saveDense(path: string): void;
+    getDenseBuffer(): Uint8Array;
     saveEliasFano(path: string): void;
   };
 }
@@ -292,7 +317,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       currentPosition = positionStr.slice(0, nbMoves + 1);
       const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
       const movesToEnd = 0;
-      const score = Math.floor((this.width * this.height + 1 - nbMoves) / 2);
+      const score = Math.floor((this.width * this.height - nbMoves) / 2);
       evaluation = {
         eval: {
           value: Number.POSITIVE_INFINITY,
@@ -351,7 +376,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     } else if (status === STATUS_WIN) {
       currentPosition = positionStr.slice(0, nbMoves + 1);
       const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
-      const score = Math.floor((this.width * this.height + 1 - nbMoves) / 2);
+      const score = Math.floor((this.width * this.height - nbMoves) / 2);
       evaluation = {
         eval: {
           value: Number.POSITIVE_INFINITY,

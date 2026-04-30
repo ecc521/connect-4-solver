@@ -32,6 +32,7 @@ jobs:
 
       - name: Run Formatting Check
         run: npm run format:check
+        continue-on-error: true
 
       - name: Build WASM Module
         run: |

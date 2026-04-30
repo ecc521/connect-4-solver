@@ -16,7 +16,12 @@ native/.depend
 tools/pos*.txt
 tools/scored*.txt
 tools/c4solver*
-tools/bench*
+tools/bench_*
+!tools/benchmarks/
+tools/benchmarks/bench_native*
+tools/benchmarks/gen*
+!tools/benchmarks/*.ts
+!tools/benchmarks/*.cpp
 tools/test_*
 tools/verify_book
 tools/generator_*

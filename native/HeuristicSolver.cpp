@@ -13,6 +13,7 @@
 #endif
 #include <chrono>
 #include <stdexcept>
+#include <future>
 
 using namespace GameSolver::Connect4;
 
@@ -20,8 +21,8 @@ namespace GameSolver {
 namespace Connect4 {
 
 namespace {
-  thread_local uint32_t heuristicTlNodeCount = 0;
-  thread_local int smp_thread_id = 0;
+inline thread_local uint32_t heuristicTlNodeCount = 0;
+inline thread_local int smp_thread_id = 0;
 }
 
 template <int WIDTH, int HEIGHT>
@@ -115,16 +116,14 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   }
 
   const typename GenericPosition<WIDTH, HEIGHT>::position_t key = P.key();
-  uint32_t tt_val = transTable->get(key);
-  
-  int val = tt_val ? ((int)(tt_val & 0xFFFF) - 32768) : 0;
-  int tt_depth = (tt_val >> 16) & 0x3F;
-  int tt_flags = (tt_val >> 22) & 0x03; 
-  int best_move_col = tt_val ? (tt_val >> 24) - 1 : -1;
-  uint32_t tt_extra_key = (tt_val >> 28) & 0xF;
-  uint32_t current_extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
+  auto packed = transTable->getPacked(key);
+  int tt_flags = packed.flags; 
+  int val = tt_flags ? packed.value : 0;
+  int tt_depth = packed.work;
+  int best_move_col = tt_flags ? packed.best_move : -1;
+  if (best_move_col >= WIDTH) best_move_col = -1; // WIDTH or higher means no move stored
 
-  if(tt_val && tt_depth >= depth && tt_extra_key == current_extra_key) {
+  if(tt_flags != 0 && tt_depth >= depth) {
     if(tt_flags == 2) { // lower bound
       if(alpha < val) {
         alpha = val;                     
@@ -142,7 +141,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
 
   GenericMoveSorter<WIDTH, HEIGHT> moves;
   for(int i = WIDTH; i--;) {
-    int col = columnOrder[i];
+    int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
     if(typename GenericPosition<WIDTH, HEIGHT>::position_t move = possible & GenericPosition<WIDTH, HEIGHT>::column_mask(col)) {
       int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<position_t>(move);
       int base_score = P.moveScore(move) * 1000000 + history[bit_idx];
@@ -173,7 +172,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, acc);
     acc.removePiece(player, next_col, next_row);
 
-    if(score > best_score) {
+    if(score > best_score || best_seen_col == -1) {
       best_score = score;
       best_seen_col = next_col;
     }
@@ -189,8 +188,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
       }
       history[bit_idx] += depth * depth; // standard history heuristic scale
 
-      uint32_t extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
-      transTable->put(key, (extra_key << 28) | ((uint32_t)(next_col + 1) << 24) | (2 << 22) | ((uint32_t)depth << 16) | (uint32_t)(score + 32768)); 
+      transTable->put(key, (int16_t)(score), (uint8_t)depth, (uint8_t)next_col, 2); // 2 = lower bound
       return score;  
     }
     if(score > alpha) {
@@ -198,19 +196,13 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     }
   }
 
-  int flags = (best_score <= orig_alpha) ? 3 : 1; 
-  uint32_t extra_key = (uint32_t)((key / transTable->getSize()) >> 32) & 0xF;
-  transTable->put(key, (extra_key << 28) | ((uint32_t)(best_seen_col == -1 ? 0 : best_seen_col + 1) << 24) | ((uint32_t)flags << 22) | ((uint32_t)depth << 16) | (uint32_t)(best_score + 32768)); 
+  int flags = (best_score <= orig_alpha) ? 3 : 1; // 3 = upper bound, 1 = exact
+  transTable->put(key, (int16_t)(best_score), (uint8_t)depth, (uint8_t)(best_seen_col == -1 ? WIDTH : best_seen_col), flags); 
   return best_score;
 }
 
 template <int WIDTH, int HEIGHT>
-SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool reset_tt, NNUEAccumulator<WIDTH, HEIGHT>* acc, int threads) {
-  if (reset_tt) {
-    reset();
-    stopSearch = false;
-  }
-
+SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool /*reset_tt*/, NNUEAccumulator<WIDTH, HEIGHT>* acc, int /*threads*/) {
   if(P.canWinNext()) {
     int score = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
     for (int i = 0; i < WIDTH; i++) {
@@ -234,10 +226,9 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
     best_score = current_score;
     
     // Extract best move from TT
-    uint32_t val = transTable->get(P.key());
-    if (val != 0) {
-        int move_idx = (int)((val >> 24) & 0xF);
-        if (move_idx > 0) best_move = move_idx - 1;
+    auto packed_root = transTable->getPacked(P.key());
+    if (packed_root.flags != 0) {
+        if (packed_root.best_move < WIDTH) best_move = packed_root.best_move;
     }
 
     depth_reached = d;
@@ -251,17 +242,10 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
 }
 
 template <int WIDTH, int HEIGHT>
-std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads, double timeout_ms) {
+std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads, double end_time_ms) {
   std::vector<int> scores(WIDTH, -32000);
   int final_depth_reached = 0;
-#ifdef __EMSCRIPTEN__
-  double end_time_ms = timeout_ms > 0.0 ? emscripten_get_now() + timeout_ms : 0.0;
-#else
-  double end_time_ms = timeout_ms > 0.0 ? std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()).time_since_epoch().count() + timeout_ms : 0.0;
-#endif
-
-  reset();
-  nodeCount = 0;
+  stopSearch.store(false, std::memory_order_relaxed);
 
   int total_valid_cols = 0;
   for (int i = 0; i < WIDTH; i++) {
@@ -280,7 +264,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
         if (i >= WIDTH) break;
         if (stopSearch.load(std::memory_order_relaxed)) break;
 
-        int col = columnOrder[i];
+        int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
         if (P.canPlay(col)) {
           if(P.isWinningMove(col)) {
             current_scores[col] = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
@@ -305,27 +289,25 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
     } else {
       pool->ensureCapacity(num_threads - 1);
       std::atomic<int> remaining(num_threads - 1);
-      std::mutex wait_mutex;
-      std::condition_variable wait_cv;
+      std::promise<void> prom;
+      auto fut = prom.get_future();
       
       for (unsigned int i = 0; i < num_threads - 1; i++) {
         pool->enqueue([&]() {
           worker();
           if (remaining.fetch_sub(1) == 1) {
-            std::unique_lock<std::mutex> lock(wait_mutex);
-            wait_cv.notify_all();
+            prom.set_value();
           }
         });
       }
       worker();
       
-      std::unique_lock<std::mutex> lock(wait_mutex);
-      wait_cv.wait(lock, [&] { return remaining == 0; });
+      fut.wait();
     }
 #else
     for (int i = 0; i < WIDTH; i++) {
       if (stopSearch.load(std::memory_order_relaxed)) break;
-      int col = columnOrder[i];
+      int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
       if (P.canPlay(col)) {
         if(P.isWinningMove(col)) {
           current_scores[col] = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
@@ -353,9 +335,8 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 }
 
 template <int WIDTH, int HEIGHT>
-HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16>> cache) : transTable(cache), nodeCount{0}, isSearching{false}, pool(std::make_unique<ThreadPool>()) {
-  for(int i = 0; i < WIDTH; i++) 
-    columnOrder[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; 
+HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 2, uint64_t>> cache)
+    : transTable(cache), nodeCount(0), isSearching{false}, pool(std::make_unique<ThreadPool>()) {
   for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
     history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
   }

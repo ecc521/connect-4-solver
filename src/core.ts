@@ -110,6 +110,16 @@ export interface SolverModule {
   ) => void;
 
   _createBook: (w: number, h: number, pathPtr: number) => number;
+  _createBookFromBuffer: (
+    w: number,
+    h: number,
+    ptr: number,
+    size: number,
+  ) => number;
+  _convertBookToDense: (w: number, h: number, ptr: number) => number;
+  _convertBookToEF: (w: number, h: number, ptr: number) => number;
+  _getBookFormat: (w: number, h: number, ptr: number) => number;
+  _getBookScore: (w: number, h: number, ptr: number, posPtr: number) => number;
   _destroyBook: (w: number, h: number, ptr: number) => void;
   _analyzeExact: (
     w: number,
@@ -154,6 +164,7 @@ export interface SolverModule {
   UTF8ToString(pointer: number): string;
   _malloc(size: number): number;
   _free(pointer: number): void;
+  HEAPU8: Uint8Array;
   onRuntimeInitialized?: () => void;
   FS: {
     writeFile(path: string, data: Uint8Array): void;

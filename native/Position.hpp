@@ -75,12 +75,6 @@ namespace Connect4 {
  * in practice, as bottom is constant, key = position + mask is also a
  * non-ambigous representation of the position.
  */
-  
-/**
- * Generate a bitmask containing one for the bottom slot of each column
- * must be defined outside of the class definition to be available at compile time for bottom_mask
- */
-
 
 template <int W, int H>
 class GenericPosition {
@@ -88,8 +82,6 @@ class GenericPosition {
 
   // Board size is 64bits or 128 bits depending on W and H
   using position_t = typename std::conditional < W * (H + 1) <= 64, uint64_t, unsigned __int128>::type;
-  // __int128 is a g++ non portable type. Use the following line limited to 64bits board for C++ compatibility
-  // using position_t = uint64_t;
 
   static constexpr int WIDTH = W;
   static constexpr int HEIGHT = H;
@@ -97,7 +89,7 @@ class GenericPosition {
   static constexpr int MIN_SCORE = -(W*H) / 2 + 3;
   static constexpr int MAX_SCORE = (W * H + 1) / 2 - 3;
 
-  static std::array<int32_t, WIDTH * (HEIGHT + 1)> compute_tromp_weights() {
+  static constexpr std::array<int32_t, WIDTH * (HEIGHT + 1)> compute_tromp_weights() {
     std::array<int32_t, WIDTH * (HEIGHT + 1)> weights = {};
     for (int col = 0; col < WIDTH; col++) {
       for (int row = 0; row < HEIGHT; row++) {
@@ -135,84 +127,51 @@ class GenericPosition {
     return w;
   }
 
-  static const std::array<int32_t, W * (H + 1)> TROMP_WEIGHTS;
-  static const std::array<position_t, W> CENTER_MASKS;
-  static const std::array<int, W> CENTER_WEIGHTS;
+  static constexpr std::array<int, WIDTH> compute_column_order() {
+    std::array<int, WIDTH> order = {};
+    for (int i = 0; i < WIDTH; i++) {
+      order[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
+    }
+    return order;
+  }
+
+  static constexpr std::array<int32_t, WIDTH * (HEIGHT + 1)> TROMP_WEIGHTS = compute_tromp_weights();
+  static constexpr std::array<position_t, WIDTH> CENTER_MASKS = compute_center_masks();
+  static constexpr std::array<int, WIDTH> CENTER_WEIGHTS = compute_center_weights();
+  static constexpr std::array<int, WIDTH> COLUMN_ORDER = compute_column_order();
 
   static_assert(W <= 16, "Board's width must be <= 16 due to alphanumeric parsing limits");
   static_assert(W * (H + 1) <= sizeof(position_t)*8, "Board does not fit into position_t bitmask");
 
-  /**
-   * Plays a possible move given by its bitmap representation
-   *
-   * @param move: a possible move given by its bitmap representation
-   *        only one bit of the bitmap should be set to 1
-   *        the move should be a valid possible move for the current player
-   */
   void play(position_t move) {
     current_position ^= mask;
     mask |= move;
     moves++;
   }
 
-  /*
-   * Plays a sequence of successive played columns, mainly used to initialize a board.
-   * @param seq: a sequence of digits corresponding to the 1-based index of the column played.
-   *
-   * @return number of played moves. Processing will stop at first invalid move that can be:
-   *           - invalid character (non digit, or digit >= WIDTH)
-   *           - playing a column that is already full
-   *           - playing a column that makes an alignment (we only solve non).
-   *         Caller can check if the move sequence was valid by comparing the number of
-   *         processed moves to the length of the sequence.
-   */
   unsigned int play(const std::string &seq) {
     for(unsigned int i = 0; i < seq.size(); i++) {
       int col = seq[i] - '1';
       if (seq[i] >= 'a' && seq[i] <= 'z') col = seq[i] - 'a' + 9;
       else if (seq[i] >= 'A' && seq[i] <= 'Z') col = seq[i] - 'A' + 9;
-      if(col < 0 || col >= WIDTH || !canPlay(col) || isWinningMove(col)) return i; // invalid move
+      if(col < 0 || col >= WIDTH || !canPlay(col) || isWinningMove(col)) return i;
       playCol(col);
     }
     return seq.size();
   }
 
-  /**
-   * return true if current player can win next move
-   */
   bool canWinNext() const {
     return winning_position() & possible();
   }
 
-
-  /**
-   * @return number of moves played from the beginning of the game.
-   */
   int nbMoves() const {
     return moves;
   }
 
-  /**
-   * @return a compact representation of a position on WIDTH*(HEIGHT+1) bits.
-   */
   position_t key() const {
     return current_position + mask;
   }
 
-  /**
-  * Build a symmetric base 3 key. Two symmetric positions will have the same key.
-  *
-  * This key is a base 3 representation of the sequence of played moves column per column,
-  * from bottom to top. The 3 digits are top_of_column(0), current_player(1), opponent(2).
-  *
-  * example: game "45" where player one played column 4, then player two played column 5
-  * has a representation in base 3 digits : 0 0 0 1 0 2 0 0 0 or : 3*3^3 + 1*3^5
-  *
-  * The symmetric key is the minimum key of the two keys built iterating columns from left to right or right to left.
-  *
-  * as the last digit is always 0, we omit it and a base 3 key
-  * uses N = (nbMoves + nbColumns - 1) base 3 digits or N*log2(3) bits.
-  */
   position_t mirror_key(position_t k) const {
       position_t res = 0;
       for (int i = 0; i < WIDTH; i++) {
@@ -243,10 +202,10 @@ class GenericPosition {
 
   uint64_t key3(bool &is_reverse) const {
     uint64_t key_forward = 0;
-    for(int i = 0; i < WIDTH; i++) partialKey3(key_forward, i);  // compute key in increasing order of columns
+    for(int i = 0; i < WIDTH; i++) partialKey3(key_forward, i);
 
     uint64_t key_reverse = 0;
-    for(int i = WIDTH; i--;) partialKey3(key_reverse, i);  // compute key in decreasing order of columns
+    for(int i = WIDTH; i--;) partialKey3(key_reverse, i);
 
     if (key_forward < key_reverse) {
         is_reverse = false;
@@ -262,62 +221,33 @@ class GenericPosition {
       return key3(is_reverse);
   }
 
-  /**
-   * Return a bitmap of all the possible next moves the do not lose in one turn.
-   * A losing move is a move leaving the possibility for the opponent to win directly.
-   *
-   * Warning this function is intended to test position where you cannot win in one turn
-   * If you have a winning move, this function can miss it and prefer to prevent the opponent
-   * to make an alignment.
-   */
   position_t possibleNonLosingMoves() const {
     assert(!canWinNext());
     position_t possible_mask = possible();
     position_t opponent_win = opponent_winning_position();
     position_t forced_moves = possible_mask & opponent_win;
     if(forced_moves) {
-      if(forced_moves & (forced_moves - 1)) // check if there is more than one forced move
-        return 0;                           // the opponnent has two winning moves and you cannot stop him
-      else possible_mask = forced_moves;    // enforce to play the single forced move
+      if(forced_moves & (forced_moves - 1)) return 0;
+      else possible_mask = forced_moves;
     }
-    return possible_mask & ~(opponent_win >> 1);  // avoid to play below an opponent winning spot
+    return possible_mask & ~(opponent_win >> 1);
   }
 
-  /**
-   * Score a possible move.
-   *
-   * @param move, a possible move given in a bitmap format.
-   *
-   * The score we are using is the number of winning spots
-   * the current player has after playing the move.
-   */
   int moveScore(position_t move) const {
     return popcount_impl(compute_winning_position(current_position | move, mask));
   }
 
-  /**
-   * Heuristic score of the position using center-weights and threat counts.
-   * Non-terminal fallback evaluated when depth_limit is reached.
-   */
   int heuristic_evaluate(int double_threat_weight = 10, int uncontested_parity_weight = 57, int tempo_weight = 76, int center_multiplier = 5, int base_threat_weight = 23) const {
     int score = 0;
-    
     position_t opp_position = current_position ^ mask;
-
     position_t my_threats = compute_winning_position(current_position, mask);
     position_t opp_threats = compute_winning_position(opp_position, mask);
     position_t playable = possible();
     position_t double_edged = (playable << 1) & board_mask;
 
-    // 1. Double-edged threats: If we play under it, we allow the opponent to claim it.
-    // Having a threat here is actively GOOD, because it mathematically prevents the 
-    // opponent from playing in that column, effectively locking them out.
-    // We award +50 points for locking the opponent out, and subtract 50 if we are locked out.
     score += popcount(my_threats & double_edged) * double_threat_weight;
     score -= popcount(opp_threats & double_edged) * double_threat_weight;
 
-    // 2. Strict Parity Control (Victor Allis's Uncontested Threats)
-    // Smear threats upward to identify cells that are vertically "blocked" by an opponent's threat
     position_t opp_threats_above = (opp_threats << 1) & board_mask;
     opp_threats_above |= (opp_threats_above << 1) & board_mask;
     opp_threats_above |= (opp_threats_above << 2) & board_mask;
@@ -342,18 +272,15 @@ class GenericPosition {
     position_t my_parity = (moves % 2 == 0) ? even_rows : odd_rows;
     position_t opp_parity = (moves % 2 == 0) ? odd_rows : even_rows;
 
-    // Isolate only the lowest threat per column (since higher ones are implicitly blocked by the lower one)
     position_t lowest_my_threats = my_threats & ~my_threats_above;
     position_t lowest_opp_threats = opp_threats & ~opp_threats_above;
 
     position_t my_uncontested_parity = (lowest_my_threats & my_parity) & ~my_useless_threats;
     position_t opp_uncontested_parity = (lowest_opp_threats & opp_parity) & ~opp_useless_threats;
 
-    // Uncontested parity threats are highly prized (but kept below +1000 forced win threshold)
     score += popcount(my_uncontested_parity) * uncontested_parity_weight;
     score -= popcount(opp_uncontested_parity) * uncontested_parity_weight;
     
-    // 3. Zugzwang Timer (Safe Squares Parity)
     position_t all_threats = my_threats | opp_threats;
     position_t empty_squares = board_mask ^ (current_position | opp_position);
 
@@ -365,58 +292,32 @@ class GenericPosition {
 
     int safe_squares = popcount(empty_squares & ~all_threats_above);
     
-    if ((safe_squares % 2) != (moves % 2)) {
-        score += tempo_weight; // We control the tempo
-    } else {
-        score -= tempo_weight; // Opponent controls the tempo
-    }
+    if ((safe_squares % 2) != (moves % 2)) score += tempo_weight;
+    else score -= tempo_weight;
     
-    // 4. Base Threat Advantage
     score += (popcount(lowest_my_threats & ~my_useless_threats) - popcount(lowest_opp_threats & ~opp_useless_threats)) * base_threat_weight;
     
-    // 4. Center-control weighting (fallback)
     for(int i = 0; i < WIDTH; i++) {
       score += (popcount(current_position & CENTER_MASKS[i]) - popcount(opp_position & CENTER_MASKS[i])) * CENTER_WEIGHTS[i] * center_multiplier;
     }
     
-
-
     return score;
   }
 
-  /**
-   * Default constructor, build an empty position.
-   */
   GenericPosition() : current_position{0}, mask{0}, moves{0} {}
 
-  /**
-   * Indicates whether a column is playable.
-   * @param col: 0-based index of column to play
-   * @return true if the column is playable, false if the column is already full.
-   */
   bool canPlay(int col) const {
     return (mask & top_mask_col(col)) == 0;
   }
 
-  /**
-   * Plays a playable column.
-   * This function should not be called on a non-playable column or a column making an alignment.
-   *
-   * @param col: 0-based index of a playable column.
-   */
   void playCol(int col) {
     play((mask + bottom_mask_col(col)) & column_mask(col));
   }
 
-  /**
-   * Indicates whether the current player wins by playing a given column.
-   * This function should never be called on a non-playable column.
-   * @param col: 0-based index of a playable column.
-   * @return true if current player makes an alignment by playing the corresponding column col.
-   */
   bool isWinningMove(int col) const {
     return winning_position() & possible() & column_mask(col);
   }
+
   static GenericPosition fromKey(position_t key) {
     GenericPosition P;
     P.current_position = 0;
@@ -424,18 +325,22 @@ class GenericPosition {
     P.moves = 0;
     for (int col = 0; col < WIDTH; col++) {
       position_t col_shift = col * (HEIGHT + 1);
-      position_t col_mask = (1ULL << (HEIGHT + 1)) - 1;
+      position_t col_mask = (position_t(1) << (HEIGHT + 1)) - 1;
       position_t k_col = (key >> col_shift) & col_mask;
       
-      if (k_col == 0) continue; // invalid key without bottom mask
+      if (k_col == 0) continue;
       
-      int highest_bit = 63 - __builtin_clzll(k_col);
-      position_t pos_col = k_col - (1ULL << highest_bit);
-      position_t m_col = (1ULL << highest_bit) - 1;
+      
+      // Actually we need to find MSB.
+      int msb = 0;
+      for(int i = HEIGHT; i >= 0; i--) if(k_col & (position_t(1) << i)) { msb = i; break; }
+      
+      position_t pos_col = k_col - (position_t(1) << msb);
+      position_t m_col = (position_t(1) << msb) - 1;
       
       P.current_position |= (pos_col << col_shift);
       P.mask |= (m_col << col_shift);
-      P.moves += highest_bit;
+      P.moves += msb;
     }
     return P;
   }
@@ -443,15 +348,11 @@ class GenericPosition {
   position_t getCurrentPosition() const { return current_position; }
   position_t getMask() const { return mask; }
 
-
  private:
-  position_t current_position; // bitmap of the current_player stones
-  position_t mask;             // bitmap of all the already played spots
-  unsigned int moves;        // number of moves played since the beginning of the game.
+  position_t current_position;
+  position_t mask;
+  unsigned int moves;
 
-  /**
-    * Compute a partial base 3 key for a given column
-    */
   void partialKey3(uint64_t &key, int col) const {
     for(position_t pos = position_t(1) << (col * (HEIGHT + 1)); pos & mask; pos <<= 1) {
       key *= 3;
@@ -461,33 +362,19 @@ class GenericPosition {
     key *= 3;
   }
 
-  /**
-   * Return a bitmask of the possible winning positions for the current player
-   */
  public:
   position_t winning_position() const {
     return compute_winning_position(current_position, mask);
   }
 
-  /**
-   * Return a bitmask of the possible winning positions for the opponent
-   */
   position_t opponent_winning_position() const {
     return compute_winning_position(current_position ^ mask, mask);
   }
 
-  /**
-   * Bitmap of the next possible valid moves for the current player
-   * Including losing moves.
-   */
   position_t possible() const {
     return (mask + bottom_mask) & board_mask;
   }
 
-  /**
-   * counts number of bit set to one in a 64bits or 128bits integer safely
-   */
- public:
   template <typename T>
   static typename std::enable_if<sizeof(T) <= 8, unsigned int>::type popcount_impl(T m) {
     return __builtin_popcountll((uint64_t)m);
@@ -520,57 +407,40 @@ class GenericPosition {
     return ctz_impl<position_t>(m) / (HEIGHT + 1);
   }
 
-  /**
-   * @param position, a bitmap of the player to evaluate the winning pos
-   * @param mask, a mask of the already played spots
-   *
-   * @return a bitmap of all the winning free spots making an alignment
-   */
   static position_t compute_winning_position(position_t position, position_t mask) {
-    // vertical;
     position_t r = (position << 1) & (position << 2) & (position << 3);
-
-    //horizontal
     position_t p = (position << (HEIGHT + 1)) & (position << 2 * (HEIGHT + 1));
     r |= p & (position << 3 * (HEIGHT + 1));
     r |= p & (position >> (HEIGHT + 1));
     p = (position >> (HEIGHT + 1)) & (position >> 2 * (HEIGHT + 1));
     r |= p & (position << (HEIGHT + 1));
     r |= p & (position >> 3 * (HEIGHT + 1));
-
-    //diagonal 1
     p = (position << HEIGHT) & (position << 2 * HEIGHT);
     r |= p & (position << 3 * HEIGHT);
     r |= p & (position >> HEIGHT);
     p = (position >> HEIGHT) & (position >> 2 * HEIGHT);
     r |= p & (position << HEIGHT);
     r |= p & (position >> 3 * HEIGHT);
-
-    //diagonal 2
     p = (position << (HEIGHT + 2)) & (position << 2 * (HEIGHT + 2));
     r |= p & (position << 3 * (HEIGHT + 2));
     r |= p & (position >> (HEIGHT + 2));
     p = (position >> (HEIGHT + 2)) & (position >> 2 * (HEIGHT + 2));
     r |= p & (position << (HEIGHT + 2));
     r |= p & (position >> 3 * (HEIGHT + 2));
-
     return r & (board_mask ^ mask);
   }
 
-  // Static bitmaps
   template<int width, int height> struct bottom {static constexpr position_t mask = bottom<width-1, height>::mask | position_t(1) << (width - 1) * (height + 1);};
   template <int height> struct bottom<0, height> {static constexpr position_t mask = 0;};
 
   static constexpr position_t bottom_mask = bottom<WIDTH, HEIGHT>::mask;
-  static constexpr position_t board_mask = bottom_mask * ((1LL << HEIGHT) - 1);
+  static constexpr position_t board_mask = bottom_mask * ((position_t(1) << HEIGHT) - 1);
   static constexpr position_t TOP = bottom_mask << HEIGHT;
   static constexpr position_t TOP_PLUS_1 = TOP + 1;
 
   static constexpr position_t get_alt_col() {
       position_t res = 0;
-      for (int i = 0; i < HEIGHT; i += 2) {
-          res |= (position_t(1) << i);
-      }
+      for (int i = 0; i < HEIGHT; i += 2) res |= (position_t(1) << i);
       return res;
   }
   static constexpr position_t ALTO = bottom_mask * get_alt_col();
@@ -581,93 +451,57 @@ class GenericPosition {
     return x2 & (x2 >> (2 * dir));
   }
 
-  /**
-   * Computes whether the second player can mathematically force a Draw or Win 
-   * using the Evens Strategy (pairing odd/even rows).
-   * 
-   * @return The score upper bound (e.g. -1, -2, -3) if 2nd player forces a Win, 0 if 2nd player forces a Draw, 1000 otherwise.
-   */
   int computeEvensStrategy() const {
     if constexpr (HEIGHT % 2 != 0) return 1000;
-    if (moves % 2 != 0) return 1000; // Strategy evaluates the second player's forced bounds, so only evaluate when P1 is to move
-
+    if (moves % 2 != 0) return 1000;
     position_t color0 = current_position;
     position_t color1 = current_position ^ mask;
-
     position_t xe = color1 | (ALTX & ~(2 * color0 + color1 + bottom_mask));
     position_t oe = board_mask - xe;
-
     if (haswond(oe, 1)) return 1000;
-
     position_t xeh = haswond(xe, HEIGHT + 1);
     position_t xed1 = haswond(xe, HEIGHT);
     position_t xed2 = haswond(xe, HEIGHT + 2);
     position_t xeany = xeh | xed1 | xed2;
-
     position_t oeh = haswond(oe, HEIGHT + 1);
     position_t oed1 = haswond(oe, HEIGHT);
     position_t oed2 = haswond(oe, HEIGHT + 2);
-
     if (oeh & (xeany - TOP_PLUS_1)) return 1000;
     if (oed1 && ((oeh | oed1) & ((xeh | xed1) - TOP_PLUS_1))) return 1000;
     if (oed2 && ((oeh | oed2) & ((xeh | xed2) - TOP_PLUS_1))) return 1000;
-
     if (xeany) {
       if (xeh) {
         for (int r = HEIGHT / 2; r > 1; r--) {
-          // Wait, c4 checks COLUMN_HEADERS >> (2 * r - 1). 
-          // COLUMN_HEADERS is row 6. 6 - (2*r-1). 
-          // For r=3, 6-5 = 1. So r=3 checks row 1!
-          // So in 0-indexed, we check row 1, then row 3.
-          int check_row = HEIGHT - (2 * r - 1); // r=3 -> 1, r=2 -> 3
-          if (xeh & (bottom_mask << check_row)) {
-            return -r;
-          }
+          int check_row = HEIGHT - (2 * r - 1);
+          if (xeh & (bottom_mask << check_row)) return -r;
         }
       } else {
         position_t diag_cells = 0;
         if (xed1) diag_cells |= xed1 | (xed1 << HEIGHT) | (xed1 << (2*HEIGHT)) | (xed1 << (3*HEIGHT));
         if (xed2) diag_cells |= xed2 | (xed2 << (HEIGHT + 2)) | (xed2 << (2*(HEIGHT + 2))) | (xed2 << (3*(HEIGHT + 2)));
-        
         position_t empty_cells = diag_cells & ~(color0 | color1);
         for (int r = 1; r <= HEIGHT / 2; r++) {
-          int check_row = HEIGHT - (2 * r - 1); // r=1 -> 5, r=2 -> 3, r=3 -> 1
-          if (empty_cells & (bottom_mask << check_row)) {
-            return -r;
-          }
+          int check_row = HEIGHT - (2 * r - 1);
+          if (empty_cells & (bottom_mask << check_row)) return -r;
         }
       }
       return -1;
     }
-
     return 0;
   }
 
-  // return a bitmask containing a single 1 corresponding to the top cell of a given column
   static constexpr position_t top_mask_col(int col) {
     return position_t(1) << ((HEIGHT - 1) + col * (HEIGHT + 1));
   }
 
-  // return a bitmask containing a single 1 corresponding to the bottom cell of a given column
   static constexpr position_t bottom_mask_col(int col) {
     return position_t(1) << (col * (HEIGHT + 1));
   }
 
- public:
-  // return a bitmask 1 on all the cells of a given column
   static constexpr position_t column_mask(int col) {
-    return (position_t((1ULL << HEIGHT) - 1)) << (col * (HEIGHT + 1));
+    return ((position_t(1) << HEIGHT) - 1) << (col * (HEIGHT + 1));
   }
 };
-
-template <int W, int H>
-const std::array<int32_t, W * (H + 1)> GenericPosition<W, H>::TROMP_WEIGHTS = GenericPosition<W, H>::compute_tromp_weights();
-
-template <int W, int H>
-const std::array<typename GenericPosition<W, H>::position_t, W> GenericPosition<W, H>::CENTER_MASKS = GenericPosition<W, H>::compute_center_masks();
-
-template <int W, int H>
-const std::array<int, W> GenericPosition<W, H>::CENTER_WEIGHTS = GenericPosition<W, H>::compute_center_weights();
 
 #ifndef BOARD_WIDTH_MACRO
 #define BOARD_WIDTH_MACRO 7

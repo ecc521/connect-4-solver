@@ -8,6 +8,7 @@ class Cache {
  public:
   virtual ~Cache() = default;
   virtual void reset() = 0;
+  virtual int getSlotWidth() const = 0;
 };
 
 } // namespace Connect4

@@ -79,6 +79,11 @@ async function run() {
     console.log(`[!] Loading bootstrap book from ${bootstrap}...`);
     const bookData = fs.readFileSync(bootstrap);
     bootstrapBook = await OpeningBook.fromBuffer(bookData);
+    if (bootstrapBook.width !== width || bootstrapBook.height !== height) {
+      throw new Error(
+        `Bootstrap book dimensions (${bootstrapBook.width}x${bootstrapBook.height}) do not match target dimensions (${width}x${height}).`,
+      );
+    }
     console.log(
       `[+] Bootstrap book loaded (${bootstrapBook.width}x${bootstrapBook.height}).`,
     );
@@ -139,13 +144,12 @@ async function run() {
     `[+] Crunching ${weak ? "WEAK " : ""}Alpha-Beta evaluations using ${threads} concurrent workers...`,
   );
 
-  let processed = 0;
   const start = Date.now();
   const totalPositions = positions.length;
   // Reverse to evaluate deepest positions first for better cache utilization
   positions.reverse();
 
-  const bookPtr = bootstrapBook ? (bootstrapBook as any)._bookPtr : undefined;
+  const bookPtr = bootstrapBook ? bootstrapBook.ptr : undefined;
 
   const worker = async () => {
     while (true) {
@@ -168,8 +172,9 @@ async function run() {
       if (processed % 10 === 0 || processed === totalPositions) {
         const currentTotalNodes = BigInt(solver.getNodeCount());
         const elapsed = (Date.now() - start) / 1000;
-        const pct = ((processed / totalPositions) * 100).toFixed(1);
         const nps = (Number(currentTotalNodes) / elapsed / 1000000).toFixed(1);
+        const pct = ((processed / totalPositions) * 100).toFixed(1);
+
         process.stdout.write(
           `\r[${processed}/${totalPositions}] (${pct}%) | ${nps} MN/s | Total Nodes: ${currentTotalNodes.toLocaleString()} | Current: ${pos}      `,
         );
@@ -198,4 +203,7 @@ async function run() {
   process.exit(0);
 }
 
-run().catch(console.error);
+run().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
