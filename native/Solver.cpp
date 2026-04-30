@@ -94,12 +94,14 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     }
   }
 
-  const Position::position_t key = P.key();
+  bool is_reverse = false;
+  const Position::position_t key = P.symmetric_key(is_reverse);
   uint8_t table_move = Position::WIDTH;
   
   if(auto packed = transTable->getPacked(key); packed.value) {
     uint8_t val = packed.value;
     table_move = packed.best_move;
+    if (table_move < Position::WIDTH && is_reverse) table_move = Position::WIDTH - 1 - table_move;
     
     if(val > Position::MAX_SCORE - Position::MIN_SCORE + 1) { // we have an lower bound
       min = val + 2 * Position::MIN_SCORE - Position::MAX_SCORE - 2;
@@ -132,7 +134,8 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
       if (Position::position_t move = possible & Position::column_mask(col)) {
         Position child(P);
         child.play(move);
-        if (auto child_packed = transTable->getPacked(child.key()); child_packed.value) {
+        bool dummy;
+        if (auto child_packed = transTable->getPacked(child.symmetric_key(dummy)); child_packed.value) {
           uint8_t child_val = child_packed.value;
           if (child_val <= Position::MAX_SCORE - Position::MIN_SCORE + 1) { 
             // child upper bound means child_score <= child_max
@@ -182,14 +185,18 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     }
 
     if(best_score >= beta) {
-      transTable->put(key, best_score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves()), best_move);  
+      uint8_t stored_move = best_move;
+      if (stored_move < Position::WIDTH && is_reverse) stored_move = Position::WIDTH - 1 - stored_move;
+      transTable->put(key, best_score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves()), stored_move);  
       return best_score;  
     }
     if(best_score > alpha) alpha = best_score; 
   }
 
   uint8_t work = std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves());
-  transTable->put(key, best_score - Position::MIN_SCORE + 1, work, best_move); 
+  uint8_t stored_move = best_move;
+  if (stored_move < Position::WIDTH && is_reverse) stored_move = Position::WIDTH - 1 - stored_move;
+  transTable->put(key, best_score - Position::MIN_SCORE + 1, work, stored_move); 
   return best_score;
 }
 

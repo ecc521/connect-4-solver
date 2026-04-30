@@ -57,7 +57,8 @@
     "bench:smp": "npx ts-node tools/benchmarks/bench_smp.ts",
     "bench:cache": "npx ts-node tools/benchmarks/bench_cache.ts",
     "bench:heuristic": "npx ts-node tools/benchmarks/bench_heuristic.ts",
-    "bench:book": "npx ts-node tools/benchmarks/bench_book.ts"
+    "bench:book": "npx ts-node tools/benchmarks/bench_book.ts",
+    "bench:throughput": "npx ts-node tools/benchmarks/bench_throughput.ts"
   },
   "repository": {
     "type": "git",
