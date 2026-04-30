@@ -274,17 +274,41 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const Ope
 
   int bestMove = -1;
 
-  // Quick pass to find best move using the hot TT
-  for (int i = 0; i < Position::WIDTH; i++) {
-      int col = Position::COLUMN_ORDER[i];
-      if (P.canPlay(col)) {
-          Position P2(P);
-          P2.playCol(col);
-          if (negamax(P2, -score, -score + 1, book) == -score) {
-              bestMove = col;
-              break;
-          }
-      }
+  // 1. PHASE 1: Try to find a move using ONLY the Opening Book (Shortcut for Sparse Books)
+  // This avoids accidentally triggering a deep search on an "unknown" column if a "known" 
+  // winning column is available elsewhere in the book.
+  if (book) {
+    for (int i = 0; i < Position::WIDTH; i++) {
+        int col = Position::COLUMN_ORDER[i];
+        if (P.canPlay(col)) {
+            Position P2(P);
+            P2.playCol(col);
+            if (int val = book->get(P2)) {
+                int child_score = val + Position::MIN_SCORE - 1;
+                if (-child_score == score) {
+                    bestMove = col;
+                    break;
+                }
+            }
+        }
+    }
+  }
+
+  // 2. PHASE 2: Fallback to the existing hot-TT scan
+  // If we haven't found the move in the book, we perform a quick negamax pass.
+  // Because we just called solve(), the TT is "hot" and most of these calls will be instant.
+  if (bestMove == -1) {
+    for (int i = 0; i < Position::WIDTH; i++) {
+        int col = Position::COLUMN_ORDER[i];
+        if (P.canPlay(col)) {
+            Position P2(P);
+            P2.playCol(col);
+            if (negamax(P2, -score, -score + 1, book) == -score) {
+                bestMove = col;
+                break;
+            }
+        }
+    }
   }
 
   return {score, bestMove, (int)P.nbMoves(), getNodeCount()};

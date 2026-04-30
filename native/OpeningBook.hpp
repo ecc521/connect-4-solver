@@ -199,7 +199,7 @@ class DenseBook : public OpeningBookBase<W, H> {
   DenseBook() : depth(-1) {}
   
   int get(const GenericPosition<W, H> &P) const override {
-    if(P.nbMoves() > depth || keys.empty()) return 0;
+    if(keys.empty()) return 0;
     
     typename GenericPosition<W, H>::position_t target = P.key3();
     
@@ -360,6 +360,22 @@ inline std::vector<uint8_t> OpeningBookBase<W, H>::serialize_dense(int depth, En
 
     std::vector<uint8_t> buf;
     int key_bytes = std::ceil(((depth + W - 1) * 1.58496250072) / 8.0);
+    
+    // Safety check: ensure key_bytes is sufficient for the largest key to prevent collisions
+    pos_t max_key_val = 0;
+    for (const auto& item : items) if (item.first > max_key_val) max_key_val = item.first;
+    
+    while (key_bytes < 16) {
+        bool has_more_bits = false;
+        if constexpr (sizeof(pos_t) > 8) {
+            if ((max_key_val >> (key_bytes * 8)) > 0) has_more_bits = true;
+        } else {
+            if (key_bytes < 8 && (max_key_val >> (key_bytes * 8)) > 0) has_more_bits = true;
+        }
+        if (!has_more_bits) break;
+        key_bytes++;
+    }
+
     if(key_bytes < 1) key_bytes = 1;
     if(key_bytes > 16) key_bytes = 16;
 
@@ -395,8 +411,20 @@ inline std::vector<uint8_t> OpeningBookBase<W, H>::serialize_elias_fano(int dept
 
     std::vector<uint8_t> buf;
     uint64_t n = items.size();
-    uint64_t max_key = n > 0 ? items.back().first : 0;
-    uint64_t U = max_key + 1;
+    pos_t max_key_val = n > 0 ? items.back().first : 0;
+    
+    // Elias-Fano currently uses 64-bit internal storage for U. 
+    // Ensure the keys fit within 64 bits.
+    bool ef_overflow = false;
+    if constexpr (sizeof(pos_t) > 8) {
+        if (max_key_val >> 64) ef_overflow = true;
+    }
+    if (ef_overflow) {
+        throw std::runtime_error("Elias-Fano book generation failed: keys exceed 64-bit range. "
+                                 "Upgrade OpeningBook.hpp to support 128-bit Elias-Fano.");
+    }
+
+    uint64_t U = static_cast<uint64_t>(max_key_val) + 1;
     uint8_t L = n > 0 ? (uint8_t)std::max(0, (int)std::floor(std::log2((double)U / n))) : 0;
 
     char header[6] = {(char)W, (char)H, (char)depth, 0, 1, (char)0xFF};

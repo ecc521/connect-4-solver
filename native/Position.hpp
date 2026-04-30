@@ -200,11 +200,11 @@ class GenericPosition {
       }
   }
 
-  uint64_t key3(bool &is_reverse) const {
-    uint64_t key_forward = 0;
+  position_t key3(bool &is_reverse) const {
+    position_t key_forward = 0;
     for(int i = 0; i < WIDTH; i++) partialKey3(key_forward, i);
 
-    uint64_t key_reverse = 0;
+    position_t key_reverse = 0;
     for(int i = WIDTH; i--;) partialKey3(key_reverse, i);
 
     if (key_forward < key_reverse) {
@@ -216,7 +216,7 @@ class GenericPosition {
     }
   }
 
-  uint64_t key3() const {
+  position_t key3() const {
       bool is_reverse;
       return key3(is_reverse);
   }
@@ -353,7 +353,7 @@ class GenericPosition {
   position_t mask;
   unsigned int moves;
 
-  void partialKey3(uint64_t &key, int col) const {
+  void partialKey3(position_t &key, int col) const {
     for(position_t pos = position_t(1) << (col * (HEIGHT + 1)); pos & mask; pos <<= 1) {
       key *= 3;
       if(pos & current_position) key += 1;

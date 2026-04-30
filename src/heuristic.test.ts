@@ -1,4 +1,4 @@
-import { NodeConnect4Solver, Outcome, OpeningBook } from "./index";
+import { NodeConnect4Solver, Outcome, OpeningBook, PositionAnalysis } from "./index";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -62,14 +62,18 @@ describe("HeuristicNodeConnect4Solver", () => {
       const parts = line.split(" ");
       const pos = parts[0];
 
-      const start = performance.now();
-
       // Heuristic Solver is NOT allowed to use the book.
+      let heuristicTime = 0;
       const [exactRes, heuristicRes] = await Promise.all([
         exactSolver.analyze(pos, { book }),
-        solver.analyze(pos, { timeoutMs: 25 }),
+        (async (): Promise<PositionAnalysis> => {
+          const startH = performance.now();
+          const res = await solver.analyze(pos, { timeoutMs: 25 });
+          heuristicTime = performance.now() - startH;
+          return res;
+        })()
       ]);
-      totalTimeMs += performance.now() - start;
+      totalTimeMs += heuristicTime;
 
       // 1. Find the best possible score outcome from the exact solver
       let maxExactScore = -100;
