@@ -188,21 +188,12 @@ export abstract class BaseConnect4Solver {
       if (widthOrOpts.height !== undefined) height = widthOrOpts.height;
     }
 
-    const validSizes = [
-      "6x5",
-      "6x6",
-      "7x6",
-      "7x7",
-      "8x6",
-      "9x7",
-      "8x8",
-      "9x6",
-      "11x4",
-    ];
-    if (!validSizes.includes(`${width}x${height}`)) {
-      throw new Error(
-        `Board size ${width}x${height} is not supported by the generated WASM bundle.`,
-      );
+    if (width < 4 || width > 12 || height < 4 || height > 12) {
+      throw new Error(`Board size ${width}x${height} is outside the supported range (4x4 to 12x12).`);
+    }
+
+    if (width * (height + 1) > 128) {
+      throw new Error(`Board size ${width}x${height} exceeds the maximum supported 128-bit position mask.`);
     }
     this.width = width;
     this.height = height;
