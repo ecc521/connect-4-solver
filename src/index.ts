@@ -106,7 +106,7 @@ interface NativeModuleType {
     solver: unknown,
     heuristic: boolean,
   ): number;
-  _generatePositions(w: number, h: number, depth: number): string[];
+  _generatePositions(w: number, h: number, depth: number, filterForced?: boolean): string[];
   BookBuilder: new (
     w: number,
     h: number,

@@ -2266,13 +2266,22 @@ private:
 };
 
 template<int W, int H>
-void explore_positions(const GameSolver::Connect4::GenericPosition<W, H>& P, std::string& pos_str, int max_depth, int target_depth, std::unordered_set<uint64_t>& visited, std::vector<std::string>& results) {
+void explore_positions(const GameSolver::Connect4::GenericPosition<W, H>& P, std::string& pos_str, int max_depth, int target_depth, std::unordered_set<uint64_t>& visited, std::vector<std::string>& results, bool filter_forced) {
     uint64_t key = P.key3();
     if (!visited.insert(key).second) return;
 
     int nb_moves = P.nbMoves();
     if (nb_moves == target_depth) {
-        results.push_back(pos_str);
+        bool add = true;
+        if (filter_forced && !P.canWinNext()) {
+            auto possible = P.possibleNonLosingMoves();
+            if (possible != 0 && GameSolver::Connect4::GenericPosition<W, H>::popcount(possible) == 1) {
+                add = false;
+            }
+        }
+        if (add) {
+            results.push_back(pos_str);
+        }
     }
 
     if (nb_moves >= max_depth) return;
@@ -2282,18 +2291,18 @@ void explore_positions(const GameSolver::Connect4::GenericPosition<W, H>& P, std
             GameSolver::Connect4::GenericPosition<W, H> P2(P);
             P2.playCol(i);
             pos_str.push_back(i < 9 ? '1' + i : 'a' + (i - 9));
-            explore_positions(P2, pos_str, max_depth, target_depth, visited, results);
+            explore_positions(P2, pos_str, max_depth, target_depth, visited, results, filter_forced);
             pos_str.pop_back();
         }
     }
 }
 
 template<int W, int H>
-void generate_positions_for_board(int max_depth, std::vector<std::string>& results) {
+void generate_positions_for_board(int max_depth, std::vector<std::string>& results, bool filter_forced) {
     std::string pos_str = "";
     for (int d = max_depth; d >= 0; d--) {
         std::unordered_set<uint64_t> visited;
-        explore_positions(GameSolver::Connect4::GenericPosition<W, H>(), pos_str, d, d, visited, results);
+        explore_positions(GameSolver::Connect4::GenericPosition<W, H>(), pos_str, d, d, visited, results, filter_forced);
     }
 }
 
@@ -2303,79 +2312,81 @@ Value GeneratePositions(const CallbackInfo& info) {
     int height = info[1].As<Number>().Uint32Value();
     int depth = info[2].As<Number>().Uint32Value();
 
+    bool filter_forced = info.Length() > 3 && info[3].As<Boolean>().Value();
+
     std::vector<std::string> results;
 
-    if (width == 6 && height == 5) generate_positions_for_board<6, 5>(depth, results);
-    else if (width == 6 && height == 6) generate_positions_for_board<6, 6>(depth, results);
-    else if (width == 7 && height == 6) generate_positions_for_board<7, 6>(depth, results);
-    else if (width == 7 && height == 7) generate_positions_for_board<7, 7>(depth, results);
-    else if (width == 8 && height == 6) generate_positions_for_board<8, 6>(depth, results);
-    else if (width == 4 && height == 4) generate_positions_for_board<4, 4>(depth, results);
-    else if (width == 4 && height == 5) generate_positions_for_board<4, 5>(depth, results);
-    else if (width == 4 && height == 6) generate_positions_for_board<4, 6>(depth, results);
-    else if (width == 4 && height == 7) generate_positions_for_board<4, 7>(depth, results);
-    else if (width == 4 && height == 8) generate_positions_for_board<4, 8>(depth, results);
-    else if (width == 4 && height == 9) generate_positions_for_board<4, 9>(depth, results);
-    else if (width == 4 && height == 10) generate_positions_for_board<4, 10>(depth, results);
-    else if (width == 4 && height == 11) generate_positions_for_board<4, 11>(depth, results);
-    else if (width == 4 && height == 12) generate_positions_for_board<4, 12>(depth, results);
-    else if (width == 5 && height == 4) generate_positions_for_board<5, 4>(depth, results);
-    else if (width == 5 && height == 5) generate_positions_for_board<5, 5>(depth, results);
-    else if (width == 5 && height == 6) generate_positions_for_board<5, 6>(depth, results);
-    else if (width == 5 && height == 7) generate_positions_for_board<5, 7>(depth, results);
-    else if (width == 5 && height == 8) generate_positions_for_board<5, 8>(depth, results);
-    else if (width == 5 && height == 9) generate_positions_for_board<5, 9>(depth, results);
-    else if (width == 5 && height == 10) generate_positions_for_board<5, 10>(depth, results);
-    else if (width == 5 && height == 11) generate_positions_for_board<5, 11>(depth, results);
-    else if (width == 5 && height == 12) generate_positions_for_board<5, 12>(depth, results);
-    else if (width == 6 && height == 4) generate_positions_for_board<6, 4>(depth, results);
-    else if (width == 6 && height == 7) generate_positions_for_board<6, 7>(depth, results);
-    else if (width == 6 && height == 8) generate_positions_for_board<6, 8>(depth, results);
-    else if (width == 6 && height == 9) generate_positions_for_board<6, 9>(depth, results);
-    else if (width == 6 && height == 10) generate_positions_for_board<6, 10>(depth, results);
-    else if (width == 6 && height == 11) generate_positions_for_board<6, 11>(depth, results);
-    else if (width == 6 && height == 12) generate_positions_for_board<6, 12>(depth, results);
-    else if (width == 7 && height == 4) generate_positions_for_board<7, 4>(depth, results);
-    else if (width == 7 && height == 5) generate_positions_for_board<7, 5>(depth, results);
-    else if (width == 7 && height == 8) generate_positions_for_board<7, 8>(depth, results);
-    else if (width == 7 && height == 9) generate_positions_for_board<7, 9>(depth, results);
-    else if (width == 7 && height == 10) generate_positions_for_board<7, 10>(depth, results);
-    else if (width == 7 && height == 11) generate_positions_for_board<7, 11>(depth, results);
-    else if (width == 7 && height == 12) generate_positions_for_board<7, 12>(depth, results);
-    else if (width == 8 && height == 4) generate_positions_for_board<8, 4>(depth, results);
-    else if (width == 8 && height == 5) generate_positions_for_board<8, 5>(depth, results);
-    else if (width == 8 && height == 7) generate_positions_for_board<8, 7>(depth, results);
-    else if (width == 8 && height == 9) generate_positions_for_board<8, 9>(depth, results);
-    else if (width == 8 && height == 10) generate_positions_for_board<8, 10>(depth, results);
-    else if (width == 8 && height == 11) generate_positions_for_board<8, 11>(depth, results);
-    else if (width == 8 && height == 12) generate_positions_for_board<8, 12>(depth, results);
-    else if (width == 9 && height == 4) generate_positions_for_board<9, 4>(depth, results);
-    else if (width == 9 && height == 5) generate_positions_for_board<9, 5>(depth, results);
-    else if (width == 9 && height == 8) generate_positions_for_board<9, 8>(depth, results);
-    else if (width == 9 && height == 10) generate_positions_for_board<9, 10>(depth, results);
-    else if (width == 9 && height == 11) generate_positions_for_board<9, 11>(depth, results);
-    else if (width == 9 && height == 12) generate_positions_for_board<9, 12>(depth, results);
-    else if (width == 10 && height == 4) generate_positions_for_board<10, 4>(depth, results);
-    else if (width == 10 && height == 5) generate_positions_for_board<10, 5>(depth, results);
-    else if (width == 10 && height == 6) generate_positions_for_board<10, 6>(depth, results);
-    else if (width == 10 && height == 8) generate_positions_for_board<10, 8>(depth, results);
-    else if (width == 10 && height == 9) generate_positions_for_board<10, 9>(depth, results);
-    else if (width == 10 && height == 11) generate_positions_for_board<10, 11>(depth, results);
-    else if (width == 11 && height == 5) generate_positions_for_board<11, 5>(depth, results);
-    else if (width == 11 && height == 6) generate_positions_for_board<11, 6>(depth, results);
-    else if (width == 11 && height == 7) generate_positions_for_board<11, 7>(depth, results);
-    else if (width == 11 && height == 8) generate_positions_for_board<11, 8>(depth, results);
-    else if (width == 11 && height == 9) generate_positions_for_board<11, 9>(depth, results);
-    else if (width == 11 && height == 10) generate_positions_for_board<11, 10>(depth, results);
-    else if (width == 12 && height == 4) generate_positions_for_board<12, 4>(depth, results);
-    else if (width == 12 && height == 5) generate_positions_for_board<12, 5>(depth, results);
-    else if (width == 12 && height == 6) generate_positions_for_board<12, 6>(depth, results);
-    else if (width == 12 && height == 7) generate_positions_for_board<12, 7>(depth, results);
-    else if (width == 12 && height == 8) generate_positions_for_board<12, 8>(depth, results);
-    else if (width == 12 && height == 9) generate_positions_for_board<12, 9>(depth, results);
-    else if (width == 9 && height == 7) generate_positions_for_board<9, 7>(depth, results);
-    else if (width == 9 && height == 6) generate_positions_for_board<9, 6>(depth, results);
-    else if (width == 11 && height == 4) generate_positions_for_board<11, 4>(depth, results);
+    if (width == 6 && height == 5) generate_positions_for_board<6, 5>(depth, results, filter_forced);
+    else if (width == 6 && height == 6) generate_positions_for_board<6, 6>(depth, results, filter_forced);
+    else if (width == 7 && height == 6) generate_positions_for_board<7, 6>(depth, results, filter_forced);
+    else if (width == 7 && height == 7) generate_positions_for_board<7, 7>(depth, results, filter_forced);
+    else if (width == 8 && height == 6) generate_positions_for_board<8, 6>(depth, results, filter_forced);
+    else if (width == 4 && height == 4) generate_positions_for_board<4, 4>(depth, results, filter_forced);
+    else if (width == 4 && height == 5) generate_positions_for_board<4, 5>(depth, results, filter_forced);
+    else if (width == 4 && height == 6) generate_positions_for_board<4, 6>(depth, results, filter_forced);
+    else if (width == 4 && height == 7) generate_positions_for_board<4, 7>(depth, results, filter_forced);
+    else if (width == 4 && height == 8) generate_positions_for_board<4, 8>(depth, results, filter_forced);
+    else if (width == 4 && height == 9) generate_positions_for_board<4, 9>(depth, results, filter_forced);
+    else if (width == 4 && height == 10) generate_positions_for_board<4, 10>(depth, results, filter_forced);
+    else if (width == 4 && height == 11) generate_positions_for_board<4, 11>(depth, results, filter_forced);
+    else if (width == 4 && height == 12) generate_positions_for_board<4, 12>(depth, results, filter_forced);
+    else if (width == 5 && height == 4) generate_positions_for_board<5, 4>(depth, results, filter_forced);
+    else if (width == 5 && height == 5) generate_positions_for_board<5, 5>(depth, results, filter_forced);
+    else if (width == 5 && height == 6) generate_positions_for_board<5, 6>(depth, results, filter_forced);
+    else if (width == 5 && height == 7) generate_positions_for_board<5, 7>(depth, results, filter_forced);
+    else if (width == 5 && height == 8) generate_positions_for_board<5, 8>(depth, results, filter_forced);
+    else if (width == 5 && height == 9) generate_positions_for_board<5, 9>(depth, results, filter_forced);
+    else if (width == 5 && height == 10) generate_positions_for_board<5, 10>(depth, results, filter_forced);
+    else if (width == 5 && height == 11) generate_positions_for_board<5, 11>(depth, results, filter_forced);
+    else if (width == 5 && height == 12) generate_positions_for_board<5, 12>(depth, results, filter_forced);
+    else if (width == 6 && height == 4) generate_positions_for_board<6, 4>(depth, results, filter_forced);
+    else if (width == 6 && height == 7) generate_positions_for_board<6, 7>(depth, results, filter_forced);
+    else if (width == 6 && height == 8) generate_positions_for_board<6, 8>(depth, results, filter_forced);
+    else if (width == 6 && height == 9) generate_positions_for_board<6, 9>(depth, results, filter_forced);
+    else if (width == 6 && height == 10) generate_positions_for_board<6, 10>(depth, results, filter_forced);
+    else if (width == 6 && height == 11) generate_positions_for_board<6, 11>(depth, results, filter_forced);
+    else if (width == 6 && height == 12) generate_positions_for_board<6, 12>(depth, results, filter_forced);
+    else if (width == 7 && height == 4) generate_positions_for_board<7, 4>(depth, results, filter_forced);
+    else if (width == 7 && height == 5) generate_positions_for_board<7, 5>(depth, results, filter_forced);
+    else if (width == 7 && height == 8) generate_positions_for_board<7, 8>(depth, results, filter_forced);
+    else if (width == 7 && height == 9) generate_positions_for_board<7, 9>(depth, results, filter_forced);
+    else if (width == 7 && height == 10) generate_positions_for_board<7, 10>(depth, results, filter_forced);
+    else if (width == 7 && height == 11) generate_positions_for_board<7, 11>(depth, results, filter_forced);
+    else if (width == 7 && height == 12) generate_positions_for_board<7, 12>(depth, results, filter_forced);
+    else if (width == 8 && height == 4) generate_positions_for_board<8, 4>(depth, results, filter_forced);
+    else if (width == 8 && height == 5) generate_positions_for_board<8, 5>(depth, results, filter_forced);
+    else if (width == 8 && height == 7) generate_positions_for_board<8, 7>(depth, results, filter_forced);
+    else if (width == 8 && height == 9) generate_positions_for_board<8, 9>(depth, results, filter_forced);
+    else if (width == 8 && height == 10) generate_positions_for_board<8, 10>(depth, results, filter_forced);
+    else if (width == 8 && height == 11) generate_positions_for_board<8, 11>(depth, results, filter_forced);
+    else if (width == 8 && height == 12) generate_positions_for_board<8, 12>(depth, results, filter_forced);
+    else if (width == 9 && height == 4) generate_positions_for_board<9, 4>(depth, results, filter_forced);
+    else if (width == 9 && height == 5) generate_positions_for_board<9, 5>(depth, results, filter_forced);
+    else if (width == 9 && height == 8) generate_positions_for_board<9, 8>(depth, results, filter_forced);
+    else if (width == 9 && height == 10) generate_positions_for_board<9, 10>(depth, results, filter_forced);
+    else if (width == 9 && height == 11) generate_positions_for_board<9, 11>(depth, results, filter_forced);
+    else if (width == 9 && height == 12) generate_positions_for_board<9, 12>(depth, results, filter_forced);
+    else if (width == 10 && height == 4) generate_positions_for_board<10, 4>(depth, results, filter_forced);
+    else if (width == 10 && height == 5) generate_positions_for_board<10, 5>(depth, results, filter_forced);
+    else if (width == 10 && height == 6) generate_positions_for_board<10, 6>(depth, results, filter_forced);
+    else if (width == 10 && height == 8) generate_positions_for_board<10, 8>(depth, results, filter_forced);
+    else if (width == 10 && height == 9) generate_positions_for_board<10, 9>(depth, results, filter_forced);
+    else if (width == 10 && height == 11) generate_positions_for_board<10, 11>(depth, results, filter_forced);
+    else if (width == 11 && height == 5) generate_positions_for_board<11, 5>(depth, results, filter_forced);
+    else if (width == 11 && height == 6) generate_positions_for_board<11, 6>(depth, results, filter_forced);
+    else if (width == 11 && height == 7) generate_positions_for_board<11, 7>(depth, results, filter_forced);
+    else if (width == 11 && height == 8) generate_positions_for_board<11, 8>(depth, results, filter_forced);
+    else if (width == 11 && height == 9) generate_positions_for_board<11, 9>(depth, results, filter_forced);
+    else if (width == 11 && height == 10) generate_positions_for_board<11, 10>(depth, results, filter_forced);
+    else if (width == 12 && height == 4) generate_positions_for_board<12, 4>(depth, results, filter_forced);
+    else if (width == 12 && height == 5) generate_positions_for_board<12, 5>(depth, results, filter_forced);
+    else if (width == 12 && height == 6) generate_positions_for_board<12, 6>(depth, results, filter_forced);
+    else if (width == 12 && height == 7) generate_positions_for_board<12, 7>(depth, results, filter_forced);
+    else if (width == 12 && height == 8) generate_positions_for_board<12, 8>(depth, results, filter_forced);
+    else if (width == 12 && height == 9) generate_positions_for_board<12, 9>(depth, results, filter_forced);
+    else if (width == 9 && height == 7) generate_positions_for_board<9, 7>(depth, results, filter_forced);
+    else if (width == 9 && height == 6) generate_positions_for_board<9, 6>(depth, results, filter_forced);
+    else if (width == 11 && height == 4) generate_positions_for_board<11, 4>(depth, results, filter_forced);
 
     Array js_results = Array::New(env, results.size());
     for (size_t i = 0; i < results.size(); i++) {

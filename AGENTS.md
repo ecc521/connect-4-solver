@@ -28,6 +28,13 @@ This repository provides an extremely fast, high-performance, and "perfect" Conn
 - **`eslint.config.mjs`** & **`tsconfig.json`**
   Establish rigorous code-quality constraints for the TypeScript portion of the repository. They utilize `recommendedTypeChecked`, prohibit `any` types, and enforce explicit function return types.
 
+## Building the Native Addon
+
+When compiling the native C++ bindings for Node.js (especially during development or by agents), you should use the `--jobs` flag to enable parallel compilation. The `package.json` install script is already configured to use `--jobs max`, but if running manually, prefer:
+```bash
+npx node-gyp rebuild --jobs max
+```
+
 ## Generating New Books
 
 The `TranspositionTable` cache sizes natively default to tight memory constraints optimized for WebAssembly, mobile environments, and browsers (e.g. `TABLE_SIZE=23` mapping to ~32MB, and `HEURISTIC_TABLE_SIZE=22` mapping to ~24MB).

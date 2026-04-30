@@ -45,7 +45,8 @@ async function run() {
     threads = 12,
     useEf = false,
     bootstrap = "",
-    weak = false;
+    weak = false,
+    filterForced = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--width") width = parseInt(args[++i]);
@@ -56,6 +57,7 @@ async function run() {
     if (args[i] === "--ef") useEf = true;
     if (args[i] === "--bootstrap") bootstrap = args[++i];
     if (args[i] === "--weak") weak = true;
+    if (args[i] === "--filter-forced") filterForced = true;
   }
 
   console.log("=========================================================");
@@ -89,8 +91,8 @@ async function run() {
     );
   }
 
-  console.log(`[!] Generating raw permutations up to depth ${depth}...`);
-  const positions: string[] = native._generatePositions(width, height, depth);
+  console.log(`[!] Generating raw permutations up to depth ${depth}${filterForced ? " (filtering forced moves)" : ""}...`);
+  const positions: string[] = native._generatePositions(width, height, depth, filterForced);
   console.log(
     `[+] Generated ${positions.length.toLocaleString()} unique evaluation points.`,
   );
