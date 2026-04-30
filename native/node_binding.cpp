@@ -1245,21 +1245,13 @@ public:
             else if (w == 11 && h == 5) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 5>, GameSolver::Connect4::GenericPosition<11, 5>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 5>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 11 && h == 6) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 6>, GameSolver::Connect4::GenericPosition<11, 6>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 6>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 11 && h == 7) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 7>, GameSolver::Connect4::GenericPosition<11, 7>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 7>*>(solver), pos, max_depth, threads, timeout_ms);
-<<<<<<< ours
-            else if (w == 11 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 8>, GameSolver::Connect4::GenericPosition<11, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 8>*>(solver), pos, max_depth, threads, timeout_ms);
-=======
             else if (w == 11 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 8>, GameSolver::Connect4::GenericPosition<11, 8>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 8>*>(solver), pos, max_depth, threads, timeout_ms);
->>>>>>> theirs
             else if (w == 11 && h == 9) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 9>, GameSolver::Connect4::GenericPosition<11, 9>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 9>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 11 && h == 10) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 10>, GameSolver::Connect4::GenericPosition<11, 10>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 10>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 12 && h == 5) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<12, 5>, GameSolver::Connect4::GenericPosition<12, 5>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 5>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 12 && h == 6) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<12, 6>, GameSolver::Connect4::GenericPosition<12, 6>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 6>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 12 && h == 7) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<12, 7>, GameSolver::Connect4::GenericPosition<12, 7>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 7>*>(solver), pos, max_depth, threads, timeout_ms);
-<<<<<<< ours
-            else if (w == 12 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<12, 8>, GameSolver::Connect4::GenericPosition<12, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 8>*>(solver), pos, max_depth, threads, timeout_ms);
-=======
             else if (w == 12 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<12, 8>, GameSolver::Connect4::GenericPosition<12, 8>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 8>*>(solver), pos, max_depth, threads, timeout_ms);
->>>>>>> theirs
             else if (w == 12 && h == 9) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<12, 9>, GameSolver::Connect4::GenericPosition<12, 9>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 9>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 9 && h == 7) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<9, 7>, GameSolver::Connect4::GenericPosition<9, 7>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 8 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<8, 8>, GameSolver::Connect4::GenericPosition<8, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver), pos, max_depth, threads, timeout_ms);
@@ -1341,21 +1333,13 @@ public:
             else if (w == 11 && h == 5) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 5>, GameSolver::Connect4::GenericPosition<11, 5>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 5>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 11 && h == 6) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 6>, GameSolver::Connect4::GenericPosition<11, 6>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 6>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 11 && h == 7) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 7>, GameSolver::Connect4::GenericPosition<11, 7>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 7>*>(solver), pos, max_depth, timeout_ms);
-<<<<<<< ours
-            else if (w == 11 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 8>, GameSolver::Connect4::GenericPosition<11, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 8>*>(solver), pos, max_depth, timeout_ms);
-=======
             else if (w == 11 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 8>, GameSolver::Connect4::GenericPosition<11, 8>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 8>*>(solver), pos, max_depth, timeout_ms);
->>>>>>> theirs
             else if (w == 11 && h == 9) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 9>, GameSolver::Connect4::GenericPosition<11, 9>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 9>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 11 && h == 10) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 10>, GameSolver::Connect4::GenericPosition<11, 10>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 10>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 12 && h == 5) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<12, 5>, GameSolver::Connect4::GenericPosition<12, 5>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 5>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 12 && h == 6) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<12, 6>, GameSolver::Connect4::GenericPosition<12, 6>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 6>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 12 && h == 7) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<12, 7>, GameSolver::Connect4::GenericPosition<12, 7>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 7>*>(solver), pos, max_depth, timeout_ms);
-<<<<<<< ours
-            else if (w == 12 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<12, 8>, GameSolver::Connect4::GenericPosition<12, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 8>*>(solver), pos, max_depth, timeout_ms);
-=======
             else if (w == 12 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<12, 8>, GameSolver::Connect4::GenericPosition<12, 8>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 8>*>(solver), pos, max_depth, timeout_ms);
->>>>>>> theirs
             else if (w == 12 && h == 9) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<12, 9>, GameSolver::Connect4::GenericPosition<12, 9>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 9>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 9 && h == 7) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<9, 7>, GameSolver::Connect4::GenericPosition<9, 7>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 8 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<8, 8>, GameSolver::Connect4::GenericPosition<8, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver), pos, max_depth, timeout_ms);
