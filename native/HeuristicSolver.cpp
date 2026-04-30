@@ -303,19 +303,24 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
     if (num_threads <= 1) {
       worker();
     } else {
-      std::vector<std::thread> thread_pool;
-      for (unsigned int i = 1; i < num_threads; i++) {
-          try {
-              thread_pool.emplace_back(worker);
-          } catch (const std::system_error& e) {
-              std::cerr << "Connect4Solver Warning: Thread pool exhausted." << std::endl;
-              break;
+      pool->ensureCapacity(num_threads - 1);
+      std::atomic<int> remaining(num_threads - 1);
+      std::mutex wait_mutex;
+      std::condition_variable wait_cv;
+      
+      for (unsigned int i = 0; i < num_threads - 1; i++) {
+        pool->enqueue([&]() {
+          worker();
+          if (remaining.fetch_sub(1) == 1) {
+            std::unique_lock<std::mutex> lock(wait_mutex);
+            wait_cv.notify_all();
           }
+        });
       }
       worker();
-      for (auto& t : thread_pool) {
-        if (t.joinable()) t.join();
-      }
+      
+      std::unique_lock<std::mutex> lock(wait_mutex);
+      wait_cv.wait(lock, [&] { return remaining == 0; });
     }
 #else
     for (int i = 0; i < WIDTH; i++) {
@@ -348,7 +353,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 }
 
 template <int WIDTH, int HEIGHT>
-HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache) : transTable(cache), nodeCount{0}, isSearching{false} {
+HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache) : transTable(cache), nodeCount{0}, isSearching{false}, pool(std::make_unique<ThreadPool>()) {
   for(int i = 0; i < WIDTH; i++) 
     columnOrder[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; 
   for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {

@@ -17,6 +17,7 @@
 #include "NNUEAccumulator.hpp"
 #include "NNUE.hpp"
 #include "SolverResult.hpp"
+#include "ThreadPool.hpp"
 
 namespace GameSolver {
 namespace Connect4 {
@@ -44,6 +45,7 @@ class HeuristicSolver {
   std::atomic<bool> isSearching{false};
   std::atomic<bool> stopSearch;
   int columnOrder[WIDTH]; // column exploration order
+  std::unique_ptr<ThreadPool> pool;
 
   // Dynamic history heuristic table
   mutable uint32_t history[WIDTH * (HEIGHT + 1)];
@@ -81,7 +83,7 @@ class HeuristicSolver {
   bool isBusy() const { return isSearching.load(std::memory_order_relaxed); }
   void setBusy(bool busy) { isSearching.store(busy, std::memory_order_relaxed); }
 
-  HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache); // Constructor
+  HeuristicSolver(std::shared_ptr<TranspositionTable<uint64_t, uint32_t, 32>> cache);
 
   static std::unique_ptr<Cache> createCache(size_t table_bytes) {
     return std::make_unique<HeuristicCache>(table_bytes);
