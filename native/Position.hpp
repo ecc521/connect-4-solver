@@ -213,8 +213,7 @@ class GenericPosition {
   * as the last digit is always 0, we omit it and a base 3 key
   * uses N = (nbMoves + nbColumns - 1) base 3 digits or N*log2(3) bits.
   */
-  position_t mirror_key() const {
-      position_t k = key();
+  position_t mirror_key(position_t k) const {
       position_t res = 0;
       for (int i = 0; i < WIDTH; i++) {
           position_t col_mask = ((position_t(1) << (HEIGHT + 1)) - 1) << (i * (HEIGHT + 1));
@@ -232,7 +231,7 @@ class GenericPosition {
 
   position_t symmetric_key(bool &is_reverse) const {
       position_t k_forward = key();
-      position_t k_reverse = mirror_key();
+      position_t k_reverse = mirror_key(k_forward);
       if (k_forward < k_reverse) {
           is_reverse = false;
           return k_forward;
