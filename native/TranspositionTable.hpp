@@ -104,6 +104,13 @@ class TranspositionTable {
       KeyType partial = key / num_buckets;
       int shift_amount = ValueBits + WorkBits + MoveBits;
       int available_bits = sizeof(SlotType) * 8 - shift_amount;
+      
+      if constexpr (sizeof(KeyType) > 8) {
+          // For 128-bit keys, fold the upper bits down to prevent collision when truncating
+          partial ^= (partial >> available_bits);
+          partial ^= (partial >> (available_bits * 2));
+      }
+      
       if (available_bits >= 64) return static_cast<SlotType>(partial);
       return static_cast<SlotType>(partial) & ((1ULL << available_bits) - 1);
   }
