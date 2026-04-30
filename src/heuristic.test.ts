@@ -1,4 +1,9 @@
-import { NodeConnect4Solver, Outcome, OpeningBook, PositionAnalysis } from "./index";
+import {
+  NodeConnect4Solver,
+  Outcome,
+  OpeningBook,
+  PositionAnalysis,
+} from "./index";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -71,7 +76,7 @@ describe("HeuristicNodeConnect4Solver", () => {
           const res = await solver.analyze(pos, { timeoutMs: 25 });
           heuristicTime = performance.now() - startH;
           return res;
-        })()
+        })(),
       ]);
       totalTimeMs += heuristicTime;
 

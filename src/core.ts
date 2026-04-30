@@ -138,6 +138,7 @@ export interface SolverModule {
     threads: number,
     max_depth: number,
     timeout: number,
+    bookPtr: number,
   ) => number;
   _solveExact: (
     w: number,
@@ -154,6 +155,7 @@ export interface SolverModule {
     posPtr: number,
     depth: number,
     timeout: number,
+    bookPtr: number,
   ) => number;
   _getNodeCount: (
     w: number,

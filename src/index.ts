@@ -58,6 +58,7 @@ interface NativeModuleType {
     threads: number,
     depth: number,
     timeout: number,
+    book: unknown,
   ): Promise<Int32Array>;
   _solveExact(
     w: number,
@@ -74,6 +75,7 @@ interface NativeModuleType {
     pos: string,
     depth: number,
     timeout: number,
+    book: unknown,
   ): Promise<Int32Array>;
   _createBook(w: number, h: number, path: string): unknown;
   _createBookFromBuffer(w: number, h: number, data: Uint8Array): unknown;
@@ -106,7 +108,12 @@ interface NativeModuleType {
     solver: unknown,
     heuristic: boolean,
   ): number;
-  _generatePositions(w: number, h: number, depth: number, filterForced?: boolean): string[];
+  _generatePositions(
+    w: number,
+    h: number,
+    depth: number,
+    filterForced?: boolean,
+  ): string[];
   BookBuilder: new (
     w: number,
     h: number,
@@ -428,6 +435,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         allocatedMemory,
         maxDepth,
         timeoutMs,
+        bookPtr,
       );
     else
       outputPointer = mod._solveExact(
@@ -468,6 +476,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         threads,
         maxDepth,
         timeoutMs,
+        bookPtr,
       );
     else
       outputPointer = mod._analyzeExact(
@@ -563,6 +572,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
                 threads,
                 maxDepth,
                 timeoutMs,
+                bookPtr,
               );
             else
               resArr = await native._analyzeExact(
@@ -610,6 +620,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
                 positionStr,
                 maxDepth,
                 timeoutMs,
+                bookPtr,
               );
             else
               resArr = await native._solveExact(

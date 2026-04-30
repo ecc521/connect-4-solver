@@ -13,6 +13,7 @@
 #include <memory>
 #include "Position.hpp"
 #include "TranspositionTable.hpp"
+#include "OpeningBook.hpp"
 #include "Cache.hpp"
 #include "NNUEAccumulator.hpp"
 #include "NNUE.hpp"
@@ -44,6 +45,7 @@ class HeuristicSolver {
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
   
   std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 2, uint64_t>> transTable;
+  OpeningBookBase<WIDTH, HEIGHT>* book;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
   std::atomic<bool> isSearching{false};
   std::atomic<bool> stopSearch;
@@ -80,6 +82,10 @@ class HeuristicSolver {
     for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
       history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
     }
+  }
+
+  void loadBook(OpeningBookBase<WIDTH, HEIGHT>* b) {
+    book = b;
   }
 
   bool isBusy() const { return isSearching.load(std::memory_order_relaxed); }

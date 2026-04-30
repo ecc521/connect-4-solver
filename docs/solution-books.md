@@ -1,6 +1,6 @@
 # Solution Books
 
-Perfectly solving a Connect 4 position can be CPU-intensive, so the exact solver supports loading pre-computed **Solution Books** (Opening Books). The heuristic solver (`heuristic: true`) does not require books and works at any board size without them.
+Perfectly solving a Connect 4 position can be CPU-intensive, so the exact solver supports loading pre-computed **Solution Books** (Opening Books). The heuristic solver (`heuristic: true`) can also optionally accept books to eliminate search latency and guarantee perfect play in the early game.
 
 These books map early-game and mid-game position sequences to their evaluations (supporting both Weak and Strong solution mappings). When the exact solver encounters a position that exists within a loaded book, it returns the solution immediately and avoids deep Alpha-Beta tree searches.
 

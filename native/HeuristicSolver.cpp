@@ -47,6 +47,15 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
 #endif
     }
   }
+  if (book && P.nbMoves() < book->getDepth()) {
+    if (int val = book->get(P)) {
+      int exact_score = val + GenericPosition<WIDTH, HEIGHT>::MIN_SCORE - 1;
+      if (exact_score > 0) return 31000 + exact_score;
+      else if (exact_score < 0) return -31000 + exact_score;
+      else return 0;
+    }
+  }
+
   typename GenericPosition<WIDTH, HEIGHT>::position_t possible = P.possibleNonLosingMoves();
   if(possible == 0) // opponent wins next move
     return -(31000 + (WIDTH * HEIGHT - P.nbMoves()) / 2);
@@ -336,7 +345,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 
 template <int WIDTH, int HEIGHT>
 HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 2, uint64_t>> cache)
-    : transTable(cache), nodeCount(0), isSearching{false}, pool(std::make_unique<ThreadPool>()) {
+    : transTable(cache), book(nullptr), nodeCount(0), isSearching{false}, pool(std::make_unique<ThreadPool>()) {
   for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
     history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
   }

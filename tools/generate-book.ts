@@ -91,8 +91,15 @@ async function run() {
     );
   }
 
-  console.log(`[!] Generating raw permutations up to depth ${depth}${filterForced ? " (filtering forced moves)" : ""}...`);
-  const positions: string[] = native._generatePositions(width, height, depth, filterForced);
+  console.log(
+    `[!] Generating raw permutations up to depth ${depth}${filterForced ? " (filtering forced moves)" : ""}...`,
+  );
+  const positions: string[] = native._generatePositions(
+    width,
+    height,
+    depth,
+    filterForced,
+  );
   console.log(
     `[+] Generated ${positions.length.toLocaleString()} unique evaluation points.`,
   );

@@ -31,6 +31,7 @@ This repository provides an extremely fast, high-performance, and "perfect" Conn
 ## Building the Native Addon
 
 When compiling the native C++ bindings for Node.js (especially during development or by agents), you should use the `--jobs` flag to enable parallel compilation. The `package.json` install script is already configured to use `--jobs max`, but if running manually, prefer:
+
 ```bash
 npx node-gyp rebuild --jobs max
 ```
