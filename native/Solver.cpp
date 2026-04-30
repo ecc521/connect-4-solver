@@ -404,24 +404,81 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
   std::vector<int> scores(Position::WIDTH, -1000);
 
 #ifdef USE_PTHREADS
+  // Track which columns are still being solved (for straggler acceleration)
+  std::atomic<bool> col_done[Position::WIDTH];
+  // Abort flags for each column's solve — helpers can contribute via Lazy SMP
+  std::atomic<bool> col_abort[Position::WIDTH];
+  // Store each column's child position for helpers to search
+  Position col_positions[Position::WIDTH];
+  bool col_valid[Position::WIDTH];
+
+  for (int c = 0; c < Position::WIDTH; c++) {
+    col_done[c].store(true, std::memory_order_relaxed);   // default: done (not started)
+    col_abort[c].store(false, std::memory_order_relaxed);
+    col_valid[c] = false;
+  }
+
   std::atomic<int> next_col{0};
+
   auto worker = [&]() {
+    // Phase 1: Root-split — grab columns and solve them
     while (true) {
       int i = next_col.fetch_add(1);
       if (i >= Position::WIDTH) break;
       int col = Position::COLUMN_ORDER[i];
       solverTlNodeCount = 0;
+
       if (P.canPlay(col)) {
-        if(P.isWinningMove(col)) {
+        if (P.isWinningMove(col)) {
           scores[col] = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
         } else {
           Position P2(P);
           P2.playCol(col);
-          scores[col] = -solve(P2, weak, 1, book).score;
+          col_positions[col] = P2;
+          col_valid[col] = true;
+          col_done[col].store(false, std::memory_order_release);  // mark as in-progress
+
+          auto result = solve_single(P2, weak, book, &col_abort[col]);
+          scores[col] = -result.score;
+
+          col_done[col].store(true, std::memory_order_release);   // mark as complete
+          col_abort[col].store(true, std::memory_order_release);  // abort any helpers
         }
       }
       nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
       solverTlNodeCount = 0;
+    }
+
+    // Phase 2: Straggler assist — help the slowest still-running column
+    // Keep looping as long as there are unfinished columns
+    while (true) {
+      // Find a column that's still running
+      int straggler_col = -1;
+      for (int c = 0; c < Position::WIDTH; c++) {
+        if (!col_done[c].load(std::memory_order_acquire) && col_valid[c]) {
+          straggler_col = c;
+          break;
+        }
+      }
+      if (straggler_col < 0) break; // all done
+
+      // Launch Lazy SMP helper on straggler's position
+      // Use perturbed history for search diversity
+      int32_t local_history[Position::WIDTH * (Position::HEIGHT + 1)];
+      // Use thread id hash for diversity
+      auto tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
+      for (int j = 0; j < Position::WIDTH * (Position::HEIGHT + 1); j++) {
+        local_history[j] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[j];
+        local_history[j] += ((int)(tid >> 4) * 7 + j * 3) % 5;
+      }
+
+      solverTlNodeCount = 0;
+      // Search the straggler's position — shares TT with the primary solver
+      // col_abort[straggler_col] will be set when the primary finishes
+      solve_single(col_positions[straggler_col], weak, book, &col_abort[straggler_col], local_history);
+      nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+      solverTlNodeCount = 0;
+      // After abort, loop back to find another straggler (or exit if all done)
     }
   };
 
