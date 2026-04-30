@@ -39,13 +39,13 @@ Value CreateCache(const CallbackInfo& info) {
         else if (w == 7 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<7, 7>::createCache(bytes).release();
         else if (w == 8 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<8, 6>::createCache(bytes).release();
         else if (w == 6 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<6, 7>::createCache(bytes).release();
-        else if (w == 6 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<6, 6>::createCache(bytes).release();
+        else if (w == 6 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<6, 8>::createCache(bytes).release();
         else if (w == 6 && h == 9) ptr = GameSolver::Connect4::HeuristicSolver<6, 9>::createCache(bytes).release();
         else if (w == 6 && h == 10) ptr = GameSolver::Connect4::HeuristicSolver<6, 10>::createCache(bytes).release();
         else if (w == 6 && h == 11) ptr = GameSolver::Connect4::HeuristicSolver<6, 11>::createCache(bytes).release();
         else if (w == 6 && h == 12) ptr = GameSolver::Connect4::HeuristicSolver<6, 12>::createCache(bytes).release();
         else if (w == 7 && h == 5) ptr = GameSolver::Connect4::HeuristicSolver<7, 5>::createCache(bytes).release();
-        else if (w == 7 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<7, 7>::createCache(bytes).release();
+        else if (w == 7 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<7, 8>::createCache(bytes).release();
         else if (w == 7 && h == 9) ptr = GameSolver::Connect4::HeuristicSolver<7, 9>::createCache(bytes).release();
         else if (w == 7 && h == 10) ptr = GameSolver::Connect4::HeuristicSolver<7, 10>::createCache(bytes).release();
         else if (w == 7 && h == 11) ptr = GameSolver::Connect4::HeuristicSolver<7, 11>::createCache(bytes).release();
@@ -57,25 +57,25 @@ Value CreateCache(const CallbackInfo& info) {
         else if (w == 8 && h == 11) ptr = GameSolver::Connect4::HeuristicSolver<8, 11>::createCache(bytes).release();
         else if (w == 8 && h == 12) ptr = GameSolver::Connect4::HeuristicSolver<8, 12>::createCache(bytes).release();
         else if (w == 9 && h == 5) ptr = GameSolver::Connect4::HeuristicSolver<9, 5>::createCache(bytes).release();
-        else if (w == 9 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<9, 9>::createCache(bytes).release();
+        else if (w == 9 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<9, 8>::createCache(bytes).release();
         else if (w == 9 && h == 10) ptr = GameSolver::Connect4::HeuristicSolver<9, 10>::createCache(bytes).release();
         else if (w == 9 && h == 11) ptr = GameSolver::Connect4::HeuristicSolver<9, 11>::createCache(bytes).release();
         else if (w == 9 && h == 12) ptr = GameSolver::Connect4::HeuristicSolver<9, 12>::createCache(bytes).release();
         else if (w == 10 && h == 5) ptr = GameSolver::Connect4::HeuristicSolver<10, 5>::createCache(bytes).release();
         else if (w == 10 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<10, 6>::createCache(bytes).release();
-        else if (w == 10 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<10, 10>::createCache(bytes).release();
+        else if (w == 10 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<10, 8>::createCache(bytes).release();
         else if (w == 10 && h == 9) ptr = GameSolver::Connect4::HeuristicSolver<10, 9>::createCache(bytes).release();
         else if (w == 10 && h == 11) ptr = GameSolver::Connect4::HeuristicSolver<10, 11>::createCache(bytes).release();
         else if (w == 11 && h == 5) ptr = GameSolver::Connect4::HeuristicSolver<11, 5>::createCache(bytes).release();
         else if (w == 11 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<11, 6>::createCache(bytes).release();
         else if (w == 11 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<11, 7>::createCache(bytes).release();
-        else if (w == 11 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<11, 11>::createCache(bytes).release();
+        else if (w == 11 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<11, 8>::createCache(bytes).release();
         else if (w == 11 && h == 9) ptr = GameSolver::Connect4::HeuristicSolver<11, 9>::createCache(bytes).release();
         else if (w == 11 && h == 10) ptr = GameSolver::Connect4::HeuristicSolver<11, 10>::createCache(bytes).release();
         else if (w == 12 && h == 5) ptr = GameSolver::Connect4::HeuristicSolver<12, 5>::createCache(bytes).release();
         else if (w == 12 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<12, 6>::createCache(bytes).release();
         else if (w == 12 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<12, 7>::createCache(bytes).release();
-        else if (w == 12 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<12, 12>::createCache(bytes).release();
+        else if (w == 12 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<12, 8>::createCache(bytes).release();
         else if (w == 12 && h == 9) ptr = GameSolver::Connect4::HeuristicSolver<12, 9>::createCache(bytes).release();
         else if (w == 9 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<9, 7>::createCache(bytes).release();
         else if (w == 8 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<8, 8>::createCache(bytes).release();
@@ -181,13 +181,13 @@ Value CreateSolver(const CallbackInfo& info) {
         else if (w == 7 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<7, 7>::createWithCache(cache).release();
         else if (w == 8 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<8, 6>::createWithCache(cache).release();
         else if (w == 6 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<6, 7>::createWithCache(cache).release();
-        else if (w == 6 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<6, 6>::createWithCache(cache).release();
+        else if (w == 6 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<6, 8>::createWithCache(cache).release();
         else if (w == 6 && h == 9) ptr = GameSolver::Connect4::HeuristicSolver<6, 9>::createWithCache(cache).release();
         else if (w == 6 && h == 10) ptr = GameSolver::Connect4::HeuristicSolver<6, 10>::createWithCache(cache).release();
         else if (w == 6 && h == 11) ptr = GameSolver::Connect4::HeuristicSolver<6, 11>::createWithCache(cache).release();
         else if (w == 6 && h == 12) ptr = GameSolver::Connect4::HeuristicSolver<6, 12>::createWithCache(cache).release();
         else if (w == 7 && h == 5) ptr = GameSolver::Connect4::HeuristicSolver<7, 5>::createWithCache(cache).release();
-        else if (w == 7 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<7, 7>::createWithCache(cache).release();
+        else if (w == 7 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<7, 8>::createWithCache(cache).release();
         else if (w == 7 && h == 9) ptr = GameSolver::Connect4::HeuristicSolver<7, 9>::createWithCache(cache).release();
         else if (w == 7 && h == 10) ptr = GameSolver::Connect4::HeuristicSolver<7, 10>::createWithCache(cache).release();
         else if (w == 7 && h == 11) ptr = GameSolver::Connect4::HeuristicSolver<7, 11>::createWithCache(cache).release();
@@ -199,25 +199,25 @@ Value CreateSolver(const CallbackInfo& info) {
         else if (w == 8 && h == 11) ptr = GameSolver::Connect4::HeuristicSolver<8, 11>::createWithCache(cache).release();
         else if (w == 8 && h == 12) ptr = GameSolver::Connect4::HeuristicSolver<8, 12>::createWithCache(cache).release();
         else if (w == 9 && h == 5) ptr = GameSolver::Connect4::HeuristicSolver<9, 5>::createWithCache(cache).release();
-        else if (w == 9 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<9, 9>::createWithCache(cache).release();
+        else if (w == 9 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<9, 8>::createWithCache(cache).release();
         else if (w == 9 && h == 10) ptr = GameSolver::Connect4::HeuristicSolver<9, 10>::createWithCache(cache).release();
         else if (w == 9 && h == 11) ptr = GameSolver::Connect4::HeuristicSolver<9, 11>::createWithCache(cache).release();
         else if (w == 9 && h == 12) ptr = GameSolver::Connect4::HeuristicSolver<9, 12>::createWithCache(cache).release();
         else if (w == 10 && h == 5) ptr = GameSolver::Connect4::HeuristicSolver<10, 5>::createWithCache(cache).release();
         else if (w == 10 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<10, 6>::createWithCache(cache).release();
-        else if (w == 10 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<10, 10>::createWithCache(cache).release();
+        else if (w == 10 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<10, 8>::createWithCache(cache).release();
         else if (w == 10 && h == 9) ptr = GameSolver::Connect4::HeuristicSolver<10, 9>::createWithCache(cache).release();
         else if (w == 10 && h == 11) ptr = GameSolver::Connect4::HeuristicSolver<10, 11>::createWithCache(cache).release();
         else if (w == 11 && h == 5) ptr = GameSolver::Connect4::HeuristicSolver<11, 5>::createWithCache(cache).release();
         else if (w == 11 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<11, 6>::createWithCache(cache).release();
         else if (w == 11 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<11, 7>::createWithCache(cache).release();
-        else if (w == 11 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<11, 11>::createWithCache(cache).release();
+        else if (w == 11 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<11, 8>::createWithCache(cache).release();
         else if (w == 11 && h == 9) ptr = GameSolver::Connect4::HeuristicSolver<11, 9>::createWithCache(cache).release();
         else if (w == 11 && h == 10) ptr = GameSolver::Connect4::HeuristicSolver<11, 10>::createWithCache(cache).release();
         else if (w == 12 && h == 5) ptr = GameSolver::Connect4::HeuristicSolver<12, 5>::createWithCache(cache).release();
         else if (w == 12 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<12, 6>::createWithCache(cache).release();
         else if (w == 12 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<12, 7>::createWithCache(cache).release();
-        else if (w == 12 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<12, 12>::createWithCache(cache).release();
+        else if (w == 12 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<12, 8>::createWithCache(cache).release();
         else if (w == 12 && h == 9) ptr = GameSolver::Connect4::HeuristicSolver<12, 9>::createWithCache(cache).release();
         else if (w == 9 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<9, 7>::createWithCache(cache).release();
         else if (w == 8 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<8, 8>::createWithCache(cache).release();
@@ -316,13 +316,13 @@ Value DestroySolver(const CallbackInfo& info) {
         else if (w == 7 && h == 7) delete static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver);
         else if (w == 8 && h == 6) delete static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver);
         else if (w == 6 && h == 7) delete static_cast<GameSolver::Connect4::HeuristicSolver<6, 7>*>(solver);
-        else if (w == 6 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver);
+        else if (w == 6 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<6, 8>*>(solver);
         else if (w == 6 && h == 9) delete static_cast<GameSolver::Connect4::HeuristicSolver<6, 9>*>(solver);
         else if (w == 6 && h == 10) delete static_cast<GameSolver::Connect4::HeuristicSolver<6, 10>*>(solver);
         else if (w == 6 && h == 11) delete static_cast<GameSolver::Connect4::HeuristicSolver<6, 11>*>(solver);
         else if (w == 6 && h == 12) delete static_cast<GameSolver::Connect4::HeuristicSolver<6, 12>*>(solver);
         else if (w == 7 && h == 5) delete static_cast<GameSolver::Connect4::HeuristicSolver<7, 5>*>(solver);
-        else if (w == 7 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver);
+        else if (w == 7 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<7, 8>*>(solver);
         else if (w == 7 && h == 9) delete static_cast<GameSolver::Connect4::HeuristicSolver<7, 9>*>(solver);
         else if (w == 7 && h == 10) delete static_cast<GameSolver::Connect4::HeuristicSolver<7, 10>*>(solver);
         else if (w == 7 && h == 11) delete static_cast<GameSolver::Connect4::HeuristicSolver<7, 11>*>(solver);
@@ -334,25 +334,25 @@ Value DestroySolver(const CallbackInfo& info) {
         else if (w == 8 && h == 11) delete static_cast<GameSolver::Connect4::HeuristicSolver<8, 11>*>(solver);
         else if (w == 8 && h == 12) delete static_cast<GameSolver::Connect4::HeuristicSolver<8, 12>*>(solver);
         else if (w == 9 && h == 5) delete static_cast<GameSolver::Connect4::HeuristicSolver<9, 5>*>(solver);
-        else if (w == 9 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver);
+        else if (w == 9 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<9, 8>*>(solver);
         else if (w == 9 && h == 10) delete static_cast<GameSolver::Connect4::HeuristicSolver<9, 10>*>(solver);
         else if (w == 9 && h == 11) delete static_cast<GameSolver::Connect4::HeuristicSolver<9, 11>*>(solver);
         else if (w == 9 && h == 12) delete static_cast<GameSolver::Connect4::HeuristicSolver<9, 12>*>(solver);
         else if (w == 10 && h == 5) delete static_cast<GameSolver::Connect4::HeuristicSolver<10, 5>*>(solver);
         else if (w == 10 && h == 6) delete static_cast<GameSolver::Connect4::HeuristicSolver<10, 6>*>(solver);
-        else if (w == 10 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver);
+        else if (w == 10 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<10, 8>*>(solver);
         else if (w == 10 && h == 9) delete static_cast<GameSolver::Connect4::HeuristicSolver<10, 9>*>(solver);
         else if (w == 10 && h == 11) delete static_cast<GameSolver::Connect4::HeuristicSolver<10, 11>*>(solver);
         else if (w == 11 && h == 5) delete static_cast<GameSolver::Connect4::HeuristicSolver<11, 5>*>(solver);
         else if (w == 11 && h == 6) delete static_cast<GameSolver::Connect4::HeuristicSolver<11, 6>*>(solver);
         else if (w == 11 && h == 7) delete static_cast<GameSolver::Connect4::HeuristicSolver<11, 7>*>(solver);
-        else if (w == 11 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<11, 11>*>(solver);
+        else if (w == 11 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<11, 8>*>(solver);
         else if (w == 11 && h == 9) delete static_cast<GameSolver::Connect4::HeuristicSolver<11, 9>*>(solver);
         else if (w == 11 && h == 10) delete static_cast<GameSolver::Connect4::HeuristicSolver<11, 10>*>(solver);
         else if (w == 12 && h == 5) delete static_cast<GameSolver::Connect4::HeuristicSolver<12, 5>*>(solver);
         else if (w == 12 && h == 6) delete static_cast<GameSolver::Connect4::HeuristicSolver<12, 6>*>(solver);
         else if (w == 12 && h == 7) delete static_cast<GameSolver::Connect4::HeuristicSolver<12, 7>*>(solver);
-        else if (w == 12 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<12, 12>*>(solver);
+        else if (w == 12 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<12, 8>*>(solver);
         else if (w == 12 && h == 9) delete static_cast<GameSolver::Connect4::HeuristicSolver<12, 9>*>(solver);
         else if (w == 9 && h == 7) delete static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver);
         else if (w == 8 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver);
@@ -453,7 +453,7 @@ Value CreateBook(const CallbackInfo& info) {
     else if (w == 4 && h == 5) ptr = C4_4x5::GameSolver::Connect4::OpeningBookBase<4, 5>::load(path, w, h).release();
     else if (w == 4 && h == 6) ptr = C4_4x6::GameSolver::Connect4::OpeningBookBase<4, 6>::load(path, w, h).release();
     else if (w == 4 && h == 7) ptr = C4_4x7::GameSolver::Connect4::OpeningBookBase<4, 7>::load(path, w, h).release();
-    else if (w == 4 && h == 8) ptr = C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 4>::load(path, w, h).release();
+    else if (w == 4 && h == 8) ptr = C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 8>::load(path, w, h).release();
     else if (w == 4 && h == 9) ptr = C4_4x9::GameSolver::Connect4::OpeningBookBase<4, 9>::load(path, w, h).release();
     else if (w == 4 && h == 10) ptr = C4_4x10::GameSolver::Connect4::OpeningBookBase<4, 10>::load(path, w, h).release();
     else if (w == 4 && h == 11) ptr = C4_4x11::GameSolver::Connect4::OpeningBookBase<4, 11>::load(path, w, h).release();
@@ -462,21 +462,21 @@ Value CreateBook(const CallbackInfo& info) {
     else if (w == 5 && h == 5) ptr = C4_5x5::GameSolver::Connect4::OpeningBookBase<5, 5>::load(path, w, h).release();
     else if (w == 5 && h == 6) ptr = C4_5x6::GameSolver::Connect4::OpeningBookBase<5, 6>::load(path, w, h).release();
     else if (w == 5 && h == 7) ptr = C4_5x7::GameSolver::Connect4::OpeningBookBase<5, 7>::load(path, w, h).release();
-    else if (w == 5 && h == 8) ptr = C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 5>::load(path, w, h).release();
+    else if (w == 5 && h == 8) ptr = C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 8>::load(path, w, h).release();
     else if (w == 5 && h == 9) ptr = C4_5x9::GameSolver::Connect4::OpeningBookBase<5, 9>::load(path, w, h).release();
     else if (w == 5 && h == 10) ptr = C4_5x10::GameSolver::Connect4::OpeningBookBase<5, 10>::load(path, w, h).release();
     else if (w == 5 && h == 11) ptr = C4_5x11::GameSolver::Connect4::OpeningBookBase<5, 11>::load(path, w, h).release();
     else if (w == 5 && h == 12) ptr = C4_5x12::GameSolver::Connect4::OpeningBookBase<5, 12>::load(path, w, h).release();
     else if (w == 6 && h == 4) ptr = C4_6x4::GameSolver::Connect4::OpeningBookBase<6, 4>::load(path, w, h).release();
     else if (w == 6 && h == 7) ptr = C4_6x7::GameSolver::Connect4::OpeningBookBase<6, 7>::load(path, w, h).release();
-    else if (w == 6 && h == 8) ptr = C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 6>::load(path, w, h).release();
+    else if (w == 6 && h == 8) ptr = C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 8>::load(path, w, h).release();
     else if (w == 6 && h == 9) ptr = C4_6x9::GameSolver::Connect4::OpeningBookBase<6, 9>::load(path, w, h).release();
     else if (w == 6 && h == 10) ptr = C4_6x10::GameSolver::Connect4::OpeningBookBase<6, 10>::load(path, w, h).release();
     else if (w == 6 && h == 11) ptr = C4_6x11::GameSolver::Connect4::OpeningBookBase<6, 11>::load(path, w, h).release();
     else if (w == 6 && h == 12) ptr = C4_6x12::GameSolver::Connect4::OpeningBookBase<6, 12>::load(path, w, h).release();
     else if (w == 7 && h == 4) ptr = C4_7x4::GameSolver::Connect4::OpeningBookBase<7, 4>::load(path, w, h).release();
     else if (w == 7 && h == 5) ptr = C4_7x5::GameSolver::Connect4::OpeningBookBase<7, 5>::load(path, w, h).release();
-    else if (w == 7 && h == 8) ptr = C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 7>::load(path, w, h).release();
+    else if (w == 7 && h == 8) ptr = C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 8>::load(path, w, h).release();
     else if (w == 7 && h == 9) ptr = C4_7x9::GameSolver::Connect4::OpeningBookBase<7, 9>::load(path, w, h).release();
     else if (w == 7 && h == 10) ptr = C4_7x10::GameSolver::Connect4::OpeningBookBase<7, 10>::load(path, w, h).release();
     else if (w == 7 && h == 11) ptr = C4_7x11::GameSolver::Connect4::OpeningBookBase<7, 11>::load(path, w, h).release();
@@ -490,27 +490,27 @@ Value CreateBook(const CallbackInfo& info) {
     else if (w == 8 && h == 12) ptr = C4_8x12::GameSolver::Connect4::OpeningBookBase<8, 12>::load(path, w, h).release();
     else if (w == 9 && h == 4) ptr = C4_9x4::GameSolver::Connect4::OpeningBookBase<9, 4>::load(path, w, h).release();
     else if (w == 9 && h == 5) ptr = C4_9x5::GameSolver::Connect4::OpeningBookBase<9, 5>::load(path, w, h).release();
-    else if (w == 9 && h == 8) ptr = C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 9>::load(path, w, h).release();
+    else if (w == 9 && h == 8) ptr = C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 8>::load(path, w, h).release();
     else if (w == 9 && h == 10) ptr = C4_9x10::GameSolver::Connect4::OpeningBookBase<9, 10>::load(path, w, h).release();
     else if (w == 9 && h == 11) ptr = C4_9x11::GameSolver::Connect4::OpeningBookBase<9, 11>::load(path, w, h).release();
     else if (w == 9 && h == 12) ptr = C4_9x12::GameSolver::Connect4::OpeningBookBase<9, 12>::load(path, w, h).release();
     else if (w == 10 && h == 4) ptr = C4_10x4::GameSolver::Connect4::OpeningBookBase<10, 4>::load(path, w, h).release();
     else if (w == 10 && h == 5) ptr = C4_10x5::GameSolver::Connect4::OpeningBookBase<10, 5>::load(path, w, h).release();
     else if (w == 10 && h == 6) ptr = C4_10x6::GameSolver::Connect4::OpeningBookBase<10, 6>::load(path, w, h).release();
-    else if (w == 10 && h == 8) ptr = C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 10>::load(path, w, h).release();
+    else if (w == 10 && h == 8) ptr = C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 8>::load(path, w, h).release();
     else if (w == 10 && h == 9) ptr = C4_10x9::GameSolver::Connect4::OpeningBookBase<10, 9>::load(path, w, h).release();
     else if (w == 10 && h == 11) ptr = C4_10x11::GameSolver::Connect4::OpeningBookBase<10, 11>::load(path, w, h).release();
     else if (w == 11 && h == 5) ptr = C4_11x5::GameSolver::Connect4::OpeningBookBase<11, 5>::load(path, w, h).release();
     else if (w == 11 && h == 6) ptr = C4_11x6::GameSolver::Connect4::OpeningBookBase<11, 6>::load(path, w, h).release();
     else if (w == 11 && h == 7) ptr = C4_11x7::GameSolver::Connect4::OpeningBookBase<11, 7>::load(path, w, h).release();
-    else if (w == 11 && h == 8) ptr = C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 11>::load(path, w, h).release();
+    else if (w == 11 && h == 8) ptr = C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 8>::load(path, w, h).release();
     else if (w == 11 && h == 9) ptr = C4_11x9::GameSolver::Connect4::OpeningBookBase<11, 9>::load(path, w, h).release();
     else if (w == 11 && h == 10) ptr = C4_11x10::GameSolver::Connect4::OpeningBookBase<11, 10>::load(path, w, h).release();
     else if (w == 12 && h == 4) ptr = C4_12x4::GameSolver::Connect4::OpeningBookBase<12, 4>::load(path, w, h).release();
     else if (w == 12 && h == 5) ptr = C4_12x5::GameSolver::Connect4::OpeningBookBase<12, 5>::load(path, w, h).release();
     else if (w == 12 && h == 6) ptr = C4_12x6::GameSolver::Connect4::OpeningBookBase<12, 6>::load(path, w, h).release();
     else if (w == 12 && h == 7) ptr = C4_12x7::GameSolver::Connect4::OpeningBookBase<12, 7>::load(path, w, h).release();
-    else if (w == 12 && h == 8) ptr = C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 12>::load(path, w, h).release();
+    else if (w == 12 && h == 8) ptr = C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 8>::load(path, w, h).release();
     else if (w == 12 && h == 9) ptr = C4_12x9::GameSolver::Connect4::OpeningBookBase<12, 9>::load(path, w, h).release();
     else if (w == 8 && h == 8) ptr = C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>::load(path, w, h).release();
     else if (w == 9 && h == 7) ptr = C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>::load(path, w, h).release();
@@ -534,7 +534,7 @@ Value DestroyBook(const CallbackInfo& info) {
     else if (w == 4 && h == 5) delete static_cast<C4_4x5::GameSolver::Connect4::OpeningBookBase<4, 5>*>(book_ptr);
     else if (w == 4 && h == 6) delete static_cast<C4_4x6::GameSolver::Connect4::OpeningBookBase<4, 6>*>(book_ptr);
     else if (w == 4 && h == 7) delete static_cast<C4_4x7::GameSolver::Connect4::OpeningBookBase<4, 7>*>(book_ptr);
-    else if (w == 4 && h == 8) delete static_cast<C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 4>*>(book_ptr);
+    else if (w == 4 && h == 8) delete static_cast<C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 8>*>(book_ptr);
     else if (w == 4 && h == 9) delete static_cast<C4_4x9::GameSolver::Connect4::OpeningBookBase<4, 9>*>(book_ptr);
     else if (w == 4 && h == 10) delete static_cast<C4_4x10::GameSolver::Connect4::OpeningBookBase<4, 10>*>(book_ptr);
     else if (w == 4 && h == 11) delete static_cast<C4_4x11::GameSolver::Connect4::OpeningBookBase<4, 11>*>(book_ptr);
@@ -543,21 +543,21 @@ Value DestroyBook(const CallbackInfo& info) {
     else if (w == 5 && h == 5) delete static_cast<C4_5x5::GameSolver::Connect4::OpeningBookBase<5, 5>*>(book_ptr);
     else if (w == 5 && h == 6) delete static_cast<C4_5x6::GameSolver::Connect4::OpeningBookBase<5, 6>*>(book_ptr);
     else if (w == 5 && h == 7) delete static_cast<C4_5x7::GameSolver::Connect4::OpeningBookBase<5, 7>*>(book_ptr);
-    else if (w == 5 && h == 8) delete static_cast<C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 5>*>(book_ptr);
+    else if (w == 5 && h == 8) delete static_cast<C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 8>*>(book_ptr);
     else if (w == 5 && h == 9) delete static_cast<C4_5x9::GameSolver::Connect4::OpeningBookBase<5, 9>*>(book_ptr);
     else if (w == 5 && h == 10) delete static_cast<C4_5x10::GameSolver::Connect4::OpeningBookBase<5, 10>*>(book_ptr);
     else if (w == 5 && h == 11) delete static_cast<C4_5x11::GameSolver::Connect4::OpeningBookBase<5, 11>*>(book_ptr);
     else if (w == 5 && h == 12) delete static_cast<C4_5x12::GameSolver::Connect4::OpeningBookBase<5, 12>*>(book_ptr);
     else if (w == 6 && h == 4) delete static_cast<C4_6x4::GameSolver::Connect4::OpeningBookBase<6, 4>*>(book_ptr);
     else if (w == 6 && h == 7) delete static_cast<C4_6x7::GameSolver::Connect4::OpeningBookBase<6, 7>*>(book_ptr);
-    else if (w == 6 && h == 8) delete static_cast<C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 6>*>(book_ptr);
+    else if (w == 6 && h == 8) delete static_cast<C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 8>*>(book_ptr);
     else if (w == 6 && h == 9) delete static_cast<C4_6x9::GameSolver::Connect4::OpeningBookBase<6, 9>*>(book_ptr);
     else if (w == 6 && h == 10) delete static_cast<C4_6x10::GameSolver::Connect4::OpeningBookBase<6, 10>*>(book_ptr);
     else if (w == 6 && h == 11) delete static_cast<C4_6x11::GameSolver::Connect4::OpeningBookBase<6, 11>*>(book_ptr);
     else if (w == 6 && h == 12) delete static_cast<C4_6x12::GameSolver::Connect4::OpeningBookBase<6, 12>*>(book_ptr);
     else if (w == 7 && h == 4) delete static_cast<C4_7x4::GameSolver::Connect4::OpeningBookBase<7, 4>*>(book_ptr);
     else if (w == 7 && h == 5) delete static_cast<C4_7x5::GameSolver::Connect4::OpeningBookBase<7, 5>*>(book_ptr);
-    else if (w == 7 && h == 8) delete static_cast<C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 7>*>(book_ptr);
+    else if (w == 7 && h == 8) delete static_cast<C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 8>*>(book_ptr);
     else if (w == 7 && h == 9) delete static_cast<C4_7x9::GameSolver::Connect4::OpeningBookBase<7, 9>*>(book_ptr);
     else if (w == 7 && h == 10) delete static_cast<C4_7x10::GameSolver::Connect4::OpeningBookBase<7, 10>*>(book_ptr);
     else if (w == 7 && h == 11) delete static_cast<C4_7x11::GameSolver::Connect4::OpeningBookBase<7, 11>*>(book_ptr);
@@ -571,27 +571,27 @@ Value DestroyBook(const CallbackInfo& info) {
     else if (w == 8 && h == 12) delete static_cast<C4_8x12::GameSolver::Connect4::OpeningBookBase<8, 12>*>(book_ptr);
     else if (w == 9 && h == 4) delete static_cast<C4_9x4::GameSolver::Connect4::OpeningBookBase<9, 4>*>(book_ptr);
     else if (w == 9 && h == 5) delete static_cast<C4_9x5::GameSolver::Connect4::OpeningBookBase<9, 5>*>(book_ptr);
-    else if (w == 9 && h == 8) delete static_cast<C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 9>*>(book_ptr);
+    else if (w == 9 && h == 8) delete static_cast<C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 8>*>(book_ptr);
     else if (w == 9 && h == 10) delete static_cast<C4_9x10::GameSolver::Connect4::OpeningBookBase<9, 10>*>(book_ptr);
     else if (w == 9 && h == 11) delete static_cast<C4_9x11::GameSolver::Connect4::OpeningBookBase<9, 11>*>(book_ptr);
     else if (w == 9 && h == 12) delete static_cast<C4_9x12::GameSolver::Connect4::OpeningBookBase<9, 12>*>(book_ptr);
     else if (w == 10 && h == 4) delete static_cast<C4_10x4::GameSolver::Connect4::OpeningBookBase<10, 4>*>(book_ptr);
     else if (w == 10 && h == 5) delete static_cast<C4_10x5::GameSolver::Connect4::OpeningBookBase<10, 5>*>(book_ptr);
     else if (w == 10 && h == 6) delete static_cast<C4_10x6::GameSolver::Connect4::OpeningBookBase<10, 6>*>(book_ptr);
-    else if (w == 10 && h == 8) delete static_cast<C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 10>*>(book_ptr);
+    else if (w == 10 && h == 8) delete static_cast<C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 8>*>(book_ptr);
     else if (w == 10 && h == 9) delete static_cast<C4_10x9::GameSolver::Connect4::OpeningBookBase<10, 9>*>(book_ptr);
     else if (w == 10 && h == 11) delete static_cast<C4_10x11::GameSolver::Connect4::OpeningBookBase<10, 11>*>(book_ptr);
     else if (w == 11 && h == 5) delete static_cast<C4_11x5::GameSolver::Connect4::OpeningBookBase<11, 5>*>(book_ptr);
     else if (w == 11 && h == 6) delete static_cast<C4_11x6::GameSolver::Connect4::OpeningBookBase<11, 6>*>(book_ptr);
     else if (w == 11 && h == 7) delete static_cast<C4_11x7::GameSolver::Connect4::OpeningBookBase<11, 7>*>(book_ptr);
-    else if (w == 11 && h == 8) delete static_cast<C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 11>*>(book_ptr);
+    else if (w == 11 && h == 8) delete static_cast<C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 8>*>(book_ptr);
     else if (w == 11 && h == 9) delete static_cast<C4_11x9::GameSolver::Connect4::OpeningBookBase<11, 9>*>(book_ptr);
     else if (w == 11 && h == 10) delete static_cast<C4_11x10::GameSolver::Connect4::OpeningBookBase<11, 10>*>(book_ptr);
     else if (w == 12 && h == 4) delete static_cast<C4_12x4::GameSolver::Connect4::OpeningBookBase<12, 4>*>(book_ptr);
     else if (w == 12 && h == 5) delete static_cast<C4_12x5::GameSolver::Connect4::OpeningBookBase<12, 5>*>(book_ptr);
     else if (w == 12 && h == 6) delete static_cast<C4_12x6::GameSolver::Connect4::OpeningBookBase<12, 6>*>(book_ptr);
     else if (w == 12 && h == 7) delete static_cast<C4_12x7::GameSolver::Connect4::OpeningBookBase<12, 7>*>(book_ptr);
-    else if (w == 12 && h == 8) delete static_cast<C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 12>*>(book_ptr);
+    else if (w == 12 && h == 8) delete static_cast<C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 8>*>(book_ptr);
     else if (w == 12 && h == 9) delete static_cast<C4_12x9::GameSolver::Connect4::OpeningBookBase<12, 9>*>(book_ptr);
     else if (w == 8 && h == 8) delete static_cast<C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>*>(book_ptr);
     else if (w == 9 && h == 7) delete static_cast<C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>*>(book_ptr);
@@ -671,13 +671,13 @@ bool IsSolverBusy(int w, int h, void* solver, bool is_heuristic) {
         else if (w == 7 && h == 7) return static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver)->isBusy();
         else if (w == 8 && h == 6) return static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver)->isBusy();
         else if (w == 6 && h == 7) return static_cast<GameSolver::Connect4::HeuristicSolver<6, 7>*>(solver)->isBusy();
-        else if (w == 6 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver)->isBusy();
+        else if (w == 6 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<6, 8>*>(solver)->isBusy();
         else if (w == 6 && h == 9) return static_cast<GameSolver::Connect4::HeuristicSolver<6, 9>*>(solver)->isBusy();
         else if (w == 6 && h == 10) return static_cast<GameSolver::Connect4::HeuristicSolver<6, 10>*>(solver)->isBusy();
         else if (w == 6 && h == 11) return static_cast<GameSolver::Connect4::HeuristicSolver<6, 11>*>(solver)->isBusy();
         else if (w == 6 && h == 12) return static_cast<GameSolver::Connect4::HeuristicSolver<6, 12>*>(solver)->isBusy();
         else if (w == 7 && h == 5) return static_cast<GameSolver::Connect4::HeuristicSolver<7, 5>*>(solver)->isBusy();
-        else if (w == 7 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver)->isBusy();
+        else if (w == 7 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<7, 8>*>(solver)->isBusy();
         else if (w == 7 && h == 9) return static_cast<GameSolver::Connect4::HeuristicSolver<7, 9>*>(solver)->isBusy();
         else if (w == 7 && h == 10) return static_cast<GameSolver::Connect4::HeuristicSolver<7, 10>*>(solver)->isBusy();
         else if (w == 7 && h == 11) return static_cast<GameSolver::Connect4::HeuristicSolver<7, 11>*>(solver)->isBusy();
@@ -689,25 +689,25 @@ bool IsSolverBusy(int w, int h, void* solver, bool is_heuristic) {
         else if (w == 8 && h == 11) return static_cast<GameSolver::Connect4::HeuristicSolver<8, 11>*>(solver)->isBusy();
         else if (w == 8 && h == 12) return static_cast<GameSolver::Connect4::HeuristicSolver<8, 12>*>(solver)->isBusy();
         else if (w == 9 && h == 5) return static_cast<GameSolver::Connect4::HeuristicSolver<9, 5>*>(solver)->isBusy();
-        else if (w == 9 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver)->isBusy();
+        else if (w == 9 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<9, 8>*>(solver)->isBusy();
         else if (w == 9 && h == 10) return static_cast<GameSolver::Connect4::HeuristicSolver<9, 10>*>(solver)->isBusy();
         else if (w == 9 && h == 11) return static_cast<GameSolver::Connect4::HeuristicSolver<9, 11>*>(solver)->isBusy();
         else if (w == 9 && h == 12) return static_cast<GameSolver::Connect4::HeuristicSolver<9, 12>*>(solver)->isBusy();
         else if (w == 10 && h == 5) return static_cast<GameSolver::Connect4::HeuristicSolver<10, 5>*>(solver)->isBusy();
         else if (w == 10 && h == 6) return static_cast<GameSolver::Connect4::HeuristicSolver<10, 6>*>(solver)->isBusy();
-        else if (w == 10 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver)->isBusy();
+        else if (w == 10 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<10, 8>*>(solver)->isBusy();
         else if (w == 10 && h == 9) return static_cast<GameSolver::Connect4::HeuristicSolver<10, 9>*>(solver)->isBusy();
         else if (w == 10 && h == 11) return static_cast<GameSolver::Connect4::HeuristicSolver<10, 11>*>(solver)->isBusy();
         else if (w == 11 && h == 5) return static_cast<GameSolver::Connect4::HeuristicSolver<11, 5>*>(solver)->isBusy();
         else if (w == 11 && h == 6) return static_cast<GameSolver::Connect4::HeuristicSolver<11, 6>*>(solver)->isBusy();
         else if (w == 11 && h == 7) return static_cast<GameSolver::Connect4::HeuristicSolver<11, 7>*>(solver)->isBusy();
-        else if (w == 11 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<11, 11>*>(solver)->isBusy();
+        else if (w == 11 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<11, 8>*>(solver)->isBusy();
         else if (w == 11 && h == 9) return static_cast<GameSolver::Connect4::HeuristicSolver<11, 9>*>(solver)->isBusy();
         else if (w == 11 && h == 10) return static_cast<GameSolver::Connect4::HeuristicSolver<11, 10>*>(solver)->isBusy();
         else if (w == 12 && h == 5) return static_cast<GameSolver::Connect4::HeuristicSolver<12, 5>*>(solver)->isBusy();
         else if (w == 12 && h == 6) return static_cast<GameSolver::Connect4::HeuristicSolver<12, 6>*>(solver)->isBusy();
         else if (w == 12 && h == 7) return static_cast<GameSolver::Connect4::HeuristicSolver<12, 7>*>(solver)->isBusy();
-        else if (w == 12 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<12, 12>*>(solver)->isBusy();
+        else if (w == 12 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<12, 8>*>(solver)->isBusy();
         else if (w == 12 && h == 9) return static_cast<GameSolver::Connect4::HeuristicSolver<12, 9>*>(solver)->isBusy();
         else if (w == 9 && h == 7) return static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver)->isBusy();
         else if (w == 8 && h == 8) return static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver)->isBusy();
@@ -801,13 +801,13 @@ void SetSolverBusy(int w, int h, void* solver, bool is_heuristic, bool busy) {
         else if (w == 7 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver)->setBusy(busy);
         else if (w == 8 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver)->setBusy(busy);
         else if (w == 6 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<6, 7>*>(solver)->setBusy(busy);
-        else if (w == 6 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver)->setBusy(busy);
+        else if (w == 6 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<6, 8>*>(solver)->setBusy(busy);
         else if (w == 6 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<6, 9>*>(solver)->setBusy(busy);
         else if (w == 6 && h == 10) static_cast<GameSolver::Connect4::HeuristicSolver<6, 10>*>(solver)->setBusy(busy);
         else if (w == 6 && h == 11) static_cast<GameSolver::Connect4::HeuristicSolver<6, 11>*>(solver)->setBusy(busy);
         else if (w == 6 && h == 12) static_cast<GameSolver::Connect4::HeuristicSolver<6, 12>*>(solver)->setBusy(busy);
         else if (w == 7 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<7, 5>*>(solver)->setBusy(busy);
-        else if (w == 7 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver)->setBusy(busy);
+        else if (w == 7 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<7, 8>*>(solver)->setBusy(busy);
         else if (w == 7 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<7, 9>*>(solver)->setBusy(busy);
         else if (w == 7 && h == 10) static_cast<GameSolver::Connect4::HeuristicSolver<7, 10>*>(solver)->setBusy(busy);
         else if (w == 7 && h == 11) static_cast<GameSolver::Connect4::HeuristicSolver<7, 11>*>(solver)->setBusy(busy);
@@ -819,25 +819,25 @@ void SetSolverBusy(int w, int h, void* solver, bool is_heuristic, bool busy) {
         else if (w == 8 && h == 11) static_cast<GameSolver::Connect4::HeuristicSolver<8, 11>*>(solver)->setBusy(busy);
         else if (w == 8 && h == 12) static_cast<GameSolver::Connect4::HeuristicSolver<8, 12>*>(solver)->setBusy(busy);
         else if (w == 9 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<9, 5>*>(solver)->setBusy(busy);
-        else if (w == 9 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver)->setBusy(busy);
+        else if (w == 9 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<9, 8>*>(solver)->setBusy(busy);
         else if (w == 9 && h == 10) static_cast<GameSolver::Connect4::HeuristicSolver<9, 10>*>(solver)->setBusy(busy);
         else if (w == 9 && h == 11) static_cast<GameSolver::Connect4::HeuristicSolver<9, 11>*>(solver)->setBusy(busy);
         else if (w == 9 && h == 12) static_cast<GameSolver::Connect4::HeuristicSolver<9, 12>*>(solver)->setBusy(busy);
         else if (w == 10 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<10, 5>*>(solver)->setBusy(busy);
         else if (w == 10 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<10, 6>*>(solver)->setBusy(busy);
-        else if (w == 10 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver)->setBusy(busy);
+        else if (w == 10 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<10, 8>*>(solver)->setBusy(busy);
         else if (w == 10 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<10, 9>*>(solver)->setBusy(busy);
         else if (w == 10 && h == 11) static_cast<GameSolver::Connect4::HeuristicSolver<10, 11>*>(solver)->setBusy(busy);
         else if (w == 11 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<11, 5>*>(solver)->setBusy(busy);
         else if (w == 11 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<11, 6>*>(solver)->setBusy(busy);
         else if (w == 11 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<11, 7>*>(solver)->setBusy(busy);
-        else if (w == 11 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<11, 11>*>(solver)->setBusy(busy);
+        else if (w == 11 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<11, 8>*>(solver)->setBusy(busy);
         else if (w == 11 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<11, 9>*>(solver)->setBusy(busy);
         else if (w == 11 && h == 10) static_cast<GameSolver::Connect4::HeuristicSolver<11, 10>*>(solver)->setBusy(busy);
         else if (w == 12 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<12, 5>*>(solver)->setBusy(busy);
         else if (w == 12 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<12, 6>*>(solver)->setBusy(busy);
         else if (w == 12 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<12, 7>*>(solver)->setBusy(busy);
-        else if (w == 12 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<12, 12>*>(solver)->setBusy(busy);
+        else if (w == 12 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<12, 8>*>(solver)->setBusy(busy);
         else if (w == 12 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<12, 9>*>(solver)->setBusy(busy);
         else if (w == 9 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver)->setBusy(busy);
         else if (w == 8 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver)->setBusy(busy);
@@ -938,7 +938,7 @@ public:
             else if (w == 4 && h == 5) result_data = runAnalysisRaw<C4_4x5::GameSolver::Connect4::Solver, C4_4x5::GameSolver::Connect4::Position, 8, 6, C4_4x5::GameSolver::Connect4::OpeningBookBase<4, 5>>(*static_cast<C4_4x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 4 && h == 6) result_data = runAnalysisRaw<C4_4x6::GameSolver::Connect4::Solver, C4_4x6::GameSolver::Connect4::Position, 8, 6, C4_4x6::GameSolver::Connect4::OpeningBookBase<4, 6>>(*static_cast<C4_4x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 4 && h == 7) result_data = runAnalysisRaw<C4_4x7::GameSolver::Connect4::Solver, C4_4x7::GameSolver::Connect4::Position, 8, 6, C4_4x7::GameSolver::Connect4::OpeningBookBase<4, 7>>(*static_cast<C4_4x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
-            else if (w == 4 && h == 8) result_data = runAnalysisRaw<C4_4x8::GameSolver::Connect4::Solver, C4_4x8::GameSolver::Connect4::Position, 8, 6, C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 4>>(*static_cast<C4_4x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 4 && h == 8) result_data = runAnalysisRaw<C4_4x8::GameSolver::Connect4::Solver, C4_4x8::GameSolver::Connect4::Position, 8, 6, C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 8>>(*static_cast<C4_4x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 4 && h == 9) result_data = runAnalysisRaw<C4_4x9::GameSolver::Connect4::Solver, C4_4x9::GameSolver::Connect4::Position, 8, 6, C4_4x9::GameSolver::Connect4::OpeningBookBase<4, 9>>(*static_cast<C4_4x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 4 && h == 10) result_data = runAnalysisRaw<C4_4x10::GameSolver::Connect4::Solver, C4_4x10::GameSolver::Connect4::Position, 8, 6, C4_4x10::GameSolver::Connect4::OpeningBookBase<4, 10>>(*static_cast<C4_4x10::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 4 && h == 11) result_data = runAnalysisRaw<C4_4x11::GameSolver::Connect4::Solver, C4_4x11::GameSolver::Connect4::Position, 8, 6, C4_4x11::GameSolver::Connect4::OpeningBookBase<4, 11>>(*static_cast<C4_4x11::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
@@ -947,21 +947,21 @@ public:
             else if (w == 5 && h == 5) result_data = runAnalysisRaw<C4_5x5::GameSolver::Connect4::Solver, C4_5x5::GameSolver::Connect4::Position, 8, 6, C4_5x5::GameSolver::Connect4::OpeningBookBase<5, 5>>(*static_cast<C4_5x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 5 && h == 6) result_data = runAnalysisRaw<C4_5x6::GameSolver::Connect4::Solver, C4_5x6::GameSolver::Connect4::Position, 8, 6, C4_5x6::GameSolver::Connect4::OpeningBookBase<5, 6>>(*static_cast<C4_5x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 5 && h == 7) result_data = runAnalysisRaw<C4_5x7::GameSolver::Connect4::Solver, C4_5x7::GameSolver::Connect4::Position, 8, 6, C4_5x7::GameSolver::Connect4::OpeningBookBase<5, 7>>(*static_cast<C4_5x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
-            else if (w == 5 && h == 8) result_data = runAnalysisRaw<C4_5x8::GameSolver::Connect4::Solver, C4_5x8::GameSolver::Connect4::Position, 8, 6, C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 5>>(*static_cast<C4_5x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 5 && h == 8) result_data = runAnalysisRaw<C4_5x8::GameSolver::Connect4::Solver, C4_5x8::GameSolver::Connect4::Position, 8, 6, C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 8>>(*static_cast<C4_5x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 5 && h == 9) result_data = runAnalysisRaw<C4_5x9::GameSolver::Connect4::Solver, C4_5x9::GameSolver::Connect4::Position, 8, 6, C4_5x9::GameSolver::Connect4::OpeningBookBase<5, 9>>(*static_cast<C4_5x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 5 && h == 10) result_data = runAnalysisRaw<C4_5x10::GameSolver::Connect4::Solver, C4_5x10::GameSolver::Connect4::Position, 8, 6, C4_5x10::GameSolver::Connect4::OpeningBookBase<5, 10>>(*static_cast<C4_5x10::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 5 && h == 11) result_data = runAnalysisRaw<C4_5x11::GameSolver::Connect4::Solver, C4_5x11::GameSolver::Connect4::Position, 8, 6, C4_5x11::GameSolver::Connect4::OpeningBookBase<5, 11>>(*static_cast<C4_5x11::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 5 && h == 12) result_data = runAnalysisRaw<C4_5x12::GameSolver::Connect4::Solver, C4_5x12::GameSolver::Connect4::Position, 8, 6, C4_5x12::GameSolver::Connect4::OpeningBookBase<5, 12>>(*static_cast<C4_5x12::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 6 && h == 4) result_data = runAnalysisRaw<C4_6x4::GameSolver::Connect4::Solver, C4_6x4::GameSolver::Connect4::Position, 8, 6, C4_6x4::GameSolver::Connect4::OpeningBookBase<6, 4>>(*static_cast<C4_6x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 6 && h == 7) result_data = runAnalysisRaw<C4_6x7::GameSolver::Connect4::Solver, C4_6x7::GameSolver::Connect4::Position, 8, 6, C4_6x7::GameSolver::Connect4::OpeningBookBase<6, 7>>(*static_cast<C4_6x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
-            else if (w == 6 && h == 8) result_data = runAnalysisRaw<C4_6x8::GameSolver::Connect4::Solver, C4_6x8::GameSolver::Connect4::Position, 8, 6, C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 6>>(*static_cast<C4_6x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 6 && h == 8) result_data = runAnalysisRaw<C4_6x8::GameSolver::Connect4::Solver, C4_6x8::GameSolver::Connect4::Position, 8, 6, C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 8>>(*static_cast<C4_6x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 6 && h == 9) result_data = runAnalysisRaw<C4_6x9::GameSolver::Connect4::Solver, C4_6x9::GameSolver::Connect4::Position, 8, 6, C4_6x9::GameSolver::Connect4::OpeningBookBase<6, 9>>(*static_cast<C4_6x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 6 && h == 10) result_data = runAnalysisRaw<C4_6x10::GameSolver::Connect4::Solver, C4_6x10::GameSolver::Connect4::Position, 8, 6, C4_6x10::GameSolver::Connect4::OpeningBookBase<6, 10>>(*static_cast<C4_6x10::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 6 && h == 11) result_data = runAnalysisRaw<C4_6x11::GameSolver::Connect4::Solver, C4_6x11::GameSolver::Connect4::Position, 8, 6, C4_6x11::GameSolver::Connect4::OpeningBookBase<6, 11>>(*static_cast<C4_6x11::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 6 && h == 12) result_data = runAnalysisRaw<C4_6x12::GameSolver::Connect4::Solver, C4_6x12::GameSolver::Connect4::Position, 8, 6, C4_6x12::GameSolver::Connect4::OpeningBookBase<6, 12>>(*static_cast<C4_6x12::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 7 && h == 4) result_data = runAnalysisRaw<C4_7x4::GameSolver::Connect4::Solver, C4_7x4::GameSolver::Connect4::Position, 8, 6, C4_7x4::GameSolver::Connect4::OpeningBookBase<7, 4>>(*static_cast<C4_7x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 7 && h == 5) result_data = runAnalysisRaw<C4_7x5::GameSolver::Connect4::Solver, C4_7x5::GameSolver::Connect4::Position, 8, 6, C4_7x5::GameSolver::Connect4::OpeningBookBase<7, 5>>(*static_cast<C4_7x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
-            else if (w == 7 && h == 8) result_data = runAnalysisRaw<C4_7x8::GameSolver::Connect4::Solver, C4_7x8::GameSolver::Connect4::Position, 8, 6, C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 7>>(*static_cast<C4_7x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 7 && h == 8) result_data = runAnalysisRaw<C4_7x8::GameSolver::Connect4::Solver, C4_7x8::GameSolver::Connect4::Position, 8, 6, C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 8>>(*static_cast<C4_7x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 7 && h == 9) result_data = runAnalysisRaw<C4_7x9::GameSolver::Connect4::Solver, C4_7x9::GameSolver::Connect4::Position, 8, 6, C4_7x9::GameSolver::Connect4::OpeningBookBase<7, 9>>(*static_cast<C4_7x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 7 && h == 10) result_data = runAnalysisRaw<C4_7x10::GameSolver::Connect4::Solver, C4_7x10::GameSolver::Connect4::Position, 8, 6, C4_7x10::GameSolver::Connect4::OpeningBookBase<7, 10>>(*static_cast<C4_7x10::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 7 && h == 11) result_data = runAnalysisRaw<C4_7x11::GameSolver::Connect4::Solver, C4_7x11::GameSolver::Connect4::Position, 8, 6, C4_7x11::GameSolver::Connect4::OpeningBookBase<7, 11>>(*static_cast<C4_7x11::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
@@ -975,27 +975,27 @@ public:
             else if (w == 8 && h == 12) result_data = runAnalysisRaw<C4_8x12::GameSolver::Connect4::Solver, C4_8x12::GameSolver::Connect4::Position, 8, 6, C4_8x12::GameSolver::Connect4::OpeningBookBase<8, 12>>(*static_cast<C4_8x12::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 9 && h == 4) result_data = runAnalysisRaw<C4_9x4::GameSolver::Connect4::Solver, C4_9x4::GameSolver::Connect4::Position, 8, 6, C4_9x4::GameSolver::Connect4::OpeningBookBase<9, 4>>(*static_cast<C4_9x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 9 && h == 5) result_data = runAnalysisRaw<C4_9x5::GameSolver::Connect4::Solver, C4_9x5::GameSolver::Connect4::Position, 8, 6, C4_9x5::GameSolver::Connect4::OpeningBookBase<9, 5>>(*static_cast<C4_9x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
-            else if (w == 9 && h == 8) result_data = runAnalysisRaw<C4_9x8::GameSolver::Connect4::Solver, C4_9x8::GameSolver::Connect4::Position, 8, 6, C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 9>>(*static_cast<C4_9x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 9 && h == 8) result_data = runAnalysisRaw<C4_9x8::GameSolver::Connect4::Solver, C4_9x8::GameSolver::Connect4::Position, 8, 6, C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 8>>(*static_cast<C4_9x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 9 && h == 10) result_data = runAnalysisRaw<C4_9x10::GameSolver::Connect4::Solver, C4_9x10::GameSolver::Connect4::Position, 8, 6, C4_9x10::GameSolver::Connect4::OpeningBookBase<9, 10>>(*static_cast<C4_9x10::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 9 && h == 11) result_data = runAnalysisRaw<C4_9x11::GameSolver::Connect4::Solver, C4_9x11::GameSolver::Connect4::Position, 8, 6, C4_9x11::GameSolver::Connect4::OpeningBookBase<9, 11>>(*static_cast<C4_9x11::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 9 && h == 12) result_data = runAnalysisRaw<C4_9x12::GameSolver::Connect4::Solver, C4_9x12::GameSolver::Connect4::Position, 8, 6, C4_9x12::GameSolver::Connect4::OpeningBookBase<9, 12>>(*static_cast<C4_9x12::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 10 && h == 4) result_data = runAnalysisRaw<C4_10x4::GameSolver::Connect4::Solver, C4_10x4::GameSolver::Connect4::Position, 8, 6, C4_10x4::GameSolver::Connect4::OpeningBookBase<10, 4>>(*static_cast<C4_10x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 10 && h == 5) result_data = runAnalysisRaw<C4_10x5::GameSolver::Connect4::Solver, C4_10x5::GameSolver::Connect4::Position, 8, 6, C4_10x5::GameSolver::Connect4::OpeningBookBase<10, 5>>(*static_cast<C4_10x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 10 && h == 6) result_data = runAnalysisRaw<C4_10x6::GameSolver::Connect4::Solver, C4_10x6::GameSolver::Connect4::Position, 8, 6, C4_10x6::GameSolver::Connect4::OpeningBookBase<10, 6>>(*static_cast<C4_10x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
-            else if (w == 10 && h == 8) result_data = runAnalysisRaw<C4_10x8::GameSolver::Connect4::Solver, C4_10x8::GameSolver::Connect4::Position, 8, 6, C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 10>>(*static_cast<C4_10x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 10 && h == 8) result_data = runAnalysisRaw<C4_10x8::GameSolver::Connect4::Solver, C4_10x8::GameSolver::Connect4::Position, 8, 6, C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 8>>(*static_cast<C4_10x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 10 && h == 9) result_data = runAnalysisRaw<C4_10x9::GameSolver::Connect4::Solver, C4_10x9::GameSolver::Connect4::Position, 8, 6, C4_10x9::GameSolver::Connect4::OpeningBookBase<10, 9>>(*static_cast<C4_10x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 10 && h == 11) result_data = runAnalysisRaw<C4_10x11::GameSolver::Connect4::Solver, C4_10x11::GameSolver::Connect4::Position, 8, 6, C4_10x11::GameSolver::Connect4::OpeningBookBase<10, 11>>(*static_cast<C4_10x11::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 11 && h == 5) result_data = runAnalysisRaw<C4_11x5::GameSolver::Connect4::Solver, C4_11x5::GameSolver::Connect4::Position, 8, 6, C4_11x5::GameSolver::Connect4::OpeningBookBase<11, 5>>(*static_cast<C4_11x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 11 && h == 6) result_data = runAnalysisRaw<C4_11x6::GameSolver::Connect4::Solver, C4_11x6::GameSolver::Connect4::Position, 8, 6, C4_11x6::GameSolver::Connect4::OpeningBookBase<11, 6>>(*static_cast<C4_11x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 11 && h == 7) result_data = runAnalysisRaw<C4_11x7::GameSolver::Connect4::Solver, C4_11x7::GameSolver::Connect4::Position, 8, 6, C4_11x7::GameSolver::Connect4::OpeningBookBase<11, 7>>(*static_cast<C4_11x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
-            else if (w == 11 && h == 8) result_data = runAnalysisRaw<C4_11x8::GameSolver::Connect4::Solver, C4_11x8::GameSolver::Connect4::Position, 8, 6, C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 11>>(*static_cast<C4_11x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 11 && h == 8) result_data = runAnalysisRaw<C4_11x8::GameSolver::Connect4::Solver, C4_11x8::GameSolver::Connect4::Position, 8, 6, C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 8>>(*static_cast<C4_11x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 11 && h == 9) result_data = runAnalysisRaw<C4_11x9::GameSolver::Connect4::Solver, C4_11x9::GameSolver::Connect4::Position, 8, 6, C4_11x9::GameSolver::Connect4::OpeningBookBase<11, 9>>(*static_cast<C4_11x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 11 && h == 10) result_data = runAnalysisRaw<C4_11x10::GameSolver::Connect4::Solver, C4_11x10::GameSolver::Connect4::Position, 8, 6, C4_11x10::GameSolver::Connect4::OpeningBookBase<11, 10>>(*static_cast<C4_11x10::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 12 && h == 4) result_data = runAnalysisRaw<C4_12x4::GameSolver::Connect4::Solver, C4_12x4::GameSolver::Connect4::Position, 8, 6, C4_12x4::GameSolver::Connect4::OpeningBookBase<12, 4>>(*static_cast<C4_12x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 12 && h == 5) result_data = runAnalysisRaw<C4_12x5::GameSolver::Connect4::Solver, C4_12x5::GameSolver::Connect4::Position, 8, 6, C4_12x5::GameSolver::Connect4::OpeningBookBase<12, 5>>(*static_cast<C4_12x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 12 && h == 6) result_data = runAnalysisRaw<C4_12x6::GameSolver::Connect4::Solver, C4_12x6::GameSolver::Connect4::Position, 8, 6, C4_12x6::GameSolver::Connect4::OpeningBookBase<12, 6>>(*static_cast<C4_12x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 12 && h == 7) result_data = runAnalysisRaw<C4_12x7::GameSolver::Connect4::Solver, C4_12x7::GameSolver::Connect4::Position, 8, 6, C4_12x7::GameSolver::Connect4::OpeningBookBase<12, 7>>(*static_cast<C4_12x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
-            else if (w == 12 && h == 8) result_data = runAnalysisRaw<C4_12x8::GameSolver::Connect4::Solver, C4_12x8::GameSolver::Connect4::Position, 8, 6, C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 12>>(*static_cast<C4_12x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
+            else if (w == 12 && h == 8) result_data = runAnalysisRaw<C4_12x8::GameSolver::Connect4::Solver, C4_12x8::GameSolver::Connect4::Position, 8, 6, C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 8>>(*static_cast<C4_12x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 12 && h == 9) result_data = runAnalysisRaw<C4_12x9::GameSolver::Connect4::Solver, C4_12x9::GameSolver::Connect4::Position, 8, 6, C4_12x9::GameSolver::Connect4::OpeningBookBase<12, 9>>(*static_cast<C4_12x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 8 && h == 8) result_data = runAnalysisRaw<C4_8x8::GameSolver::Connect4::Solver, C4_8x8::GameSolver::Connect4::Position, 8, 8, C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>>(*static_cast<C4_8x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
             else if (w == 9 && h == 7) result_data = runAnalysisRaw<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9, 7, C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>>(*static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, threads, book_ptr);
@@ -1047,7 +1047,7 @@ public:
             else if (w == 4 && h == 5) result_data = runSolveRaw<C4_4x5::GameSolver::Connect4::Solver, C4_4x5::GameSolver::Connect4::Position, 8, 6, C4_4x5::GameSolver::Connect4::OpeningBookBase<4, 5>>(*static_cast<C4_4x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 4 && h == 6) result_data = runSolveRaw<C4_4x6::GameSolver::Connect4::Solver, C4_4x6::GameSolver::Connect4::Position, 8, 6, C4_4x6::GameSolver::Connect4::OpeningBookBase<4, 6>>(*static_cast<C4_4x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 4 && h == 7) result_data = runSolveRaw<C4_4x7::GameSolver::Connect4::Solver, C4_4x7::GameSolver::Connect4::Position, 8, 6, C4_4x7::GameSolver::Connect4::OpeningBookBase<4, 7>>(*static_cast<C4_4x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
-            else if (w == 4 && h == 8) result_data = runSolveRaw<C4_4x8::GameSolver::Connect4::Solver, C4_4x8::GameSolver::Connect4::Position, 8, 6, C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 4>>(*static_cast<C4_4x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 4 && h == 8) result_data = runSolveRaw<C4_4x8::GameSolver::Connect4::Solver, C4_4x8::GameSolver::Connect4::Position, 8, 6, C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 8>>(*static_cast<C4_4x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 4 && h == 9) result_data = runSolveRaw<C4_4x9::GameSolver::Connect4::Solver, C4_4x9::GameSolver::Connect4::Position, 8, 6, C4_4x9::GameSolver::Connect4::OpeningBookBase<4, 9>>(*static_cast<C4_4x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 4 && h == 10) result_data = runSolveRaw<C4_4x10::GameSolver::Connect4::Solver, C4_4x10::GameSolver::Connect4::Position, 8, 6, C4_4x10::GameSolver::Connect4::OpeningBookBase<4, 10>>(*static_cast<C4_4x10::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 4 && h == 11) result_data = runSolveRaw<C4_4x11::GameSolver::Connect4::Solver, C4_4x11::GameSolver::Connect4::Position, 8, 6, C4_4x11::GameSolver::Connect4::OpeningBookBase<4, 11>>(*static_cast<C4_4x11::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
@@ -1056,21 +1056,21 @@ public:
             else if (w == 5 && h == 5) result_data = runSolveRaw<C4_5x5::GameSolver::Connect4::Solver, C4_5x5::GameSolver::Connect4::Position, 8, 6, C4_5x5::GameSolver::Connect4::OpeningBookBase<5, 5>>(*static_cast<C4_5x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 5 && h == 6) result_data = runSolveRaw<C4_5x6::GameSolver::Connect4::Solver, C4_5x6::GameSolver::Connect4::Position, 8, 6, C4_5x6::GameSolver::Connect4::OpeningBookBase<5, 6>>(*static_cast<C4_5x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 5 && h == 7) result_data = runSolveRaw<C4_5x7::GameSolver::Connect4::Solver, C4_5x7::GameSolver::Connect4::Position, 8, 6, C4_5x7::GameSolver::Connect4::OpeningBookBase<5, 7>>(*static_cast<C4_5x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
-            else if (w == 5 && h == 8) result_data = runSolveRaw<C4_5x8::GameSolver::Connect4::Solver, C4_5x8::GameSolver::Connect4::Position, 8, 6, C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 5>>(*static_cast<C4_5x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 5 && h == 8) result_data = runSolveRaw<C4_5x8::GameSolver::Connect4::Solver, C4_5x8::GameSolver::Connect4::Position, 8, 6, C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 8>>(*static_cast<C4_5x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 5 && h == 9) result_data = runSolveRaw<C4_5x9::GameSolver::Connect4::Solver, C4_5x9::GameSolver::Connect4::Position, 8, 6, C4_5x9::GameSolver::Connect4::OpeningBookBase<5, 9>>(*static_cast<C4_5x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 5 && h == 10) result_data = runSolveRaw<C4_5x10::GameSolver::Connect4::Solver, C4_5x10::GameSolver::Connect4::Position, 8, 6, C4_5x10::GameSolver::Connect4::OpeningBookBase<5, 10>>(*static_cast<C4_5x10::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 5 && h == 11) result_data = runSolveRaw<C4_5x11::GameSolver::Connect4::Solver, C4_5x11::GameSolver::Connect4::Position, 8, 6, C4_5x11::GameSolver::Connect4::OpeningBookBase<5, 11>>(*static_cast<C4_5x11::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 5 && h == 12) result_data = runSolveRaw<C4_5x12::GameSolver::Connect4::Solver, C4_5x12::GameSolver::Connect4::Position, 8, 6, C4_5x12::GameSolver::Connect4::OpeningBookBase<5, 12>>(*static_cast<C4_5x12::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 6 && h == 4) result_data = runSolveRaw<C4_6x4::GameSolver::Connect4::Solver, C4_6x4::GameSolver::Connect4::Position, 8, 6, C4_6x4::GameSolver::Connect4::OpeningBookBase<6, 4>>(*static_cast<C4_6x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 6 && h == 7) result_data = runSolveRaw<C4_6x7::GameSolver::Connect4::Solver, C4_6x7::GameSolver::Connect4::Position, 8, 6, C4_6x7::GameSolver::Connect4::OpeningBookBase<6, 7>>(*static_cast<C4_6x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
-            else if (w == 6 && h == 8) result_data = runSolveRaw<C4_6x8::GameSolver::Connect4::Solver, C4_6x8::GameSolver::Connect4::Position, 8, 6, C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 6>>(*static_cast<C4_6x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 6 && h == 8) result_data = runSolveRaw<C4_6x8::GameSolver::Connect4::Solver, C4_6x8::GameSolver::Connect4::Position, 8, 6, C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 8>>(*static_cast<C4_6x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 6 && h == 9) result_data = runSolveRaw<C4_6x9::GameSolver::Connect4::Solver, C4_6x9::GameSolver::Connect4::Position, 8, 6, C4_6x9::GameSolver::Connect4::OpeningBookBase<6, 9>>(*static_cast<C4_6x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 6 && h == 10) result_data = runSolveRaw<C4_6x10::GameSolver::Connect4::Solver, C4_6x10::GameSolver::Connect4::Position, 8, 6, C4_6x10::GameSolver::Connect4::OpeningBookBase<6, 10>>(*static_cast<C4_6x10::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 6 && h == 11) result_data = runSolveRaw<C4_6x11::GameSolver::Connect4::Solver, C4_6x11::GameSolver::Connect4::Position, 8, 6, C4_6x11::GameSolver::Connect4::OpeningBookBase<6, 11>>(*static_cast<C4_6x11::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 6 && h == 12) result_data = runSolveRaw<C4_6x12::GameSolver::Connect4::Solver, C4_6x12::GameSolver::Connect4::Position, 8, 6, C4_6x12::GameSolver::Connect4::OpeningBookBase<6, 12>>(*static_cast<C4_6x12::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 7 && h == 4) result_data = runSolveRaw<C4_7x4::GameSolver::Connect4::Solver, C4_7x4::GameSolver::Connect4::Position, 8, 6, C4_7x4::GameSolver::Connect4::OpeningBookBase<7, 4>>(*static_cast<C4_7x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 7 && h == 5) result_data = runSolveRaw<C4_7x5::GameSolver::Connect4::Solver, C4_7x5::GameSolver::Connect4::Position, 8, 6, C4_7x5::GameSolver::Connect4::OpeningBookBase<7, 5>>(*static_cast<C4_7x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
-            else if (w == 7 && h == 8) result_data = runSolveRaw<C4_7x8::GameSolver::Connect4::Solver, C4_7x8::GameSolver::Connect4::Position, 8, 6, C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 7>>(*static_cast<C4_7x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 7 && h == 8) result_data = runSolveRaw<C4_7x8::GameSolver::Connect4::Solver, C4_7x8::GameSolver::Connect4::Position, 8, 6, C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 8>>(*static_cast<C4_7x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 7 && h == 9) result_data = runSolveRaw<C4_7x9::GameSolver::Connect4::Solver, C4_7x9::GameSolver::Connect4::Position, 8, 6, C4_7x9::GameSolver::Connect4::OpeningBookBase<7, 9>>(*static_cast<C4_7x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 7 && h == 10) result_data = runSolveRaw<C4_7x10::GameSolver::Connect4::Solver, C4_7x10::GameSolver::Connect4::Position, 8, 6, C4_7x10::GameSolver::Connect4::OpeningBookBase<7, 10>>(*static_cast<C4_7x10::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 7 && h == 11) result_data = runSolveRaw<C4_7x11::GameSolver::Connect4::Solver, C4_7x11::GameSolver::Connect4::Position, 8, 6, C4_7x11::GameSolver::Connect4::OpeningBookBase<7, 11>>(*static_cast<C4_7x11::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
@@ -1084,27 +1084,27 @@ public:
             else if (w == 8 && h == 12) result_data = runSolveRaw<C4_8x12::GameSolver::Connect4::Solver, C4_8x12::GameSolver::Connect4::Position, 8, 6, C4_8x12::GameSolver::Connect4::OpeningBookBase<8, 12>>(*static_cast<C4_8x12::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 9 && h == 4) result_data = runSolveRaw<C4_9x4::GameSolver::Connect4::Solver, C4_9x4::GameSolver::Connect4::Position, 8, 6, C4_9x4::GameSolver::Connect4::OpeningBookBase<9, 4>>(*static_cast<C4_9x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 9 && h == 5) result_data = runSolveRaw<C4_9x5::GameSolver::Connect4::Solver, C4_9x5::GameSolver::Connect4::Position, 8, 6, C4_9x5::GameSolver::Connect4::OpeningBookBase<9, 5>>(*static_cast<C4_9x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
-            else if (w == 9 && h == 8) result_data = runSolveRaw<C4_9x8::GameSolver::Connect4::Solver, C4_9x8::GameSolver::Connect4::Position, 8, 6, C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 9>>(*static_cast<C4_9x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 9 && h == 8) result_data = runSolveRaw<C4_9x8::GameSolver::Connect4::Solver, C4_9x8::GameSolver::Connect4::Position, 8, 6, C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 8>>(*static_cast<C4_9x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 9 && h == 10) result_data = runSolveRaw<C4_9x10::GameSolver::Connect4::Solver, C4_9x10::GameSolver::Connect4::Position, 8, 6, C4_9x10::GameSolver::Connect4::OpeningBookBase<9, 10>>(*static_cast<C4_9x10::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 9 && h == 11) result_data = runSolveRaw<C4_9x11::GameSolver::Connect4::Solver, C4_9x11::GameSolver::Connect4::Position, 8, 6, C4_9x11::GameSolver::Connect4::OpeningBookBase<9, 11>>(*static_cast<C4_9x11::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 9 && h == 12) result_data = runSolveRaw<C4_9x12::GameSolver::Connect4::Solver, C4_9x12::GameSolver::Connect4::Position, 8, 6, C4_9x12::GameSolver::Connect4::OpeningBookBase<9, 12>>(*static_cast<C4_9x12::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 10 && h == 4) result_data = runSolveRaw<C4_10x4::GameSolver::Connect4::Solver, C4_10x4::GameSolver::Connect4::Position, 8, 6, C4_10x4::GameSolver::Connect4::OpeningBookBase<10, 4>>(*static_cast<C4_10x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 10 && h == 5) result_data = runSolveRaw<C4_10x5::GameSolver::Connect4::Solver, C4_10x5::GameSolver::Connect4::Position, 8, 6, C4_10x5::GameSolver::Connect4::OpeningBookBase<10, 5>>(*static_cast<C4_10x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 10 && h == 6) result_data = runSolveRaw<C4_10x6::GameSolver::Connect4::Solver, C4_10x6::GameSolver::Connect4::Position, 8, 6, C4_10x6::GameSolver::Connect4::OpeningBookBase<10, 6>>(*static_cast<C4_10x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
-            else if (w == 10 && h == 8) result_data = runSolveRaw<C4_10x8::GameSolver::Connect4::Solver, C4_10x8::GameSolver::Connect4::Position, 8, 6, C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 10>>(*static_cast<C4_10x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 10 && h == 8) result_data = runSolveRaw<C4_10x8::GameSolver::Connect4::Solver, C4_10x8::GameSolver::Connect4::Position, 8, 6, C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 8>>(*static_cast<C4_10x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 10 && h == 9) result_data = runSolveRaw<C4_10x9::GameSolver::Connect4::Solver, C4_10x9::GameSolver::Connect4::Position, 8, 6, C4_10x9::GameSolver::Connect4::OpeningBookBase<10, 9>>(*static_cast<C4_10x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 10 && h == 11) result_data = runSolveRaw<C4_10x11::GameSolver::Connect4::Solver, C4_10x11::GameSolver::Connect4::Position, 8, 6, C4_10x11::GameSolver::Connect4::OpeningBookBase<10, 11>>(*static_cast<C4_10x11::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 11 && h == 5) result_data = runSolveRaw<C4_11x5::GameSolver::Connect4::Solver, C4_11x5::GameSolver::Connect4::Position, 8, 6, C4_11x5::GameSolver::Connect4::OpeningBookBase<11, 5>>(*static_cast<C4_11x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 11 && h == 6) result_data = runSolveRaw<C4_11x6::GameSolver::Connect4::Solver, C4_11x6::GameSolver::Connect4::Position, 8, 6, C4_11x6::GameSolver::Connect4::OpeningBookBase<11, 6>>(*static_cast<C4_11x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 11 && h == 7) result_data = runSolveRaw<C4_11x7::GameSolver::Connect4::Solver, C4_11x7::GameSolver::Connect4::Position, 8, 6, C4_11x7::GameSolver::Connect4::OpeningBookBase<11, 7>>(*static_cast<C4_11x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
-            else if (w == 11 && h == 8) result_data = runSolveRaw<C4_11x8::GameSolver::Connect4::Solver, C4_11x8::GameSolver::Connect4::Position, 8, 6, C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 11>>(*static_cast<C4_11x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 11 && h == 8) result_data = runSolveRaw<C4_11x8::GameSolver::Connect4::Solver, C4_11x8::GameSolver::Connect4::Position, 8, 6, C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 8>>(*static_cast<C4_11x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 11 && h == 9) result_data = runSolveRaw<C4_11x9::GameSolver::Connect4::Solver, C4_11x9::GameSolver::Connect4::Position, 8, 6, C4_11x9::GameSolver::Connect4::OpeningBookBase<11, 9>>(*static_cast<C4_11x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 11 && h == 10) result_data = runSolveRaw<C4_11x10::GameSolver::Connect4::Solver, C4_11x10::GameSolver::Connect4::Position, 8, 6, C4_11x10::GameSolver::Connect4::OpeningBookBase<11, 10>>(*static_cast<C4_11x10::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 12 && h == 4) result_data = runSolveRaw<C4_12x4::GameSolver::Connect4::Solver, C4_12x4::GameSolver::Connect4::Position, 8, 6, C4_12x4::GameSolver::Connect4::OpeningBookBase<12, 4>>(*static_cast<C4_12x4::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 12 && h == 5) result_data = runSolveRaw<C4_12x5::GameSolver::Connect4::Solver, C4_12x5::GameSolver::Connect4::Position, 8, 6, C4_12x5::GameSolver::Connect4::OpeningBookBase<12, 5>>(*static_cast<C4_12x5::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 12 && h == 6) result_data = runSolveRaw<C4_12x6::GameSolver::Connect4::Solver, C4_12x6::GameSolver::Connect4::Position, 8, 6, C4_12x6::GameSolver::Connect4::OpeningBookBase<12, 6>>(*static_cast<C4_12x6::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 12 && h == 7) result_data = runSolveRaw<C4_12x7::GameSolver::Connect4::Solver, C4_12x7::GameSolver::Connect4::Position, 8, 6, C4_12x7::GameSolver::Connect4::OpeningBookBase<12, 7>>(*static_cast<C4_12x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
-            else if (w == 12 && h == 8) result_data = runSolveRaw<C4_12x8::GameSolver::Connect4::Solver, C4_12x8::GameSolver::Connect4::Position, 8, 6, C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 12>>(*static_cast<C4_12x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
+            else if (w == 12 && h == 8) result_data = runSolveRaw<C4_12x8::GameSolver::Connect4::Solver, C4_12x8::GameSolver::Connect4::Position, 8, 6, C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 8>>(*static_cast<C4_12x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 12 && h == 9) result_data = runSolveRaw<C4_12x9::GameSolver::Connect4::Solver, C4_12x9::GameSolver::Connect4::Position, 8, 6, C4_12x9::GameSolver::Connect4::OpeningBookBase<12, 9>>(*static_cast<C4_12x9::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 8 && h == 8) result_data = runSolveRaw<C4_8x8::GameSolver::Connect4::Solver, C4_8x8::GameSolver::Connect4::Position, 8, 8, C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>>(*static_cast<C4_8x8::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
             else if (w == 9 && h == 7) result_data = runSolveRaw<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9, 7, C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>>(*static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver), pos, is_weak, book_ptr);
@@ -1215,13 +1215,13 @@ public:
             else if (w == 7 && h == 7) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 8 && h == 6) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<8, 6>, GameSolver::Connect4::GenericPosition<8, 6>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 6 && h == 7) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<6, 7>, GameSolver::Connect4::GenericPosition<6, 7>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 7>*>(solver), pos, max_depth, threads, timeout_ms);
-            else if (w == 6 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<6, 6>, GameSolver::Connect4::GenericPosition<6, 6>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver), pos, max_depth, threads, timeout_ms);
+            else if (w == 6 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<6, 8>, GameSolver::Connect4::GenericPosition<6, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 8>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 6 && h == 9) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<6, 9>, GameSolver::Connect4::GenericPosition<6, 9>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 9>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 6 && h == 10) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<6, 10>, GameSolver::Connect4::GenericPosition<6, 10>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 10>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 6 && h == 11) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<6, 11>, GameSolver::Connect4::GenericPosition<6, 11>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 11>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 6 && h == 12) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<6, 12>, GameSolver::Connect4::GenericPosition<6, 12>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 12>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 7 && h == 5) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<7, 5>, GameSolver::Connect4::GenericPosition<7, 5>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 5>*>(solver), pos, max_depth, threads, timeout_ms);
-            else if (w == 7 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver), pos, max_depth, threads, timeout_ms);
+            else if (w == 7 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<7, 8>, GameSolver::Connect4::GenericPosition<7, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 8>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 7 && h == 9) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<7, 9>, GameSolver::Connect4::GenericPosition<7, 9>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 9>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 7 && h == 10) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<7, 10>, GameSolver::Connect4::GenericPosition<7, 10>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 10>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 7 && h == 11) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<7, 11>, GameSolver::Connect4::GenericPosition<7, 11>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 11>*>(solver), pos, max_depth, threads, timeout_ms);
@@ -1233,25 +1233,25 @@ public:
             else if (w == 8 && h == 11) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<8, 11>, GameSolver::Connect4::GenericPosition<8, 11>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<8, 11>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 8 && h == 12) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<8, 12>, GameSolver::Connect4::GenericPosition<8, 12>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<8, 12>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 9 && h == 5) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<9, 5>, GameSolver::Connect4::GenericPosition<9, 5>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 5>*>(solver), pos, max_depth, threads, timeout_ms);
-            else if (w == 9 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<9, 9>, GameSolver::Connect4::GenericPosition<9, 9>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver), pos, max_depth, threads, timeout_ms);
+            else if (w == 9 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<9, 8>, GameSolver::Connect4::GenericPosition<9, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 8>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 9 && h == 10) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<9, 10>, GameSolver::Connect4::GenericPosition<9, 10>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 10>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 9 && h == 11) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<9, 11>, GameSolver::Connect4::GenericPosition<9, 11>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 11>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 9 && h == 12) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<9, 12>, GameSolver::Connect4::GenericPosition<9, 12>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 12>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 10 && h == 5) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<10, 5>, GameSolver::Connect4::GenericPosition<10, 5>, 10>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 5>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 10 && h == 6) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<10, 6>, GameSolver::Connect4::GenericPosition<10, 6>, 10>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 6>*>(solver), pos, max_depth, threads, timeout_ms);
-            else if (w == 10 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<10, 10>, GameSolver::Connect4::GenericPosition<10, 10>, 10>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver), pos, max_depth, threads, timeout_ms);
+            else if (w == 10 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<10, 8>, GameSolver::Connect4::GenericPosition<10, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 8>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 10 && h == 9) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<10, 9>, GameSolver::Connect4::GenericPosition<10, 9>, 10>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 9>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 10 && h == 11) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<10, 11>, GameSolver::Connect4::GenericPosition<10, 11>, 10>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 11>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 11 && h == 5) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 5>, GameSolver::Connect4::GenericPosition<11, 5>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 5>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 11 && h == 6) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 6>, GameSolver::Connect4::GenericPosition<11, 6>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 6>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 11 && h == 7) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 7>, GameSolver::Connect4::GenericPosition<11, 7>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 7>*>(solver), pos, max_depth, threads, timeout_ms);
-            else if (w == 11 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 11>, GameSolver::Connect4::GenericPosition<11, 11>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 11>*>(solver), pos, max_depth, threads, timeout_ms);
+            else if (w == 11 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 8>, GameSolver::Connect4::GenericPosition<11, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 8>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 11 && h == 9) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 9>, GameSolver::Connect4::GenericPosition<11, 9>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 9>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 11 && h == 10) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<11, 10>, GameSolver::Connect4::GenericPosition<11, 10>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 10>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 12 && h == 5) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<12, 5>, GameSolver::Connect4::GenericPosition<12, 5>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 5>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 12 && h == 6) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<12, 6>, GameSolver::Connect4::GenericPosition<12, 6>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 6>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 12 && h == 7) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<12, 7>, GameSolver::Connect4::GenericPosition<12, 7>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 7>*>(solver), pos, max_depth, threads, timeout_ms);
-            else if (w == 12 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<12, 12>, GameSolver::Connect4::GenericPosition<12, 12>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 12>*>(solver), pos, max_depth, threads, timeout_ms);
+            else if (w == 12 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<12, 8>, GameSolver::Connect4::GenericPosition<12, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 8>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 12 && h == 9) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<12, 9>, GameSolver::Connect4::GenericPosition<12, 9>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 9>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 9 && h == 7) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<9, 7>, GameSolver::Connect4::GenericPosition<9, 7>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver), pos, max_depth, threads, timeout_ms);
             else if (w == 8 && h == 8) result_data = runHeuristicAnalysisRaw<GameSolver::Connect4::HeuristicSolver<8, 8>, GameSolver::Connect4::GenericPosition<8, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver), pos, max_depth, threads, timeout_ms);
@@ -1303,13 +1303,13 @@ public:
             else if (w == 7 && h == 7) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 8 && h == 6) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<8, 6>, GameSolver::Connect4::GenericPosition<8, 6>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 6 && h == 7) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<6, 7>, GameSolver::Connect4::GenericPosition<6, 7>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 7>*>(solver), pos, max_depth, timeout_ms);
-            else if (w == 6 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<6, 6>, GameSolver::Connect4::GenericPosition<6, 6>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 6 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<6, 8>, GameSolver::Connect4::GenericPosition<6, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 8>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 6 && h == 9) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<6, 9>, GameSolver::Connect4::GenericPosition<6, 9>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 9>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 6 && h == 10) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<6, 10>, GameSolver::Connect4::GenericPosition<6, 10>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 10>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 6 && h == 11) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<6, 11>, GameSolver::Connect4::GenericPosition<6, 11>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 11>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 6 && h == 12) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<6, 12>, GameSolver::Connect4::GenericPosition<6, 12>, 6>(*static_cast<GameSolver::Connect4::HeuristicSolver<6, 12>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 7 && h == 5) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<7, 5>, GameSolver::Connect4::GenericPosition<7, 5>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 5>*>(solver), pos, max_depth, timeout_ms);
-            else if (w == 7 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 7 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<7, 8>, GameSolver::Connect4::GenericPosition<7, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 8>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 7 && h == 9) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<7, 9>, GameSolver::Connect4::GenericPosition<7, 9>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 9>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 7 && h == 10) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<7, 10>, GameSolver::Connect4::GenericPosition<7, 10>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 10>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 7 && h == 11) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<7, 11>, GameSolver::Connect4::GenericPosition<7, 11>, 7>(*static_cast<GameSolver::Connect4::HeuristicSolver<7, 11>*>(solver), pos, max_depth, timeout_ms);
@@ -1321,25 +1321,25 @@ public:
             else if (w == 8 && h == 11) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<8, 11>, GameSolver::Connect4::GenericPosition<8, 11>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<8, 11>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 8 && h == 12) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<8, 12>, GameSolver::Connect4::GenericPosition<8, 12>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<8, 12>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 9 && h == 5) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<9, 5>, GameSolver::Connect4::GenericPosition<9, 5>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 5>*>(solver), pos, max_depth, timeout_ms);
-            else if (w == 9 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<9, 9>, GameSolver::Connect4::GenericPosition<9, 9>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 9 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<9, 8>, GameSolver::Connect4::GenericPosition<9, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 8>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 9 && h == 10) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<9, 10>, GameSolver::Connect4::GenericPosition<9, 10>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 10>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 9 && h == 11) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<9, 11>, GameSolver::Connect4::GenericPosition<9, 11>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 11>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 9 && h == 12) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<9, 12>, GameSolver::Connect4::GenericPosition<9, 12>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 12>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 10 && h == 5) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<10, 5>, GameSolver::Connect4::GenericPosition<10, 5>, 10>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 5>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 10 && h == 6) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<10, 6>, GameSolver::Connect4::GenericPosition<10, 6>, 10>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 6>*>(solver), pos, max_depth, timeout_ms);
-            else if (w == 10 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<10, 10>, GameSolver::Connect4::GenericPosition<10, 10>, 10>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 10 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<10, 8>, GameSolver::Connect4::GenericPosition<10, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 8>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 10 && h == 9) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<10, 9>, GameSolver::Connect4::GenericPosition<10, 9>, 10>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 9>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 10 && h == 11) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<10, 11>, GameSolver::Connect4::GenericPosition<10, 11>, 10>(*static_cast<GameSolver::Connect4::HeuristicSolver<10, 11>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 11 && h == 5) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 5>, GameSolver::Connect4::GenericPosition<11, 5>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 5>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 11 && h == 6) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 6>, GameSolver::Connect4::GenericPosition<11, 6>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 6>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 11 && h == 7) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 7>, GameSolver::Connect4::GenericPosition<11, 7>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 7>*>(solver), pos, max_depth, timeout_ms);
-            else if (w == 11 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 11>, GameSolver::Connect4::GenericPosition<11, 11>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 11>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 11 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 8>, GameSolver::Connect4::GenericPosition<11, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 8>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 11 && h == 9) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 9>, GameSolver::Connect4::GenericPosition<11, 9>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 9>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 11 && h == 10) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<11, 10>, GameSolver::Connect4::GenericPosition<11, 10>, 11>(*static_cast<GameSolver::Connect4::HeuristicSolver<11, 10>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 12 && h == 5) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<12, 5>, GameSolver::Connect4::GenericPosition<12, 5>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 5>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 12 && h == 6) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<12, 6>, GameSolver::Connect4::GenericPosition<12, 6>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 6>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 12 && h == 7) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<12, 7>, GameSolver::Connect4::GenericPosition<12, 7>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 7>*>(solver), pos, max_depth, timeout_ms);
-            else if (w == 12 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<12, 12>, GameSolver::Connect4::GenericPosition<12, 12>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 12>*>(solver), pos, max_depth, timeout_ms);
+            else if (w == 12 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<12, 8>, GameSolver::Connect4::GenericPosition<12, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 8>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 12 && h == 9) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<12, 9>, GameSolver::Connect4::GenericPosition<12, 9>, 12>(*static_cast<GameSolver::Connect4::HeuristicSolver<12, 9>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 9 && h == 7) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<9, 7>, GameSolver::Connect4::GenericPosition<9, 7>, 9>(*static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver), pos, max_depth, timeout_ms);
             else if (w == 8 && h == 8) result_data = runSolveHeuristicRaw<GameSolver::Connect4::HeuristicSolver<8, 8>, GameSolver::Connect4::GenericPosition<8, 8>, 8>(*static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver), pos, max_depth, timeout_ms);
@@ -1434,13 +1434,13 @@ Value GetNodeCount(const CallbackInfo& info) {
         else if (w == 7 && h == 7) count = static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver)->getNodeCount();
         else if (w == 8 && h == 6) count = static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver)->getNodeCount();
         else if (w == 6 && h == 7) count = static_cast<GameSolver::Connect4::HeuristicSolver<6, 7>*>(solver)->getNodeCount();
-        else if (w == 6 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver)->getNodeCount();
+        else if (w == 6 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<6, 8>*>(solver)->getNodeCount();
         else if (w == 6 && h == 9) count = static_cast<GameSolver::Connect4::HeuristicSolver<6, 9>*>(solver)->getNodeCount();
         else if (w == 6 && h == 10) count = static_cast<GameSolver::Connect4::HeuristicSolver<6, 10>*>(solver)->getNodeCount();
         else if (w == 6 && h == 11) count = static_cast<GameSolver::Connect4::HeuristicSolver<6, 11>*>(solver)->getNodeCount();
         else if (w == 6 && h == 12) count = static_cast<GameSolver::Connect4::HeuristicSolver<6, 12>*>(solver)->getNodeCount();
         else if (w == 7 && h == 5) count = static_cast<GameSolver::Connect4::HeuristicSolver<7, 5>*>(solver)->getNodeCount();
-        else if (w == 7 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver)->getNodeCount();
+        else if (w == 7 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<7, 8>*>(solver)->getNodeCount();
         else if (w == 7 && h == 9) count = static_cast<GameSolver::Connect4::HeuristicSolver<7, 9>*>(solver)->getNodeCount();
         else if (w == 7 && h == 10) count = static_cast<GameSolver::Connect4::HeuristicSolver<7, 10>*>(solver)->getNodeCount();
         else if (w == 7 && h == 11) count = static_cast<GameSolver::Connect4::HeuristicSolver<7, 11>*>(solver)->getNodeCount();
@@ -1452,25 +1452,25 @@ Value GetNodeCount(const CallbackInfo& info) {
         else if (w == 8 && h == 11) count = static_cast<GameSolver::Connect4::HeuristicSolver<8, 11>*>(solver)->getNodeCount();
         else if (w == 8 && h == 12) count = static_cast<GameSolver::Connect4::HeuristicSolver<8, 12>*>(solver)->getNodeCount();
         else if (w == 9 && h == 5) count = static_cast<GameSolver::Connect4::HeuristicSolver<9, 5>*>(solver)->getNodeCount();
-        else if (w == 9 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver)->getNodeCount();
+        else if (w == 9 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<9, 8>*>(solver)->getNodeCount();
         else if (w == 9 && h == 10) count = static_cast<GameSolver::Connect4::HeuristicSolver<9, 10>*>(solver)->getNodeCount();
         else if (w == 9 && h == 11) count = static_cast<GameSolver::Connect4::HeuristicSolver<9, 11>*>(solver)->getNodeCount();
         else if (w == 9 && h == 12) count = static_cast<GameSolver::Connect4::HeuristicSolver<9, 12>*>(solver)->getNodeCount();
         else if (w == 10 && h == 5) count = static_cast<GameSolver::Connect4::HeuristicSolver<10, 5>*>(solver)->getNodeCount();
         else if (w == 10 && h == 6) count = static_cast<GameSolver::Connect4::HeuristicSolver<10, 6>*>(solver)->getNodeCount();
-        else if (w == 10 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver)->getNodeCount();
+        else if (w == 10 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<10, 8>*>(solver)->getNodeCount();
         else if (w == 10 && h == 9) count = static_cast<GameSolver::Connect4::HeuristicSolver<10, 9>*>(solver)->getNodeCount();
         else if (w == 10 && h == 11) count = static_cast<GameSolver::Connect4::HeuristicSolver<10, 11>*>(solver)->getNodeCount();
         else if (w == 11 && h == 5) count = static_cast<GameSolver::Connect4::HeuristicSolver<11, 5>*>(solver)->getNodeCount();
         else if (w == 11 && h == 6) count = static_cast<GameSolver::Connect4::HeuristicSolver<11, 6>*>(solver)->getNodeCount();
         else if (w == 11 && h == 7) count = static_cast<GameSolver::Connect4::HeuristicSolver<11, 7>*>(solver)->getNodeCount();
-        else if (w == 11 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<11, 11>*>(solver)->getNodeCount();
+        else if (w == 11 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<11, 8>*>(solver)->getNodeCount();
         else if (w == 11 && h == 9) count = static_cast<GameSolver::Connect4::HeuristicSolver<11, 9>*>(solver)->getNodeCount();
         else if (w == 11 && h == 10) count = static_cast<GameSolver::Connect4::HeuristicSolver<11, 10>*>(solver)->getNodeCount();
         else if (w == 12 && h == 5) count = static_cast<GameSolver::Connect4::HeuristicSolver<12, 5>*>(solver)->getNodeCount();
         else if (w == 12 && h == 6) count = static_cast<GameSolver::Connect4::HeuristicSolver<12, 6>*>(solver)->getNodeCount();
         else if (w == 12 && h == 7) count = static_cast<GameSolver::Connect4::HeuristicSolver<12, 7>*>(solver)->getNodeCount();
-        else if (w == 12 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<12, 12>*>(solver)->getNodeCount();
+        else if (w == 12 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<12, 8>*>(solver)->getNodeCount();
         else if (w == 12 && h == 9) count = static_cast<GameSolver::Connect4::HeuristicSolver<12, 9>*>(solver)->getNodeCount();
         else if (w == 9 && h == 7) count = static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver)->getNodeCount();
         else if (w == 8 && h == 8) count = static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver)->getNodeCount();
@@ -1606,7 +1606,7 @@ private:
         else if (width == 4 && height == 5) { auto entries = static_cast<C4_4x5::GameSolver::Connect4::OpeningBookBase<4, 5>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 4 && height == 6) { auto entries = static_cast<C4_4x6::GameSolver::Connect4::OpeningBookBase<4, 6>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 4 && height == 7) { auto entries = static_cast<C4_4x7::GameSolver::Connect4::OpeningBookBase<4, 7>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
-        else if (width == 4 && height == 8) { auto entries = static_cast<C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 4>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
+        else if (width == 4 && height == 8) { auto entries = static_cast<C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 8>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 4 && height == 9) { auto entries = static_cast<C4_4x9::GameSolver::Connect4::OpeningBookBase<4, 9>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 4 && height == 10) { auto entries = static_cast<C4_4x10::GameSolver::Connect4::OpeningBookBase<4, 10>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 4 && height == 11) { auto entries = static_cast<C4_4x11::GameSolver::Connect4::OpeningBookBase<4, 11>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
@@ -1615,21 +1615,21 @@ private:
         else if (width == 5 && height == 5) { auto entries = static_cast<C4_5x5::GameSolver::Connect4::OpeningBookBase<5, 5>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 5 && height == 6) { auto entries = static_cast<C4_5x6::GameSolver::Connect4::OpeningBookBase<5, 6>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 5 && height == 7) { auto entries = static_cast<C4_5x7::GameSolver::Connect4::OpeningBookBase<5, 7>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
-        else if (width == 5 && height == 8) { auto entries = static_cast<C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 5>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
+        else if (width == 5 && height == 8) { auto entries = static_cast<C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 8>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 5 && height == 9) { auto entries = static_cast<C4_5x9::GameSolver::Connect4::OpeningBookBase<5, 9>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 5 && height == 10) { auto entries = static_cast<C4_5x10::GameSolver::Connect4::OpeningBookBase<5, 10>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 5 && height == 11) { auto entries = static_cast<C4_5x11::GameSolver::Connect4::OpeningBookBase<5, 11>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 5 && height == 12) { auto entries = static_cast<C4_5x12::GameSolver::Connect4::OpeningBookBase<5, 12>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 6 && height == 4) { auto entries = static_cast<C4_6x4::GameSolver::Connect4::OpeningBookBase<6, 4>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 6 && height == 7) { auto entries = static_cast<C4_6x7::GameSolver::Connect4::OpeningBookBase<6, 7>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
-        else if (width == 6 && height == 8) { auto entries = static_cast<C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 6>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
+        else if (width == 6 && height == 8) { auto entries = static_cast<C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 8>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 6 && height == 9) { auto entries = static_cast<C4_6x9::GameSolver::Connect4::OpeningBookBase<6, 9>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 6 && height == 10) { auto entries = static_cast<C4_6x10::GameSolver::Connect4::OpeningBookBase<6, 10>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 6 && height == 11) { auto entries = static_cast<C4_6x11::GameSolver::Connect4::OpeningBookBase<6, 11>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 6 && height == 12) { auto entries = static_cast<C4_6x12::GameSolver::Connect4::OpeningBookBase<6, 12>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 7 && height == 4) { auto entries = static_cast<C4_7x4::GameSolver::Connect4::OpeningBookBase<7, 4>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 7 && height == 5) { auto entries = static_cast<C4_7x5::GameSolver::Connect4::OpeningBookBase<7, 5>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
-        else if (width == 7 && height == 8) { auto entries = static_cast<C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 7>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
+        else if (width == 7 && height == 8) { auto entries = static_cast<C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 8>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 7 && height == 9) { auto entries = static_cast<C4_7x9::GameSolver::Connect4::OpeningBookBase<7, 9>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 7 && height == 10) { auto entries = static_cast<C4_7x10::GameSolver::Connect4::OpeningBookBase<7, 10>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 7 && height == 11) { auto entries = static_cast<C4_7x11::GameSolver::Connect4::OpeningBookBase<7, 11>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
@@ -1643,27 +1643,27 @@ private:
         else if (width == 8 && height == 12) { auto entries = static_cast<C4_8x12::GameSolver::Connect4::OpeningBookBase<8, 12>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 9 && height == 4) { auto entries = static_cast<C4_9x4::GameSolver::Connect4::OpeningBookBase<9, 4>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 9 && height == 5) { auto entries = static_cast<C4_9x5::GameSolver::Connect4::OpeningBookBase<9, 5>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
-        else if (width == 9 && height == 8) { auto entries = static_cast<C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 9>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
+        else if (width == 9 && height == 8) { auto entries = static_cast<C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 8>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 9 && height == 10) { auto entries = static_cast<C4_9x10::GameSolver::Connect4::OpeningBookBase<9, 10>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 9 && height == 11) { auto entries = static_cast<C4_9x11::GameSolver::Connect4::OpeningBookBase<9, 11>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 9 && height == 12) { auto entries = static_cast<C4_9x12::GameSolver::Connect4::OpeningBookBase<9, 12>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 10 && height == 4) { auto entries = static_cast<C4_10x4::GameSolver::Connect4::OpeningBookBase<10, 4>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 10 && height == 5) { auto entries = static_cast<C4_10x5::GameSolver::Connect4::OpeningBookBase<10, 5>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 10 && height == 6) { auto entries = static_cast<C4_10x6::GameSolver::Connect4::OpeningBookBase<10, 6>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
-        else if (width == 10 && height == 8) { auto entries = static_cast<C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 10>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
+        else if (width == 10 && height == 8) { auto entries = static_cast<C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 8>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 10 && height == 9) { auto entries = static_cast<C4_10x9::GameSolver::Connect4::OpeningBookBase<10, 9>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 10 && height == 11) { auto entries = static_cast<C4_10x11::GameSolver::Connect4::OpeningBookBase<10, 11>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 11 && height == 5) { auto entries = static_cast<C4_11x5::GameSolver::Connect4::OpeningBookBase<11, 5>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 11 && height == 6) { auto entries = static_cast<C4_11x6::GameSolver::Connect4::OpeningBookBase<11, 6>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 11 && height == 7) { auto entries = static_cast<C4_11x7::GameSolver::Connect4::OpeningBookBase<11, 7>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
-        else if (width == 11 && height == 8) { auto entries = static_cast<C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 11>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
+        else if (width == 11 && height == 8) { auto entries = static_cast<C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 8>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 11 && height == 9) { auto entries = static_cast<C4_11x9::GameSolver::Connect4::OpeningBookBase<11, 9>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 11 && height == 10) { auto entries = static_cast<C4_11x10::GameSolver::Connect4::OpeningBookBase<11, 10>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 12 && height == 4) { auto entries = static_cast<C4_12x4::GameSolver::Connect4::OpeningBookBase<12, 4>*>(book_ptr)->dump(); items64.insert(items64.end(), entries.begin(), entries.end()); }
         else if (width == 12 && height == 5) { auto entries = static_cast<C4_12x5::GameSolver::Connect4::OpeningBookBase<12, 5>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 12 && height == 6) { auto entries = static_cast<C4_12x6::GameSolver::Connect4::OpeningBookBase<12, 6>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 12 && height == 7) { auto entries = static_cast<C4_12x7::GameSolver::Connect4::OpeningBookBase<12, 7>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
-        else if (width == 12 && height == 8) { auto entries = static_cast<C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 12>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
+        else if (width == 12 && height == 8) { auto entries = static_cast<C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 8>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 12 && height == 9) { auto entries = static_cast<C4_12x9::GameSolver::Connect4::OpeningBookBase<12, 9>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 8 && height == 8) { auto entries = static_cast<C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
         else if (width == 9 && height == 7) { auto entries = static_cast<C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>*>(book_ptr)->dump(); items128.insert(items128.end(), entries.begin(), entries.end()); }
@@ -1781,7 +1781,7 @@ private:
         else if (width == 4 && height == 5) C4_4x5::GameSolver::Connect4::OpeningBookBase<4, 5>::save_dense(filename, depth, items64);
         else if (width == 4 && height == 6) C4_4x6::GameSolver::Connect4::OpeningBookBase<4, 6>::save_dense(filename, depth, items64);
         else if (width == 4 && height == 7) C4_4x7::GameSolver::Connect4::OpeningBookBase<4, 7>::save_dense(filename, depth, items64);
-        else if (width == 4 && height == 8) C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 4>::save_dense(filename, depth, items64);
+        else if (width == 4 && height == 8) C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 8>::save_dense(filename, depth, items64);
         else if (width == 4 && height == 9) C4_4x9::GameSolver::Connect4::OpeningBookBase<4, 9>::save_dense(filename, depth, items64);
         else if (width == 4 && height == 10) C4_4x10::GameSolver::Connect4::OpeningBookBase<4, 10>::save_dense(filename, depth, items64);
         else if (width == 4 && height == 11) C4_4x11::GameSolver::Connect4::OpeningBookBase<4, 11>::save_dense(filename, depth, items64);
@@ -1790,21 +1790,21 @@ private:
         else if (width == 5 && height == 5) C4_5x5::GameSolver::Connect4::OpeningBookBase<5, 5>::save_dense(filename, depth, items64);
         else if (width == 5 && height == 6) C4_5x6::GameSolver::Connect4::OpeningBookBase<5, 6>::save_dense(filename, depth, items64);
         else if (width == 5 && height == 7) C4_5x7::GameSolver::Connect4::OpeningBookBase<5, 7>::save_dense(filename, depth, items64);
-        else if (width == 5 && height == 8) C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 5>::save_dense(filename, depth, items64);
+        else if (width == 5 && height == 8) C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 8>::save_dense(filename, depth, items64);
         else if (width == 5 && height == 9) C4_5x9::GameSolver::Connect4::OpeningBookBase<5, 9>::save_dense(filename, depth, items64);
         else if (width == 5 && height == 10) C4_5x10::GameSolver::Connect4::OpeningBookBase<5, 10>::save_dense(filename, depth, items64);
         else if (width == 5 && height == 11) C4_5x11::GameSolver::Connect4::OpeningBookBase<5, 11>::save_dense(filename, depth, items64);
         else if (width == 5 && height == 12) C4_5x12::GameSolver::Connect4::OpeningBookBase<5, 12>::save_dense(filename, depth, items128);
         else if (width == 6 && height == 4) C4_6x4::GameSolver::Connect4::OpeningBookBase<6, 4>::save_dense(filename, depth, items64);
         else if (width == 6 && height == 7) C4_6x7::GameSolver::Connect4::OpeningBookBase<6, 7>::save_dense(filename, depth, items64);
-        else if (width == 6 && height == 8) C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 6>::save_dense(filename, depth, items64);
+        else if (width == 6 && height == 8) C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 8>::save_dense(filename, depth, items64);
         else if (width == 6 && height == 9) C4_6x9::GameSolver::Connect4::OpeningBookBase<6, 9>::save_dense(filename, depth, items64);
         else if (width == 6 && height == 10) C4_6x10::GameSolver::Connect4::OpeningBookBase<6, 10>::save_dense(filename, depth, items128);
         else if (width == 6 && height == 11) C4_6x11::GameSolver::Connect4::OpeningBookBase<6, 11>::save_dense(filename, depth, items128);
         else if (width == 6 && height == 12) C4_6x12::GameSolver::Connect4::OpeningBookBase<6, 12>::save_dense(filename, depth, items128);
         else if (width == 7 && height == 4) C4_7x4::GameSolver::Connect4::OpeningBookBase<7, 4>::save_dense(filename, depth, items64);
         else if (width == 7 && height == 5) C4_7x5::GameSolver::Connect4::OpeningBookBase<7, 5>::save_dense(filename, depth, items64);
-        else if (width == 7 && height == 8) C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 7>::save_dense(filename, depth, items64);
+        else if (width == 7 && height == 8) C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 8>::save_dense(filename, depth, items64);
         else if (width == 7 && height == 9) C4_7x9::GameSolver::Connect4::OpeningBookBase<7, 9>::save_dense(filename, depth, items128);
         else if (width == 7 && height == 10) C4_7x10::GameSolver::Connect4::OpeningBookBase<7, 10>::save_dense(filename, depth, items128);
         else if (width == 7 && height == 11) C4_7x11::GameSolver::Connect4::OpeningBookBase<7, 11>::save_dense(filename, depth, items128);
@@ -1818,27 +1818,27 @@ private:
         else if (width == 8 && height == 12) C4_8x12::GameSolver::Connect4::OpeningBookBase<8, 12>::save_dense(filename, depth, items128);
         else if (width == 9 && height == 4) C4_9x4::GameSolver::Connect4::OpeningBookBase<9, 4>::save_dense(filename, depth, items64);
         else if (width == 9 && height == 5) C4_9x5::GameSolver::Connect4::OpeningBookBase<9, 5>::save_dense(filename, depth, items64);
-        else if (width == 9 && height == 8) C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 9>::save_dense(filename, depth, items128);
+        else if (width == 9 && height == 8) C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 8>::save_dense(filename, depth, items128);
         else if (width == 9 && height == 10) C4_9x10::GameSolver::Connect4::OpeningBookBase<9, 10>::save_dense(filename, depth, items128);
         else if (width == 9 && height == 11) C4_9x11::GameSolver::Connect4::OpeningBookBase<9, 11>::save_dense(filename, depth, items128);
         else if (width == 9 && height == 12) C4_9x12::GameSolver::Connect4::OpeningBookBase<9, 12>::save_dense(filename, depth, items128);
         else if (width == 10 && height == 4) C4_10x4::GameSolver::Connect4::OpeningBookBase<10, 4>::save_dense(filename, depth, items64);
         else if (width == 10 && height == 5) C4_10x5::GameSolver::Connect4::OpeningBookBase<10, 5>::save_dense(filename, depth, items64);
         else if (width == 10 && height == 6) C4_10x6::GameSolver::Connect4::OpeningBookBase<10, 6>::save_dense(filename, depth, items128);
-        else if (width == 10 && height == 8) C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 10>::save_dense(filename, depth, items128);
+        else if (width == 10 && height == 8) C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 8>::save_dense(filename, depth, items128);
         else if (width == 10 && height == 9) C4_10x9::GameSolver::Connect4::OpeningBookBase<10, 9>::save_dense(filename, depth, items128);
         else if (width == 10 && height == 11) C4_10x11::GameSolver::Connect4::OpeningBookBase<10, 11>::save_dense(filename, depth, items128);
         else if (width == 11 && height == 5) C4_11x5::GameSolver::Connect4::OpeningBookBase<11, 5>::save_dense(filename, depth, items128);
         else if (width == 11 && height == 6) C4_11x6::GameSolver::Connect4::OpeningBookBase<11, 6>::save_dense(filename, depth, items128);
         else if (width == 11 && height == 7) C4_11x7::GameSolver::Connect4::OpeningBookBase<11, 7>::save_dense(filename, depth, items128);
-        else if (width == 11 && height == 8) C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 11>::save_dense(filename, depth, items128);
+        else if (width == 11 && height == 8) C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 8>::save_dense(filename, depth, items128);
         else if (width == 11 && height == 9) C4_11x9::GameSolver::Connect4::OpeningBookBase<11, 9>::save_dense(filename, depth, items128);
         else if (width == 11 && height == 10) C4_11x10::GameSolver::Connect4::OpeningBookBase<11, 10>::save_dense(filename, depth, items128);
         else if (width == 12 && height == 4) C4_12x4::GameSolver::Connect4::OpeningBookBase<12, 4>::save_dense(filename, depth, items64);
         else if (width == 12 && height == 5) C4_12x5::GameSolver::Connect4::OpeningBookBase<12, 5>::save_dense(filename, depth, items128);
         else if (width == 12 && height == 6) C4_12x6::GameSolver::Connect4::OpeningBookBase<12, 6>::save_dense(filename, depth, items128);
         else if (width == 12 && height == 7) C4_12x7::GameSolver::Connect4::OpeningBookBase<12, 7>::save_dense(filename, depth, items128);
-        else if (width == 12 && height == 8) C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 12>::save_dense(filename, depth, items128);
+        else if (width == 12 && height == 8) C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 8>::save_dense(filename, depth, items128);
         else if (width == 12 && height == 9) C4_12x9::GameSolver::Connect4::OpeningBookBase<12, 9>::save_dense(filename, depth, items128);
         else if (width == 8 && height == 8) C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>::save_dense(filename, depth, items128);
         else if (width == 9 && height == 7) C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>::save_dense(filename, depth, items128);
@@ -1858,7 +1858,7 @@ private:
         else if (width == 4 && height == 5) C4_4x5::GameSolver::Connect4::OpeningBookBase<4, 5>::save_elias_fano(filename, depth, items64);
         else if (width == 4 && height == 6) C4_4x6::GameSolver::Connect4::OpeningBookBase<4, 6>::save_elias_fano(filename, depth, items64);
         else if (width == 4 && height == 7) C4_4x7::GameSolver::Connect4::OpeningBookBase<4, 7>::save_elias_fano(filename, depth, items64);
-        else if (width == 4 && height == 8) C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 4>::save_elias_fano(filename, depth, items64);
+        else if (width == 4 && height == 8) C4_4x8::GameSolver::Connect4::OpeningBookBase<4, 8>::save_elias_fano(filename, depth, items64);
         else if (width == 4 && height == 9) C4_4x9::GameSolver::Connect4::OpeningBookBase<4, 9>::save_elias_fano(filename, depth, items64);
         else if (width == 4 && height == 10) C4_4x10::GameSolver::Connect4::OpeningBookBase<4, 10>::save_elias_fano(filename, depth, items64);
         else if (width == 4 && height == 11) C4_4x11::GameSolver::Connect4::OpeningBookBase<4, 11>::save_elias_fano(filename, depth, items64);
@@ -1867,21 +1867,21 @@ private:
         else if (width == 5 && height == 5) C4_5x5::GameSolver::Connect4::OpeningBookBase<5, 5>::save_elias_fano(filename, depth, items64);
         else if (width == 5 && height == 6) C4_5x6::GameSolver::Connect4::OpeningBookBase<5, 6>::save_elias_fano(filename, depth, items64);
         else if (width == 5 && height == 7) C4_5x7::GameSolver::Connect4::OpeningBookBase<5, 7>::save_elias_fano(filename, depth, items64);
-        else if (width == 5 && height == 8) C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 5>::save_elias_fano(filename, depth, items64);
+        else if (width == 5 && height == 8) C4_5x8::GameSolver::Connect4::OpeningBookBase<5, 8>::save_elias_fano(filename, depth, items64);
         else if (width == 5 && height == 9) C4_5x9::GameSolver::Connect4::OpeningBookBase<5, 9>::save_elias_fano(filename, depth, items64);
         else if (width == 5 && height == 10) C4_5x10::GameSolver::Connect4::OpeningBookBase<5, 10>::save_elias_fano(filename, depth, items64);
         else if (width == 5 && height == 11) C4_5x11::GameSolver::Connect4::OpeningBookBase<5, 11>::save_elias_fano(filename, depth, items64);
         else if (width == 5 && height == 12) C4_5x12::GameSolver::Connect4::OpeningBookBase<5, 12>::save_elias_fano(filename, depth, items128);
         else if (width == 6 && height == 4) C4_6x4::GameSolver::Connect4::OpeningBookBase<6, 4>::save_elias_fano(filename, depth, items64);
         else if (width == 6 && height == 7) C4_6x7::GameSolver::Connect4::OpeningBookBase<6, 7>::save_elias_fano(filename, depth, items64);
-        else if (width == 6 && height == 8) C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 6>::save_elias_fano(filename, depth, items64);
+        else if (width == 6 && height == 8) C4_6x8::GameSolver::Connect4::OpeningBookBase<6, 8>::save_elias_fano(filename, depth, items64);
         else if (width == 6 && height == 9) C4_6x9::GameSolver::Connect4::OpeningBookBase<6, 9>::save_elias_fano(filename, depth, items64);
         else if (width == 6 && height == 10) C4_6x10::GameSolver::Connect4::OpeningBookBase<6, 10>::save_elias_fano(filename, depth, items128);
         else if (width == 6 && height == 11) C4_6x11::GameSolver::Connect4::OpeningBookBase<6, 11>::save_elias_fano(filename, depth, items128);
         else if (width == 6 && height == 12) C4_6x12::GameSolver::Connect4::OpeningBookBase<6, 12>::save_elias_fano(filename, depth, items128);
         else if (width == 7 && height == 4) C4_7x4::GameSolver::Connect4::OpeningBookBase<7, 4>::save_elias_fano(filename, depth, items64);
         else if (width == 7 && height == 5) C4_7x5::GameSolver::Connect4::OpeningBookBase<7, 5>::save_elias_fano(filename, depth, items64);
-        else if (width == 7 && height == 8) C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 7>::save_elias_fano(filename, depth, items64);
+        else if (width == 7 && height == 8) C4_7x8::GameSolver::Connect4::OpeningBookBase<7, 8>::save_elias_fano(filename, depth, items64);
         else if (width == 7 && height == 9) C4_7x9::GameSolver::Connect4::OpeningBookBase<7, 9>::save_elias_fano(filename, depth, items128);
         else if (width == 7 && height == 10) C4_7x10::GameSolver::Connect4::OpeningBookBase<7, 10>::save_elias_fano(filename, depth, items128);
         else if (width == 7 && height == 11) C4_7x11::GameSolver::Connect4::OpeningBookBase<7, 11>::save_elias_fano(filename, depth, items128);
@@ -1895,27 +1895,27 @@ private:
         else if (width == 8 && height == 12) C4_8x12::GameSolver::Connect4::OpeningBookBase<8, 12>::save_elias_fano(filename, depth, items128);
         else if (width == 9 && height == 4) C4_9x4::GameSolver::Connect4::OpeningBookBase<9, 4>::save_elias_fano(filename, depth, items64);
         else if (width == 9 && height == 5) C4_9x5::GameSolver::Connect4::OpeningBookBase<9, 5>::save_elias_fano(filename, depth, items64);
-        else if (width == 9 && height == 8) C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 9>::save_elias_fano(filename, depth, items128);
+        else if (width == 9 && height == 8) C4_9x8::GameSolver::Connect4::OpeningBookBase<9, 8>::save_elias_fano(filename, depth, items128);
         else if (width == 9 && height == 10) C4_9x10::GameSolver::Connect4::OpeningBookBase<9, 10>::save_elias_fano(filename, depth, items128);
         else if (width == 9 && height == 11) C4_9x11::GameSolver::Connect4::OpeningBookBase<9, 11>::save_elias_fano(filename, depth, items128);
         else if (width == 9 && height == 12) C4_9x12::GameSolver::Connect4::OpeningBookBase<9, 12>::save_elias_fano(filename, depth, items128);
         else if (width == 10 && height == 4) C4_10x4::GameSolver::Connect4::OpeningBookBase<10, 4>::save_elias_fano(filename, depth, items64);
         else if (width == 10 && height == 5) C4_10x5::GameSolver::Connect4::OpeningBookBase<10, 5>::save_elias_fano(filename, depth, items64);
         else if (width == 10 && height == 6) C4_10x6::GameSolver::Connect4::OpeningBookBase<10, 6>::save_elias_fano(filename, depth, items128);
-        else if (width == 10 && height == 8) C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 10>::save_elias_fano(filename, depth, items128);
+        else if (width == 10 && height == 8) C4_10x8::GameSolver::Connect4::OpeningBookBase<10, 8>::save_elias_fano(filename, depth, items128);
         else if (width == 10 && height == 9) C4_10x9::GameSolver::Connect4::OpeningBookBase<10, 9>::save_elias_fano(filename, depth, items128);
         else if (width == 10 && height == 11) C4_10x11::GameSolver::Connect4::OpeningBookBase<10, 11>::save_elias_fano(filename, depth, items128);
         else if (width == 11 && height == 5) C4_11x5::GameSolver::Connect4::OpeningBookBase<11, 5>::save_elias_fano(filename, depth, items128);
         else if (width == 11 && height == 6) C4_11x6::GameSolver::Connect4::OpeningBookBase<11, 6>::save_elias_fano(filename, depth, items128);
         else if (width == 11 && height == 7) C4_11x7::GameSolver::Connect4::OpeningBookBase<11, 7>::save_elias_fano(filename, depth, items128);
-        else if (width == 11 && height == 8) C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 11>::save_elias_fano(filename, depth, items128);
+        else if (width == 11 && height == 8) C4_11x8::GameSolver::Connect4::OpeningBookBase<11, 8>::save_elias_fano(filename, depth, items128);
         else if (width == 11 && height == 9) C4_11x9::GameSolver::Connect4::OpeningBookBase<11, 9>::save_elias_fano(filename, depth, items128);
         else if (width == 11 && height == 10) C4_11x10::GameSolver::Connect4::OpeningBookBase<11, 10>::save_elias_fano(filename, depth, items128);
         else if (width == 12 && height == 4) C4_12x4::GameSolver::Connect4::OpeningBookBase<12, 4>::save_elias_fano(filename, depth, items64);
         else if (width == 12 && height == 5) C4_12x5::GameSolver::Connect4::OpeningBookBase<12, 5>::save_elias_fano(filename, depth, items128);
         else if (width == 12 && height == 6) C4_12x6::GameSolver::Connect4::OpeningBookBase<12, 6>::save_elias_fano(filename, depth, items128);
         else if (width == 12 && height == 7) C4_12x7::GameSolver::Connect4::OpeningBookBase<12, 7>::save_elias_fano(filename, depth, items128);
-        else if (width == 12 && height == 8) C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 12>::save_elias_fano(filename, depth, items128);
+        else if (width == 12 && height == 8) C4_12x8::GameSolver::Connect4::OpeningBookBase<12, 8>::save_elias_fano(filename, depth, items128);
         else if (width == 12 && height == 9) C4_12x9::GameSolver::Connect4::OpeningBookBase<12, 9>::save_elias_fano(filename, depth, items128);
         else if (width == 8 && height == 8) C4_8x8::GameSolver::Connect4::OpeningBookBase<8, 8>::save_elias_fano(filename, depth, items128);
         else if (width == 9 && height == 7) C4_9x7::GameSolver::Connect4::OpeningBookBase<9, 7>::save_elias_fano(filename, depth, items128);
@@ -1974,7 +1974,7 @@ Value GeneratePositions(const CallbackInfo& info) {
     else if (width == 4 && height == 5) generate_positions_for_board<4, 5>(depth, results);
     else if (width == 4 && height == 6) generate_positions_for_board<4, 6>(depth, results);
     else if (width == 4 && height == 7) generate_positions_for_board<4, 7>(depth, results);
-    else if (width == 4 && height == 8) generate_positions_for_board<4, 4>(depth, results);
+    else if (width == 4 && height == 8) generate_positions_for_board<4, 8>(depth, results);
     else if (width == 4 && height == 9) generate_positions_for_board<4, 9>(depth, results);
     else if (width == 4 && height == 10) generate_positions_for_board<4, 10>(depth, results);
     else if (width == 4 && height == 11) generate_positions_for_board<4, 11>(depth, results);
@@ -1983,21 +1983,21 @@ Value GeneratePositions(const CallbackInfo& info) {
     else if (width == 5 && height == 5) generate_positions_for_board<5, 5>(depth, results);
     else if (width == 5 && height == 6) generate_positions_for_board<5, 6>(depth, results);
     else if (width == 5 && height == 7) generate_positions_for_board<5, 7>(depth, results);
-    else if (width == 5 && height == 8) generate_positions_for_board<5, 5>(depth, results);
+    else if (width == 5 && height == 8) generate_positions_for_board<5, 8>(depth, results);
     else if (width == 5 && height == 9) generate_positions_for_board<5, 9>(depth, results);
     else if (width == 5 && height == 10) generate_positions_for_board<5, 10>(depth, results);
     else if (width == 5 && height == 11) generate_positions_for_board<5, 11>(depth, results);
     else if (width == 5 && height == 12) generate_positions_for_board<5, 12>(depth, results);
     else if (width == 6 && height == 4) generate_positions_for_board<6, 4>(depth, results);
     else if (width == 6 && height == 7) generate_positions_for_board<6, 7>(depth, results);
-    else if (width == 6 && height == 8) generate_positions_for_board<6, 6>(depth, results);
+    else if (width == 6 && height == 8) generate_positions_for_board<6, 8>(depth, results);
     else if (width == 6 && height == 9) generate_positions_for_board<6, 9>(depth, results);
     else if (width == 6 && height == 10) generate_positions_for_board<6, 10>(depth, results);
     else if (width == 6 && height == 11) generate_positions_for_board<6, 11>(depth, results);
     else if (width == 6 && height == 12) generate_positions_for_board<6, 12>(depth, results);
     else if (width == 7 && height == 4) generate_positions_for_board<7, 4>(depth, results);
     else if (width == 7 && height == 5) generate_positions_for_board<7, 5>(depth, results);
-    else if (width == 7 && height == 8) generate_positions_for_board<7, 7>(depth, results);
+    else if (width == 7 && height == 8) generate_positions_for_board<7, 8>(depth, results);
     else if (width == 7 && height == 9) generate_positions_for_board<7, 9>(depth, results);
     else if (width == 7 && height == 10) generate_positions_for_board<7, 10>(depth, results);
     else if (width == 7 && height == 11) generate_positions_for_board<7, 11>(depth, results);
@@ -2011,27 +2011,27 @@ Value GeneratePositions(const CallbackInfo& info) {
     else if (width == 8 && height == 12) generate_positions_for_board<8, 12>(depth, results);
     else if (width == 9 && height == 4) generate_positions_for_board<9, 4>(depth, results);
     else if (width == 9 && height == 5) generate_positions_for_board<9, 5>(depth, results);
-    else if (width == 9 && height == 8) generate_positions_for_board<9, 9>(depth, results);
+    else if (width == 9 && height == 8) generate_positions_for_board<9, 8>(depth, results);
     else if (width == 9 && height == 10) generate_positions_for_board<9, 10>(depth, results);
     else if (width == 9 && height == 11) generate_positions_for_board<9, 11>(depth, results);
     else if (width == 9 && height == 12) generate_positions_for_board<9, 12>(depth, results);
     else if (width == 10 && height == 4) generate_positions_for_board<10, 4>(depth, results);
     else if (width == 10 && height == 5) generate_positions_for_board<10, 5>(depth, results);
     else if (width == 10 && height == 6) generate_positions_for_board<10, 6>(depth, results);
-    else if (width == 10 && height == 8) generate_positions_for_board<10, 10>(depth, results);
+    else if (width == 10 && height == 8) generate_positions_for_board<10, 8>(depth, results);
     else if (width == 10 && height == 9) generate_positions_for_board<10, 9>(depth, results);
     else if (width == 10 && height == 11) generate_positions_for_board<10, 11>(depth, results);
     else if (width == 11 && height == 5) generate_positions_for_board<11, 5>(depth, results);
     else if (width == 11 && height == 6) generate_positions_for_board<11, 6>(depth, results);
     else if (width == 11 && height == 7) generate_positions_for_board<11, 7>(depth, results);
-    else if (width == 11 && height == 8) generate_positions_for_board<11, 11>(depth, results);
+    else if (width == 11 && height == 8) generate_positions_for_board<11, 8>(depth, results);
     else if (width == 11 && height == 9) generate_positions_for_board<11, 9>(depth, results);
     else if (width == 11 && height == 10) generate_positions_for_board<11, 10>(depth, results);
     else if (width == 12 && height == 4) generate_positions_for_board<12, 4>(depth, results);
     else if (width == 12 && height == 5) generate_positions_for_board<12, 5>(depth, results);
     else if (width == 12 && height == 6) generate_positions_for_board<12, 6>(depth, results);
     else if (width == 12 && height == 7) generate_positions_for_board<12, 7>(depth, results);
-    else if (width == 12 && height == 8) generate_positions_for_board<12, 12>(depth, results);
+    else if (width == 12 && height == 8) generate_positions_for_board<12, 8>(depth, results);
     else if (width == 12 && height == 9) generate_positions_for_board<12, 9>(depth, results);
     else if (width == 9 && height == 7) generate_positions_for_board<9, 7>(depth, results);
     else if (width == 9 && height == 6) generate_positions_for_board<9, 6>(depth, results);

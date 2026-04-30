@@ -68,6 +68,8 @@ export default tseslint.config(
       "test-data/",
       "test_addon.js",
       "test_addon.ts",
+      "*.ts",
+      "c4_benchmark2/",
     ],
   },
 );

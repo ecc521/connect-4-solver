@@ -128,18 +128,19 @@ describe("HeuristicNodeConnect4Solver", () => {
       solver.solve(pos, { maxDepth: 42, timeoutMs: 5000 }),
     ]);
 
-    // Heuristic scores are scaled by 1000 for terminal wins
+    // Heuristic scores are shifted by 31000 for terminal wins
+    // So +31021 is a win in 1 (distance 21), and -31021 is a loss in 1 (distance -21).
     const hScore = heuristicRes.evaluation?.score ?? 0;
     const eScore = exactRes.evaluation?.score ?? 0;
 
-    const hNormalized =
-      hScore > 10000
-        ? Math.floor(hScore / 1000)
-        : hScore < -10000
-          ? Math.ceil(hScore / 1000)
+    const parsedHScore =
+      hScore >= 31000
+        ? hScore - 31000
+        : hScore <= -31000
+          ? hScore + 31000
           : hScore;
 
-    expect(hNormalized).toBe(eScore);
+    expect(parsedHScore).toBe(eScore);
     exactSolver.release();
   });
 

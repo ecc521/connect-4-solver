@@ -207,8 +207,8 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     const halfMovesRemaining = Math.ceil(movesRemaining / 2);
 
     if (this.isHeuristic) {
-      if (score > 10000) {
-        const realScore = Math.floor(score / 1000);
+      if (score >= 31000) {
+        const realScore = score - 31000;
         return {
           eval: {
             value: Number.POSITIVE_INFINITY,
@@ -219,8 +219,8 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
           movesToEnd: halfMovesRemaining - realScore + 1,
           score,
         };
-      } else if (score < -10000) {
-        const realScore = Math.ceil(score / 1000);
+      } else if (score <= -31000) {
+        const realScore = score + 31000;
         return {
           eval: {
             value: Number.NEGATIVE_INFINITY,

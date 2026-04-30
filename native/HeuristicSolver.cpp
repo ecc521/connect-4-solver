@@ -48,7 +48,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   }
   typename GenericPosition<WIDTH, HEIGHT>::position_t possible = P.possibleNonLosingMoves();
   if(possible == 0) // opponent wins next move
-    return -(WIDTH * HEIGHT - P.nbMoves()) / 2 * 1000;
+    return -(31000 + (WIDTH * HEIGHT - P.nbMoves()) / 2);
 
   if(P.nbMoves() >= WIDTH * HEIGHT - 2) // draw game
     return 0;
@@ -58,8 +58,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
       depth = 1; // Quiescence extension: Forced move resolves tactical tension
     } else {
       int eval = NNUE<WIDTH, HEIGHT>::evaluate_accumulated(acc, P);
-      if (eval > 9000) eval = 9000;
-      if (eval < -9000) eval = -9000;
+      if (eval > 30000) eval = 30000;
+      if (eval < -30000) eval = -30000;
       return eval;
     }
   }
@@ -84,13 +84,13 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     return score;
   }
 
-  int min = -(WIDTH * HEIGHT - 2 - P.nbMoves()) / 2 * 1000;
+  int min = -(31000 + (WIDTH * HEIGHT - 2 - P.nbMoves()) / 2);
   if(alpha < min) {
     alpha = min;                     
     if(alpha >= beta) return alpha;  
   }
 
-  int max = (WIDTH * HEIGHT - 1 - P.nbMoves()) / 2 * 1000;
+  int max = 31000 + (WIDTH * HEIGHT - 1 - P.nbMoves()) / 2;
   if(beta > max) {
     beta = max;                     
     if(alpha >= beta) return beta;  
@@ -100,7 +100,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     if (P.nbMoves() % 2 == 0) {
       int evens = P.computeEvensStrategy();
       if (evens < 0) { // Forced Loss with calculated upper bound
-        int evens_scaled = evens * 1000;
+        int evens_scaled = -31000 + evens;
         if (beta > evens_scaled) {
           beta = evens_scaled;
           if (alpha >= beta) return beta;
@@ -150,14 +150,14 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
         // Perturb the score slightly to induce search divergence
         base_score += ((smp_thread_id * 17 + bit_idx) % 7);
       }
-      if(col == best_move_col) base_score += 1000000000;
+      if(col == best_move_col) base_score += 32000000;
       moves.add(move, base_score);
     }
   }
 
   int best_seen_col = -1;
   int orig_alpha = alpha;
-  int best_score = -1000000;
+  int best_score = -32000;
 
   while(typename GenericPosition<WIDTH, HEIGHT>::position_t next = moves.getNext()) {
     if (stopSearch.load(std::memory_order_relaxed)) break;
@@ -212,7 +212,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
   }
 
   if(P.canWinNext()) {
-    int score = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+    int score = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
     for (int i = 0; i < WIDTH; i++) {
         if (P.canPlay(i) && P.isWinningMove(i)) return {score, i, (int)P.nbMoves(), getNodeCount()};
     }
@@ -229,7 +229,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
   int best_move = -1;
   int depth_reached = 0;
   for (int d = 1; d <= max_depth; d++) {
-    int current_score = negamax_heuristic(P, -1000000, 1000000, d, end_time_ms, *acc);
+    int current_score = negamax_heuristic(P, -32000, 32000, d, end_time_ms, *acc);
     if (stopSearch.load(std::memory_order_relaxed) && d > 1) break;
     best_score = current_score;
     
@@ -241,7 +241,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
     }
 
     depth_reached = d;
-    if (best_score > 1000000 || best_score < -1000000) {
+    if (best_score > 32000 || best_score < -32000) {
       break;
     }
   }
@@ -252,7 +252,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
 
 template <int WIDTH, int HEIGHT>
 std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads, double timeout_ms) {
-  std::vector<int> scores(WIDTH, -1000000);
+  std::vector<int> scores(WIDTH, -32000);
   int final_depth_reached = 0;
 #ifdef __EMSCRIPTEN__
   double end_time_ms = timeout_ms > 0.0 ? emscripten_get_now() + timeout_ms : 0.0;
@@ -283,13 +283,13 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
         int col = columnOrder[i];
         if (P.canPlay(col)) {
           if(P.isWinningMove(col)) {
-            current_scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+            current_scores[col] = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
           } else {
             GenericPosition<WIDTH, HEIGHT> P2(P);
             P2.playCol(col);
             NNUEAccumulator<WIDTH, HEIGHT> local_acc;
             local_acc.init(P2);
-            int score = -negamax_heuristic(P2, -1000000, 1000000, d - 1, end_time_ms, local_acc);
+            int score = -negamax_heuristic(P2, -32000, 32000, d - 1, end_time_ms, local_acc);
             if (stopSearch.load(std::memory_order_relaxed)) break;
             current_scores[col] = score;
           }
@@ -328,13 +328,13 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
       int col = columnOrder[i];
       if (P.canPlay(col)) {
         if(P.isWinningMove(col)) {
-          current_scores[col] = (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2 * 1000;
+          current_scores[col] = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
         } else {
           GenericPosition<WIDTH, HEIGHT> P2(P);
           P2.playCol(col);
           NNUEAccumulator<WIDTH, HEIGHT> local_acc;
           local_acc.init(P2);
-          int score = -negamax_heuristic(P2, -1000000, 1000000, d - 1, end_time_ms, local_acc);
+          int score = -negamax_heuristic(P2, -32000, 32000, d - 1, end_time_ms, local_acc);
           if (stopSearch.load(std::memory_order_relaxed)) break;
           current_scores[col] = score;
         }
@@ -353,7 +353,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 }
 
 template <int WIDTH, int HEIGHT>
-HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int32_t, 32>> cache) : transTable(cache), nodeCount{0}, isSearching{false}, pool(std::make_unique<ThreadPool>()) {
+HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16>> cache) : transTable(cache), nodeCount{0}, isSearching{false}, pool(std::make_unique<ThreadPool>()) {
   for(int i = 0; i < WIDTH; i++) 
     columnOrder[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2; 
   for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {

@@ -40,3 +40,15 @@ jobs:
 
       - name: Run Jest Parity Tests
         run: npm test
+
+      - name: Benchmark SMP Scaling
+        run: npm run bench:smp
+
+      - name: Benchmark Cache Efficiency
+        run: npm run bench:cache
+
+      - name: Benchmark Heuristic Engine
+        run: npm run bench:heuristic
+
+      - name: Benchmark Book Latency
+        run: npm run bench:book
