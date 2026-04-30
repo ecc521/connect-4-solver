@@ -34,6 +34,7 @@
 #include "TranspositionTable.hpp"
 #include "OpeningBook.hpp"
 #include "SolverResult.hpp"
+#include "ThreadPool.hpp"
 
 namespace GameSolver {
 namespace Connect4 {
@@ -119,12 +120,11 @@ class SolverImplBase {
   };
 };
 
+template <typename SlotType>
 class SolverImpl : public Solver {
-  using ThreadPool = SolverImplBase::ThreadPool;
  public:
   static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
-  using SlotType = uint64_t;
-  std::shared_ptr<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>> transTable;
+  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
   std::atomic<unsigned long long> nodeCount;
   std::atomic<bool> isSearching{false};
 
@@ -137,7 +137,7 @@ class SolverImpl : public Solver {
  public:
 
   SolverImpl(size_t table_bytes) 
-    : transTable(std::make_shared<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0}, pool(std::make_unique<ThreadPool>()) {
+    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0}, pool(std::make_unique<ThreadPool>()) {
     for(int i = 0; i < Position::WIDTH; i++) {
       columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
     }
@@ -146,7 +146,7 @@ class SolverImpl : public Solver {
     }
   }
 
-  SolverImpl(std::shared_ptr<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>> cache)
+  SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> cache)
     : transTable(cache), nodeCount{0}, pool(std::make_unique<ThreadPool>()) {
     for(int i = 0; i < Position::WIDTH; i++) {
       columnOrder[i] = Position::WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;

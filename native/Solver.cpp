@@ -37,7 +37,8 @@ namespace {
 /**
  * Reccursively score connect 4 position using negamax variant of alpha-beta algorithm.
  */
-int SolverImpl::negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+template <typename SlotType>
+int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
   assert(alpha < beta);
   assert(!P.canWinNext());
 
@@ -192,7 +193,8 @@ int SolverImpl::negamax(const Position &P, int alpha, int beta, const OpeningBoo
   return best_score;
 }
 
-SolverResult SolverImpl::solve(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+template <typename SlotType>
+SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
   if(P.canWinNext()) {
     int score = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
     for (int i = 0; i < Position::WIDTH; i++) {
@@ -276,7 +278,8 @@ SolverResult SolverImpl::solve(const Position &P, bool weak, const OpeningBookBa
   return {score, bestMove, (int)P.nbMoves(), getNodeCount()};
 }
 
-std::vector<int> SolverImpl::analyze(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+template <typename SlotType>
+std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
   std::vector<int> scores(Position::WIDTH, -1000);
 
 #ifdef USE_PTHREADS
@@ -343,17 +346,18 @@ std::vector<int> SolverImpl::analyze(const Position &P, bool weak, int threads, 
   return scores;
 }
 
+template <typename SlotType>
 class TypedCache : public Cache {
  public:
   static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
-  std::shared_ptr<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>> transTable;
+  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
 
   TypedCache(size_t table_bytes) 
-    : transTable(std::make_shared<TranspositionTable<uint64_t, uint8_t, VALUE_BITS>>(table_bytes)) {
+    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)) {
       
       // Calculate CRT safety
       int shift_amount = VALUE_BITS + 7 + 4; // ValueBits + WorkBits + MoveBits
-      int available_bits = 64 - shift_amount;
+      int available_bits = sizeof(SlotType) * 8 - shift_amount;
       int board_bits = Position::WIDTH * (Position::HEIGHT + 1);
       
       if (board_bits > available_bits) {
@@ -373,12 +377,37 @@ class TypedCache : public Cache {
 };
 
 std::unique_ptr<Cache> Solver::createCache(size_t table_bytes) {
-  return std::make_unique<TypedCache>(table_bytes);
+  constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
+  constexpr int shift_amount = VALUE_BITS + 7 + 4;
+  constexpr int available_bits_64 = 64 - shift_amount;
+  constexpr int board_bits = Position::WIDTH * (Position::HEIGHT + 1);
+  
+  if constexpr (board_bits > available_bits_64) {
+      constexpr int index_bits_64 = board_bits - available_bits_64;
+      if constexpr (index_bits_64 < 64) {
+          uint64_t required_buckets_64 = 1ULL << index_bits_64;
+          // Calculate approx required bytes (16 bytes per bucket + overhead)
+          size_t bucket_size = 16;
+          size_t required_bytes_64 = required_buckets_64 * bucket_size;
+          
+          if (table_bytes < required_bytes_64) {
+              // Upgrade to 128-bit slot since memory is too small for 64-bit CRT
+              return std::make_unique<TypedCache<unsigned __int128>>(table_bytes);
+          }
+      } else {
+          // If 64-bit slot mathematically requires > 2^64 buckets, it's impossible. Must use 128-bit.
+          return std::make_unique<TypedCache<unsigned __int128>>(table_bytes);
+      }
+  }
+  
+  return std::make_unique<TypedCache<uint64_t>>(table_bytes);
 }
 
 std::unique_ptr<Solver> Solver::createWithCache(Cache* cache) {
-  if (auto c = dynamic_cast<TypedCache*>(cache)) {
-    return std::make_unique<SolverImpl>(c->transTable);
+  if (auto c64 = dynamic_cast<TypedCache<uint64_t>*>(cache)) {
+    return std::make_unique<SolverImpl<uint64_t>>(c64->transTable);
+  } else if (auto c128 = dynamic_cast<TypedCache<unsigned __int128>*>(cache)) {
+    return std::make_unique<SolverImpl<unsigned __int128>>(c128->transTable);
   } else {
     throw std::invalid_argument("Unsupported cache type");
   }
