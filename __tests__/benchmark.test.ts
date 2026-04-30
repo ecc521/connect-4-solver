@@ -29,9 +29,7 @@ describe("Heuristic vs Perfect Connectivity Benchmark", () => {
         threads: 4,
       });
 
-      console.log(
-        `[Pos: ${pos}] Perfect Score: ${perfect.evaluation?.score} | Heuristic (1T): ${heuristicResult.evaluation?.score} | Heuristic (4T): ${heuristicThreaded.evaluation?.score}`,
-      );
+
 
       // Ensure the evaluations are not null and returned valid move option structures
       expect(heuristicResult.moveOptions.length).toBe(
