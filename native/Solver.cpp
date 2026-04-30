@@ -94,8 +94,22 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     }
   }
 
+  static int tt_probe_depth = -1;
+  if (tt_probe_depth == -1) {
+    if (const char* env_p = std::getenv("TT_PROBE_DEPTH")) {
+      tt_probe_depth = std::stoi(env_p);
+    } else {
+      tt_probe_depth = 15; // default: stop symmetry and child-probing at <= 15 plies from leaf
+    }
+  }
+
   bool is_reverse = false;
-  const Position::position_t key = P.symmetric_key(is_reverse);
+  Position::position_t key;
+  if (Position::WIDTH * Position::HEIGHT - P.nbMoves() <= tt_probe_depth) {
+    key = P.key();
+  } else {
+    key = P.symmetric_key(is_reverse);
+  }
   uint8_t table_move = Position::WIDTH;
 
   if(auto packed = transTable->getPacked(key); packed.value) {
@@ -118,15 +132,6 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     }
   }
 
-  static int tt_probe_depth = -1;
-  if (tt_probe_depth == -1) {
-    if (const char* env_p = std::getenv("TT_PROBE_DEPTH")) {
-      tt_probe_depth = std::stoi(env_p);
-    } else {
-      tt_probe_depth = 15;
-    }
-  }
-
   // 1-ply TT lookahead (Child Probing) to prune early before deep searches
   if (P.nbMoves() < (Position::WIDTH * Position::HEIGHT) - tt_probe_depth) {
     for (int i = 0; i < Position::WIDTH; i++) {
@@ -134,8 +139,14 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
       if (Position::position_t move = possible & Position::column_mask(col)) {
         Position child(P);
         child.play(move);
-        bool dummy;
-        if (auto child_packed = transTable->getPacked(child.symmetric_key(dummy)); child_packed.value) {
+        bool dummy = false;
+        Position::position_t child_key;
+        if (Position::WIDTH * Position::HEIGHT - child.nbMoves() <= tt_probe_depth) {
+          child_key = child.key();
+        } else {
+          child_key = child.symmetric_key(dummy);
+        }
+        if (auto child_packed = transTable->getPacked(child_key); child_packed.value) {
           uint8_t child_val = child_packed.value;
           if (child_val <= Position::MAX_SCORE - Position::MIN_SCORE + 1) {
             // child upper bound means child_score <= child_max
