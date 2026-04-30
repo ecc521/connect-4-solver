@@ -2266,39 +2266,24 @@ private:
 };
 
 template<int W, int H>
-void explore_positions(GameSolver::Connect4::GenericPosition<W, H> P, std::string& pos_str, int max_depth, std::unordered_set<uint64_t>& visited, std::vector<std::string>& results) {
+void explore_positions(const GameSolver::Connect4::GenericPosition<W, H>& P, std::string& pos_str, int max_depth, int target_depth, std::unordered_set<uint64_t>& visited, std::vector<std::string>& results) {
     uint64_t key = P.key3();
     if (!visited.insert(key).second) return;
 
-    // Check for forced move
-    bool is_forced = false;
-    if (!P.canWinNext()) {
-        auto possible = P.possibleNonLosingMoves();
-        if (possible != 0 && GameSolver::Connect4::GenericPosition<W, H>::popcount(possible) == 1) {
-            is_forced = true;
-            int col = GameSolver::Connect4::GenericPosition<W, H>::getCol(possible);
-            P.playCol(col);
-            pos_str.push_back(col < 9 ? '1' + col : 'a' + (col - 9));
-            explore_positions(P, pos_str, max_depth, visited, results);
-            pos_str.pop_back();
-        }
+    int nb_moves = P.nbMoves();
+    if (nb_moves == target_depth) {
+        results.push_back(pos_str);
     }
 
-    if (!is_forced) {
-        // Interesting position (branching point, win, or loss)
-        results.push_back(pos_str);
+    if (nb_moves >= max_depth) return;
 
-        // Branch if we haven't reached the depth limit
-        if (P.nbMoves() < max_depth) {
-            for (int i = 0; i < W; i++) {
-                if (P.canPlay(i) && !P.isWinningMove(i)) {
-                    GameSolver::Connect4::GenericPosition<W, H> P2 = P;
-                    P2.playCol(i);
-                    pos_str.push_back(i < 9 ? '1' + i : 'a' + (i - 9));
-                    explore_positions(P2, pos_str, max_depth, visited, results);
-                    pos_str.pop_back();
-                }
-            }
+    for (int i = 0; i < W; i++) {
+        if (P.canPlay(i) && !P.isWinningMove(i)) {
+            GameSolver::Connect4::GenericPosition<W, H> P2(P);
+            P2.playCol(i);
+            pos_str.push_back(i < 9 ? '1' + i : 'a' + (i - 9));
+            explore_positions(P2, pos_str, max_depth, target_depth, visited, results);
+            pos_str.pop_back();
         }
     }
 }
@@ -2306,8 +2291,10 @@ void explore_positions(GameSolver::Connect4::GenericPosition<W, H> P, std::strin
 template<int W, int H>
 void generate_positions_for_board(int max_depth, std::vector<std::string>& results) {
     std::string pos_str = "";
-    std::unordered_set<uint64_t> visited;
-    explore_positions(GameSolver::Connect4::GenericPosition<W, H>(), pos_str, max_depth, visited, results);
+    for (int d = max_depth; d >= 0; d--) {
+        std::unordered_set<uint64_t> visited;
+        explore_positions(GameSolver::Connect4::GenericPosition<W, H>(), pos_str, d, d, visited, results);
+    }
 }
 
 Value GeneratePositions(const CallbackInfo& info) {
