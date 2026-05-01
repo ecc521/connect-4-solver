@@ -86,7 +86,8 @@ class SolverImpl : public Solver {
  private:
   mutable int32_t history[Position::WIDTH * (Position::HEIGHT + 1)];
 
-  int negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
+  template <bool HasBook>
+  int negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
 
  public:
 
@@ -108,7 +109,8 @@ class SolverImpl : public Solver {
   std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr, double timeout_ms = 0) override;
 
  private:
-  ::GameSolver::Connect4::SolverResult solve_single(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
+  template <bool HasBook>
+  ::GameSolver::Connect4::SolverResult solve_single(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
 
   unsigned long long getNodeCount() const override {
     return nodeCount;

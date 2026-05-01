@@ -46,7 +46,8 @@ namespace {
  * Reccursively score connect 4 position using negamax variant of alpha-beta algorithm.
  */
 template <typename SlotType>
-int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag, int32_t* thread_history) {
+template <bool HasBook>
+int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history) {
   if (shouldAbort(abort_flag)) [[unlikely]] return 0;
 
   assert(alpha < beta);
@@ -78,7 +79,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     } else {
       nodeCount.fetch_sub(1, std::memory_order_relaxed);
     }
-    return -negamax(P2, -beta, -alpha, book, abort_flag, thread_history);
+    return -negamax<HasBook>(P2, -beta, -alpha, book, book_depth, abort_flag, thread_history);
   }
 
   int min = -(Position::WIDTH * Position::HEIGHT - 2 - P.nbMoves()) / 2;	// lower bound of score as opponent cannot win next move
@@ -165,8 +166,10 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     }
   }
 
-  if(book) {
-    if(int val = book->get(P)) return val + Position::MIN_SCORE - 1; // look for solutions stored in opening book
+  if constexpr (HasBook) {
+    if (P.nbMoves() <= book_depth) {
+      if(int val = book->get(P)) return val + Position::MIN_SCORE - 1; // look for solutions stored in opening book
+    }
   }
 
   MoveSorter moves;
@@ -205,7 +208,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   while(Position::position_t next = moves.getNext()) {
     Position P2(P);
     P2.play(next);
-    int score = -negamax(P2, -beta, -alpha, book, abort_flag, thread_history);
+    int score = -negamax<HasBook>(P2, -beta, -alpha, book, book_depth, abort_flag, thread_history);
 
     if (shouldAbort(abort_flag)) return 0;
 
@@ -235,7 +238,8 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
  * and an optional private history table for search diversity.
  */
 template <typename SlotType>
-::GameSolver::Connect4::SolverResult SolverImpl<SlotType>::solve_single(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag, int32_t* thread_history) {
+template <bool HasBook>
+::GameSolver::Connect4::SolverResult SolverImpl<SlotType>::solve_single(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history) {
   if(P.canWinNext()) {
     int score = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
     for (int i = 0; i < Position::WIDTH; i++) {
@@ -244,8 +248,10 @@ template <typename SlotType>
     return {score, -1, (int)P.nbMoves(), getNodeCount()};
   }
 
-  if(book) {
-    if(int val = book->get(P))      return {val + Position::MIN_SCORE - 1, -1, (int)P.nbMoves(), getNodeCount()};
+  if constexpr (HasBook) {
+    if (P.nbMoves() <= book_depth) {
+      if(int val = book->get(P))      return {val + Position::MIN_SCORE - 1, -1, (int)P.nbMoves(), getNodeCount()};
+    }
   }
 
   int min = -(Position::WIDTH * Position::HEIGHT - P.nbMoves()) / 2;
@@ -259,20 +265,20 @@ template <typename SlotType>
       int med = min + (max - min) / 2;
       if(med <= 0 && min / 2 < med) med = min / 2;
       else if(med >= 0 && max / 2 > med) med = max / 2;
-      int r = negamax(P, med, med + 1, book, abort_flag, thread_history);
+      int r = negamax<HasBook>(P, med, med + 1, book, book_depth, abort_flag, thread_history);
       if (shouldAbort(abort_flag)) { score = min; break; }
       if(r <= med) max = r;
       else min = r;
     }
     score = min;
   } else {
-    int r = negamax(P, -1, 0, book, abort_flag, thread_history);
+    int r = negamax<HasBook>(P, -1, 0, book, book_depth, abort_flag, thread_history);
     if (shouldAbort(abort_flag)) goto flush;
     if (r <= -1) {
       max = -1;
       for (int i = -2; i >= min; i--) {
         if (shouldAbort(abort_flag)) { score = max; goto flush; }
-        if (negamax(P, i, i + 1, book, abort_flag, thread_history) > i) {
+        if (negamax<HasBook>(P, i, i + 1, book, book_depth, abort_flag, thread_history) > i) {
           min = max = i + 1;
           break;
         }
@@ -283,7 +289,7 @@ template <typename SlotType>
       }
       score = max;
     } else {
-      r = negamax(P, 0, 1, book, abort_flag, thread_history);
+      r = negamax<HasBook>(P, 0, 1, book, book_depth, abort_flag, thread_history);
       if (shouldAbort(abort_flag)) { score = 0; goto flush; }
       if (r <= 0) {
         score = 0;
@@ -291,7 +297,7 @@ template <typename SlotType>
         min = 1;
         for (int i = 1; i < max; i++) {
           if (shouldAbort(abort_flag)) { score = min; goto flush; }
-          if (negamax(P, i, i + 1, book, abort_flag, thread_history) <= i) {
+          if (negamax<HasBook>(P, i, i + 1, book, book_depth, abort_flag, thread_history) <= i) {
             min = max = i;
             break;
           }
@@ -315,20 +321,22 @@ flush:
   int bestMove = -1;
 
   // PHASE 1: Try to find a move using ONLY the Opening Book (Shortcut for Sparse Books)
-  if (book) {
-    for (int i = 0; i < Position::WIDTH; i++) {
-        int col = Position::COLUMN_ORDER[i];
-        if (P.canPlay(col)) {
-            Position P2(P);
-            P2.playCol(col);
-            if (int val = book->get(P2)) {
-                int child_score = val + Position::MIN_SCORE - 1;
-                if (-child_score == score) {
-                    bestMove = col;
-                    break;
-                }
-            }
-        }
+  if constexpr (HasBook) {
+    if (P.nbMoves() <= book_depth) {
+      for (int i = 0; i < Position::WIDTH; i++) {
+          int col = Position::COLUMN_ORDER[i];
+          if (P.canPlay(col)) {
+              Position P2(P);
+              P2.playCol(col);
+              if (int val = book->get(P2)) {
+                  int child_score = val + Position::MIN_SCORE - 1;
+                  if (-child_score == score) {
+                      bestMove = col;
+                      break;
+                  }
+              }
+          }
+      }
     }
   }
 
@@ -339,7 +347,7 @@ flush:
         if (P.canPlay(col)) {
             Position P2(P);
             P2.playCol(col);
-            if (negamax(P2, -score, -score + 1, book) == -score) {
+            if (negamax<HasBook>(P2, -score, -score + 1, book, book_depth) == -score) {
                 bestMove = col;
                 break;
             }
@@ -368,7 +376,8 @@ template <typename SlotType>
   }
 
   if (threads <= 1) {
-    return solve_single(P, weak, book);
+    if (book) return solve_single<true>(P, weak, book, book->getDepth());
+    else return solve_single<false>(P, weak, book, 0);
   }
 
   // --- True Lazy SMP ---
@@ -394,7 +403,9 @@ template <typename SlotType>
       }
       
       solverTlNodeCount = 0;
-      ::GameSolver::Connect4::SolverResult r = solve_single(P, weak, book, &done, local_history);
+      ::GameSolver::Connect4::SolverResult r;
+      if (book) r = solve_single<true>(P, weak, book, book->getDepth(), &done, local_history);
+      else r = solve_single<false>(P, weak, book, 0, &done, local_history);
       nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
       solverTlNodeCount = 0;
       
@@ -410,7 +421,9 @@ template <typename SlotType>
 
   // Main thread also searches (thread 0, no perturbation)
   solverTlNodeCount = 0;
-  ::GameSolver::Connect4::SolverResult r = solve_single(P, weak, book, &done);
+  ::GameSolver::Connect4::SolverResult r;
+  if (book) r = solve_single<true>(P, weak, book, book->getDepth(), &done);
+  else r = solve_single<false>(P, weak, book, 0, &done);
   nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
   solverTlNodeCount = 0;
   
@@ -481,7 +494,9 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
       solverTlNodeCount = 0;
 
       if (col_valid[col]) {
-        auto result = solve_single(col_positions[col], weak, book, &col_abort[col]);
+        ::GameSolver::Connect4::SolverResult result;
+        if (book) result = solve_single<true>(col_positions[col], weak, book, book->getDepth(), &col_abort[col]);
+        else result = solve_single<false>(col_positions[col], weak, book, 0, &col_abort[col]);
         scores[col] = -result.score;
 
         col_done[col].store(true, std::memory_order_release);   // mark as complete
@@ -517,7 +532,8 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
       solverTlNodeCount = 0;
       // Search the straggler's position — shares TT with the primary solver
       // col_abort[straggler_col] will be set when the primary finishes
-      solve_single(col_positions[straggler_col], weak, book, &col_abort[straggler_col], local_history);
+      if (book) solve_single<true>(col_positions[straggler_col], weak, book, book->getDepth(), &col_abort[straggler_col], local_history);
+      else solve_single<false>(col_positions[straggler_col], weak, book, 0, &col_abort[straggler_col], local_history);
       nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
       solverTlNodeCount = 0;
       // After abort, loop back to find another straggler (or exit if all done)
@@ -553,7 +569,8 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
       else {
         Position P2(P);
         P2.playCol(col);
-        scores[col] = -solve(P2, weak, 1, book).score;
+        if (book) scores[col] = -solve_single<true>(P2, weak, book, book->getDepth()).score;
+        else scores[col] = -solve_single<false>(P2, weak, book, 0).score;
       }
     }
   }
