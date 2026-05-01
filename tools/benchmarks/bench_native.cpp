@@ -24,6 +24,14 @@ using namespace GameSolver::Connect4;
 
 static int g_parity_failures = 0;
 
+template <int W, int H>
+class DummyBook : public OpeningBookBase<W, H> {
+public:
+  int get(const GenericPosition<W, H>&) const override { return 0; }
+  int getDepth() const override { return 42; }
+  typename OpeningBookBase<W, H>::EntryList dump() const override { return {}; }
+};
+
 struct BenchPos {
   std::string pos;
   int expected_score;
@@ -118,6 +126,7 @@ void run_heuristic_analyze(const std::vector<BenchPos> &positions,
   }
 
   std::string board_str = std::to_string(W) + "x" + std::to_string(H);
+  double avg_depth = positions.empty() ? 0.0 : (double)total_depth / positions.size();
   std::cout << "| " << std::left << std::setw(9) << "analyze()"
             << " | " << std::setw(9) << "Heuristic"
             << " | " << std::setw(5) << board_str << " | " << std::setw(6)
@@ -128,10 +137,79 @@ void run_heuristic_analyze(const std::vector<BenchPos> &positions,
             << " | " << std::fixed << std::setprecision(2) << std::setw(5)
             << mns << " | " << std::setw(7)
             << std::to_string((int)total_ms) + " ms" << " | " << std::setw(9)
-            << std::to_string((int)((double)total_depth / positions.size())) +
-                   " plies"
+            << std::setprecision(2) << avg_depth
             << " | " << sign_accurate_count << "/" << positions.size() << " ("
             << (int)((double)sign_accurate_count / positions.size() * 100.0)
+            << "%) |\n";
+}
+
+// --- Heuristic solve benchmark (LazySMP iterative deepening) ---
+template <int W, int H>
+void run_heuristic_solve(const std::vector<BenchPos> &positions, int threads, int timeout_ms = 30) {
+  size_t mem_size = get_cache_size();
+  auto cache = HeuristicSolver<W, H>::createCache(mem_size);
+  auto solver = HeuristicSolver<W, H>::createWithCache(cache.get());
+
+  uint64_t total_depth = 0;
+  int sign_accurate_count = 0;
+  int correct = 0;
+
+  auto start_time = std::chrono::high_resolution_clock::now();
+
+  for (const auto &bp : positions) {
+    GenericPosition<W, H> p;
+    p.play(bp.pos);
+    auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(
+                   std::chrono::steady_clock::now())
+                   .time_since_epoch()
+                   .count();
+    auto res = solver->solve_heuristic(p, 42, now + timeout_ms, true, nullptr, threads);
+    total_depth += res.depth;
+    int score = res.score;
+    if ((score > 0 && bp.expected_score > 0) ||
+        (score < 0 && bp.expected_score < 0) ||
+        (score == 0 && bp.expected_score == 0)) {
+      sign_accurate_count++;
+    }
+    if (score == bp.expected_score) {
+      correct++;
+    }
+  }
+
+  uint64_t total_nodes = solver->getNodeCount();
+  auto end_time = std::chrono::high_resolution_clock::now();
+  double total_ms =
+      std::chrono::duration<double, std::milli>(end_time - start_time).count();
+  double mns = (total_nodes / 1000000.0) / (total_ms / 1000.0);
+
+  static bool hsolve_header_printed = false;
+  if (!hsolve_header_printed) {
+    std::cout
+        << "\n| Mode         | Type      | Board | Cache  | Slot    | Thr | Pos  "
+           "| Nodes      | MN/s  | Time    | Avg Depth | Sign Acc | Exact Acc |\n";
+    std::cout << "|--------------|-----------|-------|--------|---------|-----|---"
+                 "---|------------|-------|---------|-----------|----------|------|\n";
+    hsolve_header_printed = true;
+  }
+
+  std::string board_str = std::to_string(W) + "x" + std::to_string(H);
+  double avg_depth = positions.empty() ? 0.0 : (double)total_depth / positions.size();
+  std::string mode_str = std::to_string(timeout_ms) + "ms";
+  std::cout << "| " << std::left << std::setw(12) << mode_str
+            << " | " << std::setw(9) << "Heuristic"
+            << " | " << std::setw(5) << board_str << " | " << std::setw(6)
+            << std::to_string(mem_size / (1024 * 1024)) + " MB" << " | "
+            << std::setw(7) << std::to_string(cache->getSlotWidth()) + "-bit"
+            << " | " << std::setw(3) << threads << " | " << std::setw(4)
+            << positions.size() << " | " << std::setw(10) << total_nodes
+            << " | " << std::fixed << std::setprecision(2) << std::setw(5)
+            << mns << " | " << std::setw(7)
+            << std::to_string((int)total_ms) + " ms" << " | " << std::setw(9)
+            << std::setprecision(2) << avg_depth
+            << " | " << sign_accurate_count << "/" << positions.size() << " ("
+            << (int)((double)sign_accurate_count / positions.size() * 100.0)
+            << "%) | " << correct << "/" << positions.size() << " ("
+            << (int)((double)correct / positions.size() * 100.0)
             << "%) |\n";
 }
 
@@ -198,7 +276,7 @@ void run_exact_analyze(const std::vector<BenchPos> &positions, int threads) {
 // --- Exact solve benchmark (Lazy SMP) ---
 // Each thread config gets a FRESH solver+cache to avoid TT warming artifacts
 template <int W, int H>
-void run_solve(const std::vector<BenchPos> &positions, int threads, bool weak) {
+void run_solve(const std::vector<BenchPos> &positions, int threads, bool weak, const OpeningBookBase<W, H>* book = nullptr) {
   size_t mem_size = get_cache_size();
   auto cache = Solver::createCache(mem_size);
   auto solver = Solver::createWithCache(cache.get());
@@ -210,7 +288,7 @@ void run_solve(const std::vector<BenchPos> &positions, int threads, bool weak) {
   for (const auto &bp : positions) {
     GenericPosition<W, H> p;
     p.play(bp.pos);
-    auto res = solver->solve(p, weak, threads, nullptr);
+    auto res = solver->solve(p, weak, threads, book);
 
     int expected =
         weak ? (bp.expected_score > 0 ? 1 : (bp.expected_score < 0 ? -1 : 0))
@@ -238,8 +316,8 @@ void run_solve(const std::vector<BenchPos> &positions, int threads, bool weak) {
   if (!solve_header_printed) {
     std::cout << "\n| Mode         | Type      | Board | Cache  | Slot    | "
                  "Thr | Pos  | Nodes      | MN/s  | Time     | Parity |\n";
-    std::cout << "|--------------|-----------|-------|--------|---------|-----|"
-                 "------|------------|-------|----------|--------|\n";
+    std::cout << "|--------------|-----------|-------|--------|---------|-----|-"
+                 "-----|------------|-------|----------|--------|\n";
     solve_header_printed = true;
   }
 
@@ -259,7 +337,29 @@ void run_solve(const std::vector<BenchPos> &positions, int threads, bool weak) {
             << (correct == (int)positions.size() ? " ✓" : " FAIL") << " |\n";
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  // Parse CLI flags
+  bool flag_heuristic = false, flag_exact = false;
+  bool flag_solve = false, flag_analyze = false;
+  for (int i = 1; i < argc; i++) {
+    std::string arg = argv[i];
+    if (arg == "--heuristic") flag_heuristic = true;
+    else if (arg == "--exact") flag_exact = true;
+    else if (arg == "--solve") flag_solve = true;
+    else if (arg == "--analyze") flag_analyze = true;
+    else {
+      std::cerr << "Unknown flag: " << arg << "\n";
+      std::cerr << "Usage: bench_native [--heuristic] [--exact] [--solve] [--analyze]\n";
+      return 1;
+    }
+  }
+  // No flags = run everything
+  bool run_all = !flag_heuristic && !flag_exact && !flag_solve && !flag_analyze;
+  bool do_heuristic_analyze = run_all || (flag_heuristic && !flag_solve) || (flag_analyze && !flag_exact) || (flag_heuristic && flag_analyze);
+  bool do_exact_analyze = run_all || (flag_exact && !flag_solve) || (flag_analyze && !flag_heuristic) || (flag_exact && flag_analyze);
+  bool do_heuristic_solve = run_all || (flag_heuristic && !flag_analyze) || (flag_solve && !flag_exact) || (flag_heuristic && flag_solve);
+  bool do_exact_solve = run_all || (flag_exact && !flag_analyze) || (flag_solve && !flag_heuristic) || (flag_exact && flag_solve);
+
   std::string dim_str = std::to_string(BOARD_WIDTH_MACRO) + "x" +
                         std::to_string(BOARD_HEIGHT_MACRO);
   auto pos_all = load_positions("test-data/positions_" + dim_str + ".txt");
@@ -282,66 +382,96 @@ int main() {
             << valid_positions.size() << " positions)\n";
   std::cout << "===========================================";
 
-  // --- Heuristic analyze (first 100 positions, 20ms timeout each) ---
+  // --- Heuristic analyze (first 100 positions, 30ms timeout each) ---
   std::vector<BenchPos> heuristic_subset;
   for (size_t i = 0; i < 100 && i < valid_positions.size(); i++) {
     heuristic_subset.push_back(valid_positions[i]);
   }
-  run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset,
-                                                               1);
-  run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset,
-                                                               4);
+  if (do_heuristic_analyze) {
+    run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 1);
+    run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 4);
+  }
 
-  // --- Exact analyze (aim for ~15s) ---
-  // We use length >= total_cells - 29 (ply 13 for 7x6) and cap at 500 to keep timing sane
+  // --- Exact analyze (cap at 100 positions for ~30s runtime) ---
   std::vector<BenchPos> exact_subset;
   constexpr int total_cells = BOARD_WIDTH_MACRO * BOARD_HEIGHT_MACRO;
   int min_length_analyze = total_cells - 29;
   for (const auto &bp : valid_positions) {
     if ((int)bp.pos.length() >= min_length_analyze) {
       exact_subset.push_back(bp);
-      if (exact_subset.size() >= 500) break;
+      if (exact_subset.size() >= 100) break;
     }
   }
 
-  if (exact_subset.size() >= 2) {
-    run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 1);
-    run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 4);
-  } else {
-    std::cout
-        << "\n--- Skipping exact analyze() (insufficient deep positions) ---\n";
+  if (do_exact_analyze) {
+    if (exact_subset.size() >= 2) {
+      run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 1);
+      run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 4);
+    } else {
+      std::cout
+          << "\n--- Skipping exact analyze() (insufficient deep positions) ---\n";
+    }
   }
 
-  // --- Exact solve() with Lazy SMP ---
+  // --- solve() benchmarks ---
   {
     std::vector<BenchPos> solve_hard;
 
     if (total_cells <= 42) {
-      // Small boards: use length >= 10 and cap at 500 to get a diverse ~15s benchmark
+      // Small boards: use length >= 10 and cap at 100 to get a diverse ~30s benchmark
       int min_length_solve = total_cells - 32;
       for (const auto &bp : valid_positions) {
         if ((int)bp.pos.length() >= min_length_solve) {
           solve_hard.push_back(bp);
-          if (solve_hard.size() >= 500) break;
+          if (solve_hard.size() >= 100) break;
         }
       }
     } else {
-      // Large boards: reuse tractable deep positions from exact_subset
-      for (size_t i = 0; i < 100 && i < exact_subset.size(); i++) {
-        solve_hard.push_back(exact_subset[i]);
+      // Large boards: prefer deep positions, but fall back to any valid positions
+      const auto& source = exact_subset.empty() ? valid_positions : exact_subset;
+      for (size_t i = 0; i < 100 && i < source.size(); i++) {
+        solve_hard.push_back(source[i]);
       }
     }
 
     if (!solve_hard.empty()) {
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 2, false);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, false);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 8, false);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 18, false);
+      if (do_heuristic_solve) {
+        // Quick 30ms timeout (baseline)
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, 30);
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, 30);
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 8, 30);
 
-      // Weak solve (much faster — determines win/loss/draw only)
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, true);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, true);
+        // Deep think: 250ms timeout — tests whether LazySMP helps with larger trees
+        // Use first 10 positions to keep runtime ~10s per thread count
+        std::vector<BenchPos> deep_think(solve_hard.begin(),
+          solve_hard.begin() + std::min((size_t)10, solve_hard.size()));
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(deep_think, 1, 250);
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(deep_think, 2, 250);
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(deep_think, 4, 250);
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(deep_think, 8, 250);
+
+        // Long think: 2s timeout — stress-tests LazySMP at high depth
+        std::vector<BenchPos> long_think(solve_hard.begin(),
+          solve_hard.begin() + std::min((size_t)5, solve_hard.size()));
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(long_think, 1, 2000);
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(long_think, 2, 2000);
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(long_think, 4, 2000);
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(long_think, 8, 2000);
+      }
+      if (do_exact_solve) {
+        DummyBook<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO> dummy;
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 2, false);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, false);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 8, false);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 18, false);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, &dummy);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, false, &dummy);
+
+        // Weak solve (much faster — determines win/loss/draw only)
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, true);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, true);
+      }
     } else {
       std::cout
           << "\n--- Skipping solve() benchmark (no suitable positions) ---\n";
