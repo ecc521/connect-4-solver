@@ -39,7 +39,7 @@ namespace {
  */
 template <typename SlotType>
 int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag, int32_t* thread_history) {
-  if (abort_flag && abort_flag->load(std::memory_order_relaxed)) return 0;
+  if (shouldAbort(abort_flag)) return 0;
 
   assert(alpha < beta);
   assert(!P.canWinNext());
@@ -47,13 +47,13 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   if (++solverTlNodeCount >= 16384) {
     nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
     solverTlNodeCount = 0;
-    if (this->stopSearch.load(std::memory_order_relaxed)) return 0;
+    // Check timeout, promoting to stopSearch if expired
     double current_end_time = this->endTime.load(std::memory_order_relaxed);
     if (current_end_time > 0.0) {
       double now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
       if (now >= current_end_time) { this->stopSearch.store(true, std::memory_order_relaxed); return 0; }
     }
-    if (abort_flag && abort_flag->load(std::memory_order_relaxed)) return 0;
+    if (shouldAbort(abort_flag)) return 0;
   }
 
   Position::position_t possible = P.possibleNonLosingMoves();
@@ -197,7 +197,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     P2.play(next);
     int score = -negamax(P2, -beta, -alpha, book, abort_flag, thread_history);
 
-    if (abort_flag && abort_flag->load(std::memory_order_relaxed)) return 0;
+    if (shouldAbort(abort_flag)) return 0;
 
     if(score > best_score) {
       best_score = score;
@@ -245,23 +245,23 @@ template <typename SlotType>
     min = -1;
     max = 1;
     while(min < max) {
-      if (abort_flag && abort_flag->load(std::memory_order_relaxed)) { score = min; break; }
+      if (shouldAbort(abort_flag)) { score = min; break; }
       int med = min + (max - min) / 2;
       if(med <= 0 && min / 2 < med) med = min / 2;
       else if(med >= 0 && max / 2 > med) med = max / 2;
       int r = negamax(P, med, med + 1, book, abort_flag, thread_history);
-      if (abort_flag && abort_flag->load(std::memory_order_relaxed)) { score = min; break; }
+      if (shouldAbort(abort_flag)) { score = min; break; }
       if(r <= med) max = r;
       else min = r;
     }
     score = min;
   } else {
     int r = negamax(P, -1, 0, book, abort_flag, thread_history);
-    if (abort_flag && abort_flag->load(std::memory_order_relaxed)) goto flush;
+    if (shouldAbort(abort_flag)) goto flush;
     if (r <= -1) {
       max = -1;
       for (int i = -2; i >= min; i--) {
-        if (abort_flag && abort_flag->load(std::memory_order_relaxed)) { score = max; goto flush; }
+        if (shouldAbort(abort_flag)) { score = max; goto flush; }
         if (negamax(P, i, i + 1, book, abort_flag, thread_history) > i) {
           min = max = i + 1;
           break;
@@ -274,13 +274,13 @@ template <typename SlotType>
       score = max;
     } else {
       r = negamax(P, 0, 1, book, abort_flag, thread_history);
-      if (abort_flag && abort_flag->load(std::memory_order_relaxed)) { score = 0; goto flush; }
+      if (shouldAbort(abort_flag)) { score = 0; goto flush; }
       if (r <= 0) {
         score = 0;
       } else {
         min = 1;
         for (int i = 1; i < max; i++) {
-          if (abort_flag && abort_flag->load(std::memory_order_relaxed)) { score = min; goto flush; }
+          if (shouldAbort(abort_flag)) { score = min; goto flush; }
           if (negamax(P, i, i + 1, book, abort_flag, thread_history) <= i) {
             min = max = i;
             break;
@@ -298,7 +298,7 @@ flush:
   nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
   solverTlNodeCount = 0;
 
-  if (abort_flag && abort_flag->load(std::memory_order_relaxed)) {
+  if (shouldAbort(abort_flag)) {
     return {score, -1, (int)P.nbMoves(), getNodeCount()};
   }
 
@@ -347,7 +347,16 @@ flush:
  * First thread to complete determines the result; others are aborted.
  */
 template <typename SlotType>
-::GameSolver::Connect4::SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+::GameSolver::Connect4::SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, double timeout_ms) {
+  // Reset all abort state, then configure timeout if requested
+  stopSearch.store(false, std::memory_order_relaxed);
+  if (timeout_ms > 0) {
+    auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    endTime.store(now + timeout_ms, std::memory_order_relaxed);
+  } else {
+    endTime.store(0.0, std::memory_order_relaxed);
+  }
+
   if (threads <= 1) {
     return solve_single(P, weak, book);
   }
@@ -402,11 +411,23 @@ template <typename SlotType>
 
   fut.wait();
   final_result.nodes = getNodeCount();
+  // If stopSearch was set externally (stop() or timeout), flag the result as aborted.
+  // Don't flag as aborted when it was set by normal Lazy SMP completion (done flag).
+  final_result.aborted = isAborted() && !done.load(std::memory_order_relaxed);
   return final_result;
 }
 
 template <typename SlotType>
-std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, double timeout_ms) {
+  // Reset all abort state, then configure timeout if requested
+  stopSearch.store(false, std::memory_order_relaxed);
+  if (timeout_ms > 0) {
+    auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    endTime.store(now + timeout_ms, std::memory_order_relaxed);
+  } else {
+    endTime.store(0.0, std::memory_order_relaxed);
+  }
+
   (void)threads;
   std::vector<int> scores(Position::WIDTH, -1000);
 

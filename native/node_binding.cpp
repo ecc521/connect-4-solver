@@ -620,12 +620,8 @@ std::vector<int> runAnalysisRaw(CoreSolver& solver, const std::string& pos, bool
 
     result[0] = 0;
     result[1] = P.nbMoves();
-    if (timeout_ms > 0) {
-        auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()).time_since_epoch().count();
-        solver.setTimeout(now + timeout_ms);
-    }
     const CoreBook* book = static_cast<const CoreBook*>(book_ptr);
-    std::vector<int> scores = solver.analyze(P, weak, threads, book);
+    std::vector<int> scores = solver.analyze(P, weak, threads, book, timeout_ms);
     for(int i = 0; i < W; i++) result[2 + i] = scores[i];
     result[2 + W] = solver.isAborted() ? 1 : 0;
     return result;
@@ -651,12 +647,8 @@ std::vector<int> runSolveRaw(CoreSolver& solver, const std::string& pos, bool we
 
     result[0] = 0;
     result[1] = P.nbMoves();
-    if (timeout_ms > 0) {
-        auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()).time_since_epoch().count();
-        solver.setTimeout(now + timeout_ms);
-    }
     const CoreBook* book = static_cast<const CoreBook*>(book_ptr);
-    auto res = solver.solve(P, weak, 1, book);
+    auto res = solver.solve(P, weak, 1, book, timeout_ms);
     result[2] = res.score;
     result[3] = res.bestMove;
     result[4] = res.depth;
@@ -1458,6 +1450,142 @@ Value AnalyzeHeuristic(const CallbackInfo& info) {
     
     return deferred.Promise();
 }
+
+
+Value StopSolver(const CallbackInfo& info) {
+    int w = info[0].As<Number>().Int32Value();
+    int h = info[1].As<Number>().Int32Value();
+    void* solver = UnwrapPointer<void>(info[2]);
+    bool is_heuristic = info[3].As<Boolean>().Value();
+
+    if (is_heuristic) {
+        if (w == 6 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<6, 5>*>(solver)->stop();
+        else if (w == 6 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver)->stop();
+        else if (w == 7 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<7, 6>*>(solver)->stop();
+        else if (w == 7 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver)->stop();
+        else if (w == 8 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver)->stop();
+        else if (w == 6 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<6, 7>*>(solver)->stop();
+        else if (w == 6 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<6, 8>*>(solver)->stop();
+        else if (w == 6 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<6, 9>*>(solver)->stop();
+        else if (w == 6 && h == 10) static_cast<GameSolver::Connect4::HeuristicSolver<6, 10>*>(solver)->stop();
+        else if (w == 6 && h == 11) static_cast<GameSolver::Connect4::HeuristicSolver<6, 11>*>(solver)->stop();
+        else if (w == 6 && h == 12) static_cast<GameSolver::Connect4::HeuristicSolver<6, 12>*>(solver)->stop();
+        else if (w == 7 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<7, 5>*>(solver)->stop();
+        else if (w == 7 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<7, 8>*>(solver)->stop();
+        else if (w == 7 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<7, 9>*>(solver)->stop();
+        else if (w == 7 && h == 10) static_cast<GameSolver::Connect4::HeuristicSolver<7, 10>*>(solver)->stop();
+        else if (w == 7 && h == 11) static_cast<GameSolver::Connect4::HeuristicSolver<7, 11>*>(solver)->stop();
+        else if (w == 7 && h == 12) static_cast<GameSolver::Connect4::HeuristicSolver<7, 12>*>(solver)->stop();
+        else if (w == 8 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<8, 5>*>(solver)->stop();
+        else if (w == 8 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<8, 7>*>(solver)->stop();
+        else if (w == 8 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<8, 9>*>(solver)->stop();
+        else if (w == 8 && h == 10) static_cast<GameSolver::Connect4::HeuristicSolver<8, 10>*>(solver)->stop();
+        else if (w == 8 && h == 11) static_cast<GameSolver::Connect4::HeuristicSolver<8, 11>*>(solver)->stop();
+        else if (w == 8 && h == 12) static_cast<GameSolver::Connect4::HeuristicSolver<8, 12>*>(solver)->stop();
+        else if (w == 9 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<9, 5>*>(solver)->stop();
+        else if (w == 9 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<9, 8>*>(solver)->stop();
+        else if (w == 9 && h == 10) static_cast<GameSolver::Connect4::HeuristicSolver<9, 10>*>(solver)->stop();
+        else if (w == 9 && h == 11) static_cast<GameSolver::Connect4::HeuristicSolver<9, 11>*>(solver)->stop();
+        else if (w == 9 && h == 12) static_cast<GameSolver::Connect4::HeuristicSolver<9, 12>*>(solver)->stop();
+        else if (w == 10 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<10, 5>*>(solver)->stop();
+        else if (w == 10 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<10, 6>*>(solver)->stop();
+        else if (w == 10 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<10, 8>*>(solver)->stop();
+        else if (w == 10 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<10, 9>*>(solver)->stop();
+        else if (w == 10 && h == 11) static_cast<GameSolver::Connect4::HeuristicSolver<10, 11>*>(solver)->stop();
+        else if (w == 11 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<11, 5>*>(solver)->stop();
+        else if (w == 11 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<11, 6>*>(solver)->stop();
+        else if (w == 11 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<11, 7>*>(solver)->stop();
+        else if (w == 11 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<11, 8>*>(solver)->stop();
+        else if (w == 11 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<11, 9>*>(solver)->stop();
+        else if (w == 11 && h == 10) static_cast<GameSolver::Connect4::HeuristicSolver<11, 10>*>(solver)->stop();
+        else if (w == 12 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<12, 5>*>(solver)->stop();
+        else if (w == 12 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<12, 6>*>(solver)->stop();
+        else if (w == 12 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<12, 7>*>(solver)->stop();
+        else if (w == 12 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<12, 8>*>(solver)->stop();
+        else if (w == 12 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<12, 9>*>(solver)->stop();
+        else if (w == 9 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver)->stop();
+        else if (w == 8 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver)->stop();
+        else if (w == 10 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<10, 7>*>(solver)->stop();
+        else if (w == 9 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver)->stop();
+        else if (w == 10 && h == 10) static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver)->stop();
+        else if (w == 9 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<9, 6>*>(solver)->stop();
+        else if (w == 11 && h == 4) static_cast<GameSolver::Connect4::HeuristicSolver<11, 4>*>(solver)->stop();
+    } else {
+        if (w == 6 && h == 5) static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 6 && h == 6) static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 7 && h == 6) static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 7 && h == 7) static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 8 && h == 6) static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 4 && h == 4) static_cast<C4_4x4::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 4 && h == 5) static_cast<C4_4x5::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 4 && h == 6) static_cast<C4_4x6::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 4 && h == 7) static_cast<C4_4x7::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 4 && h == 8) static_cast<C4_4x8::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 4 && h == 9) static_cast<C4_4x9::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 4 && h == 10) static_cast<C4_4x10::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 4 && h == 11) static_cast<C4_4x11::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 4 && h == 12) static_cast<C4_4x12::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 5 && h == 4) static_cast<C4_5x4::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 5 && h == 5) static_cast<C4_5x5::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 5 && h == 6) static_cast<C4_5x6::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 5 && h == 7) static_cast<C4_5x7::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 5 && h == 8) static_cast<C4_5x8::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 5 && h == 9) static_cast<C4_5x9::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 5 && h == 10) static_cast<C4_5x10::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 5 && h == 11) static_cast<C4_5x11::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 5 && h == 12) static_cast<C4_5x12::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 6 && h == 4) static_cast<C4_6x4::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 6 && h == 7) static_cast<C4_6x7::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 6 && h == 8) static_cast<C4_6x8::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 6 && h == 9) static_cast<C4_6x9::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 6 && h == 10) static_cast<C4_6x10::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 6 && h == 11) static_cast<C4_6x11::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 6 && h == 12) static_cast<C4_6x12::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 7 && h == 4) static_cast<C4_7x4::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 7 && h == 5) static_cast<C4_7x5::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 7 && h == 8) static_cast<C4_7x8::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 7 && h == 9) static_cast<C4_7x9::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 7 && h == 10) static_cast<C4_7x10::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 7 && h == 11) static_cast<C4_7x11::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 7 && h == 12) static_cast<C4_7x12::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 8 && h == 4) static_cast<C4_8x4::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 8 && h == 5) static_cast<C4_8x5::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 8 && h == 7) static_cast<C4_8x7::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 8 && h == 9) static_cast<C4_8x9::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 8 && h == 10) static_cast<C4_8x10::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 8 && h == 11) static_cast<C4_8x11::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 8 && h == 12) static_cast<C4_8x12::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 9 && h == 4) static_cast<C4_9x4::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 9 && h == 5) static_cast<C4_9x5::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 9 && h == 8) static_cast<C4_9x8::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 9 && h == 10) static_cast<C4_9x10::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 9 && h == 11) static_cast<C4_9x11::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 9 && h == 12) static_cast<C4_9x12::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 10 && h == 4) static_cast<C4_10x4::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 10 && h == 5) static_cast<C4_10x5::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 10 && h == 6) static_cast<C4_10x6::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 10 && h == 8) static_cast<C4_10x8::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 10 && h == 9) static_cast<C4_10x9::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 10 && h == 11) static_cast<C4_10x11::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 11 && h == 5) static_cast<C4_11x5::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 11 && h == 6) static_cast<C4_11x6::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 11 && h == 7) static_cast<C4_11x7::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 11 && h == 8) static_cast<C4_11x8::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 11 && h == 9) static_cast<C4_11x9::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 11 && h == 10) static_cast<C4_11x10::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 12 && h == 4) static_cast<C4_12x4::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 12 && h == 5) static_cast<C4_12x5::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 12 && h == 6) static_cast<C4_12x6::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 12 && h == 7) static_cast<C4_12x7::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 12 && h == 8) static_cast<C4_12x8::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 12 && h == 9) static_cast<C4_12x9::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 9 && h == 7) static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 9 && h == 6) static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver)->stop();
+        else if (w == 11 && h == 4) static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver)->stop();
+    }
+    return info.Env().Undefined();
+}
+
 
 Value GetNodeCount(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
@@ -2463,6 +2591,7 @@ Object Init(Env env, Object exports) {
     exports.Set(String::New(env, "_getBookScore"), Function::New(env, GetBookScore));
     exports.Set(String::New(env, "_getBookBuffer"), Function::New(env, GetBookBuffer));
     exports.Set(String::New(env, "_destroyBook"), Function::New(env, DestroyBook));
+    exports.Set(String::New(env, "_stopSolver"), Function::New(env, StopSolver));
     exports.Set(String::New(env, "_getNodeCount"), Function::New(env, GetNodeCount));
     exports.Set(String::New(env, "_generatePositions"), Function::New(env, GeneratePositions));
     

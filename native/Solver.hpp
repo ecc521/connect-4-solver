@@ -55,12 +55,11 @@ class Solver {
  public:
   static const int INVALID_MOVE = -1000;
 
-  virtual ::GameSolver::Connect4::SolverResult solve(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
-  virtual std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
+  virtual ::GameSolver::Connect4::SolverResult solve(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr, double timeout_ms = 0) = 0;
+  virtual std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr, double timeout_ms = 0) = 0;
   virtual unsigned long long getNodeCount() const = 0;
   virtual void reset() = 0;
   virtual void stop() = 0;
-  virtual void setTimeout(double end_time_ms) = 0;
   virtual bool isBusy() const = 0;
   virtual void setBusy(bool busy) = 0;
   virtual bool isAborted() const = 0;
@@ -105,8 +104,8 @@ class SolverImpl : public Solver {
     }
   }
 
-  ::GameSolver::Connect4::SolverResult solve(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
-  std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
+  ::GameSolver::Connect4::SolverResult solve(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr, double timeout_ms = 0) override;
+  std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr, double timeout_ms = 0) override;
 
  private:
   ::GameSolver::Connect4::SolverResult solve_single(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
@@ -127,8 +126,17 @@ class SolverImpl : public Solver {
   void setBusy(bool busy) override { isSearching.store(busy, std::memory_order_relaxed); }
 
   void stop() override { stopSearch.store(true, std::memory_order_relaxed); }
-  void setTimeout(double end_time_ms) override { endTime.store(end_time_ms, std::memory_order_relaxed); }
   bool isAborted() const override { return stopSearch.load(std::memory_order_relaxed); }
+
+  /**
+   * Unified abort check. Combines the solver-wide kill switch (stopSearch/endTime)
+   * with an optional per-task scoped flag (e.g. Lazy SMP thread done, per-column abort).
+   * All abort polling in negamax/solve_single should go through this single method.
+   */
+  bool shouldAbort(std::atomic<bool>* abort_flag = nullptr) const {
+    return stopSearch.load(std::memory_order_relaxed) ||
+           (abort_flag && abort_flag->load(std::memory_order_relaxed));
+  }
 
  private:
   std::unique_ptr<::GameSolver::Connect4::ThreadPool> pool;

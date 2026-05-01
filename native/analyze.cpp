@@ -32,13 +32,7 @@ int32_t* runAnalysis(CoreSolver& solver, const char* positionCharArr, bool weak,
     result[0] = 0;
     result[1] = P.nbMoves();
     const CoreBook* book = static_cast<const CoreBook*>(book_ptr);
-    if (timeout_ms > 0) {
-        double now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-        solver.setTimeout(now + timeout_ms);
-    } else {
-        solver.setTimeout(0);
-    }
-    std::vector<int> scores = solver.analyze(P, weak, threads, book);
+    std::vector<int> scores = solver.analyze(P, weak, threads, book, timeout_ms);
     for(int i = 0; i < W; i++) result[2 + i] = scores[i];
     result[2 + W] = solver.isAborted() ? 1 : 0;
   }
@@ -60,13 +54,7 @@ int32_t* runSolve(CoreSolver& solver, const char* positionCharArr, bool weak, vo
   } 
   else {
     const CoreBook* book = static_cast<const CoreBook*>(book_ptr);
-    if (timeout_ms > 0) {
-        double now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-        solver.setTimeout(now + timeout_ms);
-    } else {
-        solver.setTimeout(0);
-    }
-    auto res = solver.solve(P, weak, book);
+    auto res = solver.solve(P, weak, 1, book, timeout_ms);
     result[0] = 0;
     result[1] = P.nbMoves();
     result[2] = res.score;
