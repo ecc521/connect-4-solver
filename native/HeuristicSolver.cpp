@@ -15,6 +15,16 @@
 namespace GameSolver {
 namespace Connect4 {
 
+namespace {
+  [[gnu::cold]] bool checkTimeout(double end_time_ms) {
+    if (end_time_ms > 0.0) {
+      double now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+      if (now >= end_time_ms) return true;
+    }
+    return false;
+  }
+}
+
 template <int WIDTH, int HEIGHT>
 HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 0, position_t>> cache)
     : transTable(cache), nodeCount(0), pool(std::make_unique<ThreadPool>()) {
@@ -33,13 +43,13 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     return NNUE<WIDTH, HEIGHT>::evaluate_accumulated(acc, P);
   }
 
-  if (++localCount >= 16384) {
+  if (++localCount >= 16384) [[unlikely]] {
     this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
     localCount = 0;
     if (this->stopSearch.load(std::memory_order_relaxed)) [[unlikely]] return 40000;
-    if (end_time_ms > 0) {
-      auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-      if (now >= end_time_ms) { this->stopSearch = true; return 40000; }
+    if (checkTimeout(end_time_ms)) {
+      this->stopSearch = true;
+      return 40000;
     }
   }
 

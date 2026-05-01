@@ -32,6 +32,14 @@ namespace Connect4 {
 
 namespace {
   thread_local uint32_t solverTlNodeCount = 0;
+
+  [[gnu::cold]] bool checkTimeout(double current_end_time) {
+    if (current_end_time > 0.0) {
+      double now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+      if (now >= current_end_time) return true;
+    }
+    return false;
+  }
 }
 
 /**
@@ -44,14 +52,13 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   assert(alpha < beta);
   assert(!P.canWinNext());
 
-  if (++solverTlNodeCount >= 16384) {
+  if (++solverTlNodeCount >= 16384) [[unlikely]] {
     nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
     solverTlNodeCount = 0;
     // Check timeout, promoting to stopSearch if expired
-    double current_end_time = this->endTime.load(std::memory_order_relaxed);
-    if (current_end_time > 0.0) {
-      double now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-      if (now >= current_end_time) { this->stopSearch.store(true, std::memory_order_relaxed); return 0; }
+    if (checkTimeout(this->endTime.load(std::memory_order_relaxed))) {
+      this->stopSearch.store(true, std::memory_order_relaxed);
+      return 0;
     }
     if (shouldAbort(abort_flag)) return 0;
   }
@@ -60,7 +67,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   if(possible == 0)     // if no possible non losing move, opponent wins next move
     return -(Position::WIDTH * Position::HEIGHT - P.nbMoves()) / 2;
 
-  if(P.nbMoves() >= Position::WIDTH * Position::HEIGHT - 2) // check for draw game
+  if(P.nbMoves() >= Position::WIDTH * Position::HEIGHT - 2) [[unlikely]] // check for draw game
     return 0;
 
   if ((possible & (possible - 1)) == 0) {
