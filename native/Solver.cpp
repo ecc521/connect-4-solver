@@ -20,6 +20,7 @@
 #include "MoveSorter.hpp"
 #include <stdexcept>
 #include <iostream>
+#include <chrono>
 #include <thread>
 #include <algorithm>
 #include <future>
@@ -46,6 +47,12 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   if (++solverTlNodeCount >= 16384) {
     nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
     solverTlNodeCount = 0;
+    if (this->stopSearch.load(std::memory_order_relaxed)) return 0;
+    double current_end_time = this->endTime.load(std::memory_order_relaxed);
+    if (current_end_time > 0.0) {
+      double now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+      if (now >= current_end_time) { this->stopSearch.store(true, std::memory_order_relaxed); return 0; }
+    }
     if (abort_flag && abort_flag->load(std::memory_order_relaxed)) return 0;
   }
 
@@ -218,7 +225,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
  * and an optional private history table for search diversity.
  */
 template <typename SlotType>
-SolverResult SolverImpl<SlotType>::solve_single(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag, int32_t* thread_history) {
+::GameSolver::Connect4::SolverResult SolverImpl<SlotType>::solve_single(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag, int32_t* thread_history) {
   if(P.canWinNext()) {
     int score = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
     for (int i = 0; i < Position::WIDTH; i++) {
@@ -340,7 +347,7 @@ flush:
  * First thread to complete determines the result; others are aborted.
  */
 template <typename SlotType>
-SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
+::GameSolver::Connect4::SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book) {
   if (threads <= 1) {
     return solve_single(P, weak, book);
   }
@@ -349,7 +356,7 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, int threa
   pool->ensureCapacity(threads - 1);
   
   std::atomic<bool> done{false};
-  SolverResult final_result{0, -1, (int)P.nbMoves(), 0};
+  ::GameSolver::Connect4::SolverResult final_result{0, -1, (int)P.nbMoves(), 0};
   std::mutex result_mutex;
   
   std::atomic<int> remaining(threads - 1);
@@ -368,7 +375,7 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, int threa
       }
       
       solverTlNodeCount = 0;
-      SolverResult r = solve_single(P, weak, book, &done, local_history);
+      ::GameSolver::Connect4::SolverResult r = solve_single(P, weak, book, &done, local_history);
       nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
       solverTlNodeCount = 0;
       
@@ -384,7 +391,7 @@ SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, int threa
 
   // Main thread also searches (thread 0, no perturbation)
   solverTlNodeCount = 0;
-  SolverResult r = solve_single(P, weak, book, &done);
+  ::GameSolver::Connect4::SolverResult r = solve_single(P, weak, book, &done);
   nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
   solverTlNodeCount = 0;
   
@@ -523,7 +530,7 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
 }
 
 template <typename SlotType>
-class TypedCache : public Cache {
+class TypedCache : public ::GameSolver::Connect4::Cache {
  public:
   static constexpr int VALUE_BITS = getRequiredValueBits<Position::WIDTH, Position::HEIGHT>();
   std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
@@ -557,7 +564,7 @@ class TypedCache : public Cache {
   }
 };
 
-std::unique_ptr<Cache> Solver::createCache(size_t table_bytes) {
+std::unique_ptr<::GameSolver::Connect4::Cache> Solver::createCache(size_t table_bytes) {
   if (std::getenv("FORCE_128_BIT")) {
       return std::make_unique<TypedCache<unsigned __int128>>(table_bytes);
   }
@@ -588,7 +595,7 @@ std::unique_ptr<Cache> Solver::createCache(size_t table_bytes) {
   return std::make_unique<TypedCache<uint64_t>>(table_bytes);
 }
 
-std::unique_ptr<Solver> Solver::createWithCache(Cache* cache) {
+std::unique_ptr<Solver> Solver::createWithCache(::GameSolver::Connect4::Cache* cache) {
   if (auto c64 = dynamic_cast<TypedCache<uint64_t>*>(cache)) {
     return std::make_unique<SolverImpl<uint64_t>>(c64->transTable);
   } else if (auto c128 = dynamic_cast<TypedCache<unsigned __int128>*>(cache)) {

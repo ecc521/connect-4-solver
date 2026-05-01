@@ -1,4 +1,5 @@
-import { NodeConnect4Solver, OpeningBook } from "../src/index";
+import { NodeConnect4Solver } from "../src/node";
+import { OpeningBook } from "../src/index";
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";

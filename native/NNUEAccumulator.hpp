@@ -86,6 +86,9 @@ public:
                 sum += act * NNUE_8x8::OUTPUT_WEIGHTS[i];
             }
         }
+        sum = sum / NNUE_8x8::QA;
+        if (sum > 30000) sum = 30000;
+        if (sum < -30000) sum = -30000;
         return sum;
     }
 };
@@ -153,6 +156,9 @@ public:
                 sum += act * NNUE_7x6::OUTPUT_WEIGHTS[i];
             }
         }
+        sum = sum / NNUE_7x6::QA;
+        if (sum > 30000) sum = 30000;
+        if (sum < -30000) sum = -30000;
         return sum;
     }
 };

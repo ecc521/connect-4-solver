@@ -1,10 +1,7 @@
-import {
-  SyncWasmConnect4Solver,
-  SyncWasmNoSABConnect4Solver,
-  Connect4SolverOptions,
-  AbstractSyncSolver,
-  AnalyzeOptions,
-} from "./index";
+import { Connect4SolverOptions, AnalyzeOptions } from "./core";
+import { AbstractSyncSolver } from "./abstract-solver";
+import { SyncWasmConnect4Solver } from "./threaded";
+import { SyncWasmNoSABConnect4Solver } from "./sync";
 
 interface WorkerMessage {
   id: number;
@@ -48,6 +45,9 @@ export function setupWorkerHandler(): void {
         if (!solver) throw new Error("Solver not initialized");
         const result = await solver.solve(payload.position, payload.opts);
         self.postMessage({ id, success: true, result });
+      } else if (type === "stop") {
+        if (solver) solver.stop();
+        self.postMessage({ id, success: true });
       } else if (type === "unload") {
         if (solver) solver.release();
         self.postMessage({ id, success: true });
@@ -87,6 +87,9 @@ export function setupNoSABWorkerHandler(): void {
         if (!solver) throw new Error("Solver not initialized");
         const result = await solver.solve(payload.position, payload.opts);
         self.postMessage({ id, success: true, result });
+      } else if (type === "stop") {
+        if (solver) solver.stop();
+        self.postMessage({ id, success: true });
       } else if (type === "unload") {
         if (solver) solver.release();
         self.postMessage({ id, success: true });

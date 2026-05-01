@@ -1,5 +1,4 @@
-import { NodeConnect4Solver } from "../src/index";
-import { getNativeModule } from "../src/index";
+import { NodeConnect4Solver, getNativeModule } from "../src/node";
 import { OpeningBook } from "../src/index";
 import * as path from "path";
 import * as fs from "fs";

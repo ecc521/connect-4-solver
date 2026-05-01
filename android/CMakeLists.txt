@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10.2)
 project(connect4solver)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 add_library(connect4solver SHARED
     cpp/react-native-connect-4-solver.cpp

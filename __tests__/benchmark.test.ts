@@ -1,4 +1,4 @@
-import { NodeConnect4Solver } from "../src/index";
+import { NodeConnect4Solver } from "../src/node";
 
 describe("Heuristic vs Perfect Connectivity Benchmark", () => {
   it("heuristically evaluates complex positions without books", async () => {
@@ -21,12 +21,12 @@ describe("Heuristic vs Perfect Connectivity Benchmark", () => {
 
       // Analyze heuristics up to depth 10 - Single Threaded
       const heuristicResult = await heuristicEngine.analyze(pos, {
-        threads: 1,
+        threads: 1, maxDepth: 10,
       });
 
       // Analyze heuristics up to depth 10 - Multi Threaded
       const heuristicThreaded = await heuristicEngine.analyze(pos, {
-        threads: 4,
+        threads: 4, maxDepth: 10,
       });
 
 

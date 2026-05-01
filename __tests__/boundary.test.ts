@@ -1,4 +1,4 @@
-import { NodeConnect4Solver } from "../src/index";
+import { NodeConnect4Solver } from "../src/node";
 
 describe("128-bit / 64-bit Boundary Tests", () => {
   it("solves accurately on 9x6 (64-bit boundary)", async () => {

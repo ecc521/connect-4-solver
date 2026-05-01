@@ -105,6 +105,12 @@ export abstract class AbstractAsyncWebWorkerSolver {
     }) as Promise<PositionAnalysis>;
   }
 
+  stop(): void {
+    this.sendMessage("stop").catch(() => {
+      /* ignore */
+    });
+  }
+
   release(): void {
     this.sendMessage("unload").catch(() => {
       /* ignore */

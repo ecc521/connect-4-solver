@@ -1,225 +1,128 @@
-#include <mutex>
 /*
  * This file is part of Connect4 Game Solver <http://connect4.gamesolver.org>
  * Copyright (C) 2017-2019 Pascal Pons <contact@gamesolver.org>
  */
 
 #include "HeuristicSolver.hpp"
-#include "MoveSorter.hpp"
-#ifdef USE_PTHREADS
-#include <thread>
 #include <algorithm>
-#include <iostream>
-#endif
 #include <chrono>
-#include <stdexcept>
 #include <future>
 
-using namespace GameSolver::Connect4;
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 namespace GameSolver {
 namespace Connect4 {
 
-namespace {
-inline thread_local uint32_t heuristicTlNodeCount = 0;
-inline thread_local int smp_thread_id = 0;
+template <int WIDTH, int HEIGHT>
+HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 0, position_t>> cache)
+    : transTable(cache), nodeCount(0), pool(std::make_unique<ThreadPool>()) {
+  for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
+    history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
+  }
 }
 
 template <int WIDTH, int HEIGHT>
-int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc) {
-  assert(alpha < beta);
-  assert(!P.canWinNext());
-
-  if (++heuristicTlNodeCount >= 16384) {
-    nodeCount.fetch_add(heuristicTlNodeCount, std::memory_order_relaxed);
-    heuristicTlNodeCount = 0;
-    if (stopSearch.load(std::memory_order_relaxed)) return 0;
-    if (end_time_ms > 0) {
-#ifdef __EMSCRIPTEN__
-      if (emscripten_get_now() >= end_time_ms) {
-        stopSearch = true;
-      }
-#else
-      auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()).time_since_epoch().count();
-      if (now >= end_time_ms) {
-        stopSearch = true;
-      }
-#endif
-    }
+int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc, uint32_t& localCount) {
+  if (P.canWinNext()) {
+      return 31000 + (WIDTH * HEIGHT + 1 - (P.nbMoves() + 1)) / 2;
   }
-  if (book && P.nbMoves() < book->getDepth()) {
-    if (int val = book->get(P)) {
-      int exact_score = val + GenericPosition<WIDTH, HEIGHT>::MIN_SCORE - 1;
-      if (exact_score > 0) return 31000 + exact_score;
-      else if (exact_score < 0) return -31000 + exact_score;
-      else return 0;
-    }
-  }
-
-  typename GenericPosition<WIDTH, HEIGHT>::position_t possible = P.possibleNonLosingMoves();
-  if(possible == 0) // opponent wins next move
-    return -(31000 + (WIDTH * HEIGHT - P.nbMoves()) / 2);
-
-  if(P.nbMoves() >= WIDTH * HEIGHT - 2) // draw game
-    return 0;
 
   if (depth <= 0) {
-    if (GenericPosition<WIDTH, HEIGHT>::popcount(possible) == 1) {
-      depth = 1; // Quiescence extension: Forced move resolves tactical tension
-    } else {
-      int eval = NNUE<WIDTH, HEIGHT>::evaluate_accumulated(acc, P);
-      if (eval > 30000) eval = 30000;
-      if (eval < -30000) eval = -30000;
-      return eval;
+    return NNUE<WIDTH, HEIGHT>::evaluate_accumulated(acc, P);
+  }
+
+  if (++localCount >= 16384) {
+    this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
+    localCount = 0;
+    if (this->stopSearch.load(std::memory_order_relaxed)) return 40000;
+    if (end_time_ms > 0) {
+      auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+      if (now >= end_time_ms) { this->stopSearch = true; return 40000; }
     }
   }
 
-  if ((possible & (possible - 1)) == 0) {
-    GenericPosition<WIDTH, HEIGHT> P2(P);
-    P2.play(possible);
-    if (heuristicTlNodeCount > 0) {
-      heuristicTlNodeCount--;
-    } else {
-      nodeCount.fetch_sub(1, std::memory_order_relaxed);
-    }
-    
-    int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<position_t>(possible);
-    int next_col = bit_idx / (HEIGHT + 1);
-    int next_row = bit_idx % (HEIGHT + 1);
-    int player = P.nbMoves() % 2;
-
-    acc.addPiece(player, next_col, next_row);
-    int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, acc);
-    acc.removePiece(player, next_col, next_row);
-    return score;
+  const uint64_t key = P.key();
+  auto packed = this->transTable->getPacked(key);
+  if (packed.flags != 0 && packed.work >= depth) {
+    int16_t score = packed.value;
+    if (packed.flags == 1) return score; // Exact
+    if (packed.flags == 2 && score >= beta) return score; // Lower bound
+    if (packed.flags == 3 && score <= alpha) return score; // Upper bound
   }
 
-  int min = -(31000 + (WIDTH * HEIGHT - 2 - P.nbMoves()) / 2);
-  if(alpha < min) {
-    alpha = min;                     
-    if(alpha >= beta) return alpha;  
-  }
+  auto moves = P.possibleNonLosingMoves();
+  if (moves == 0) return -(WIDTH * HEIGHT - P.nbMoves()) / 2;
 
-  int max = 31000 + (WIDTH * HEIGHT - 1 - P.nbMoves()) / 2;
-  if(beta > max) {
-    beta = max;                     
-    if(alpha >= beta) return beta;  
-  }
+  struct Move {
+    uint64_t move;
+    int score;
+  };
+  Move sorted_moves[WIDTH];
+  int n_moves = 0;
 
-  if constexpr (HEIGHT % 2 == 0) {
-    if (P.nbMoves() % 2 == 0) {
-      int evens = P.computeEvensStrategy();
-      if (evens < 0) { // Forced Loss with calculated upper bound
-        int evens_scaled = -31000 + evens;
-        if (beta > evens_scaled) {
-          beta = evens_scaled;
-          if (alpha >= beta) return beta;
-        }
-      } else if (evens == 0) { // Forced Draw
-        if (beta > 0) {
-          beta = 0;
-          if (alpha >= beta) return beta;
-        }
-      }
-    }
-  }
-
-  const typename GenericPosition<WIDTH, HEIGHT>::position_t key = P.key();
-  auto packed = transTable->getPacked(key);
-  int tt_flags = packed.flags; 
-  int val = tt_flags ? packed.value : 0;
-  int tt_depth = packed.work;
-  int best_move_col = tt_flags ? packed.best_move : -1;
-  if (best_move_col >= WIDTH) best_move_col = -1; // WIDTH or higher means no move stored
-
-  if(tt_flags != 0 && tt_depth >= depth) {
-    if(tt_flags == 2) { // lower bound
-      if(alpha < val) {
-        alpha = val;                     
-        if(alpha >= beta) return alpha;  
-      }
-    } else if (tt_flags == 3) { // upper bound
-      if(beta > val) {
-        beta = val;                     
-        if(alpha >= beta) return beta;  
-      }
-    } else if (tt_flags == 1) { // exact
-      return val;
-    }
-  }
-
-  GenericMoveSorter<WIDTH, HEIGHT> moves;
-  for(int i = WIDTH; i--;) {
+  for (int i = 0; i < WIDTH; i++) {
     int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
-    if(typename GenericPosition<WIDTH, HEIGHT>::position_t move = possible & GenericPosition<WIDTH, HEIGHT>::column_mask(col)) {
-      int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<position_t>(move);
-      int base_score = P.moveScore(move) * 1000000 + history[bit_idx];
-      if (smp_thread_id > 0) {
-        // Perturb the score slightly to induce search divergence
-        base_score += ((smp_thread_id * 17 + bit_idx) % 7);
-      }
-      if(col == best_move_col) base_score += 32000000;
-      moves.add(move, base_score);
+    uint64_t m = moves & GenericPosition<WIDTH, HEIGHT>::column_mask(col);
+    if (m) {
+      sorted_moves[n_moves++] = {m, (int)history[col]};
     }
   }
+  std::sort(sorted_moves, sorted_moves + n_moves, [](const Move &a, const Move &b) {
+    return a.score > b.score;
+  });
 
+  int best_score = -40000;
   int best_seen_col = -1;
-  int orig_alpha = alpha;
-  int best_score = -32000;
+  uint8_t flags = 3; // Upper bound
 
-  while(typename GenericPosition<WIDTH, HEIGHT>::position_t next = moves.getNext()) {
-    if (stopSearch.load(std::memory_order_relaxed)) break;
+  for (int i = 0; i < n_moves; i++) {
     GenericPosition<WIDTH, HEIGHT> P2(P);
-    P2.play(next);  
-    
-    int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<position_t>(next);
-    int next_col = bit_idx / (HEIGHT + 1);
-    int next_row = bit_idx % (HEIGHT + 1);
-    int player = P.nbMoves() % 2;
+    P2.play(sorted_moves[i].move);
+    NNUEAccumulator<WIDTH, HEIGHT> next_acc;
+    next_acc.init(P2);
 
-    acc.addPiece(player, next_col, next_row);
-    int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, acc);
-    acc.removePiece(player, next_col, next_row);
+    int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, next_acc, localCount);
+    if (score >= 40000 || score <= -40000) return 40000;
 
-    if(score > best_score || best_seen_col == -1) {
+    if (score > best_score) {
       best_score = score;
-      best_seen_col = next_col;
+      best_seen_col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
     }
-
-    if(score > alpha) alpha = score;
-
-    if(alpha >= beta) {
-      // Decay history slightly to prevent overflow and prioritize recent cutoffs
-      if (history[bit_idx] > 100000) {
-        for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
-          history[i] /= 2;
-        }
-      }
-      history[bit_idx] += depth * depth; // standard history heuristic scale
-
-      transTable->put(key, (int16_t)(score), (uint8_t)depth, (uint8_t)next_col, 2); // 2 = lower bound
-      return score;  
+    if (score > alpha) {
+      alpha = score;
+      flags = 1; // Potentially exact
     }
-    if(score > alpha) {
-      alpha = score; 
+    if (alpha >= beta) {
+      flags = 2; // Lower bound
+      break;
     }
   }
 
-  int flags = (best_score <= orig_alpha) ? 3 : 1; // 3 = upper bound, 1 = exact
-  transTable->put(key, (int16_t)(best_score), (uint8_t)depth, (uint8_t)(best_seen_col == -1 ? WIDTH : best_seen_col), flags); 
+  this->transTable->put(key, (int16_t)(best_score), (uint8_t)depth, (uint8_t)(best_seen_col == -1 ? WIDTH : best_seen_col), flags); 
   return best_score;
 }
 
 template <int WIDTH, int HEIGHT>
 SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool /*reset_tt*/, NNUEAccumulator<WIDTH, HEIGHT>* acc, int /*threads*/) {
   if(P.canWinNext()) {
-    int score = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
+    int score = 31000 + (WIDTH * HEIGHT + 1 - (P.nbMoves() + 1)) / 2;
     for (int i = 0; i < WIDTH; i++) {
         if (P.canPlay(i) && P.isWinningMove(i)) return {score, i, (int)P.nbMoves(), getNodeCount()};
     }
     return {score, -1, (int)P.nbMoves(), getNodeCount()};
   }
   
+  if (this->book) {
+      if (int val = this->book->get(P)) {
+          int exact_score = val + GenericPosition<WIDTH, HEIGHT>::MIN_SCORE - 1;
+          int heur_score = exact_score > 0 ? 31000 + exact_score : -31000 + exact_score;
+          if (exact_score == 0) heur_score = 0;
+          return {heur_score, -1, (int)P.nbMoves(), getNodeCount(), this->stopSearch.load(std::memory_order_relaxed)};
+      }
+  }
+
   NNUEAccumulator<WIDTH, HEIGHT> local_acc;
   if (!acc) {
     local_acc.init(P);
@@ -229,126 +132,147 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
   int best_score = 0;
   int best_move = -1;
   int depth_reached = 0;
+  uint32_t localCount = 0;
+  this->stopSearch = false;
+
   for (int d = 1; d <= max_depth; d++) {
-    int current_score = negamax_heuristic(P, -32000, 32000, d, end_time_ms, *acc);
-    if (stopSearch.load(std::memory_order_relaxed) && d > 1) break;
+    int current_score = negamax_heuristic(P, -32000, 32000, d, end_time_ms, *acc, localCount);
+    if (this->stopSearch.load(std::memory_order_relaxed)) break;
     best_score = current_score;
     
-    // Extract best move from TT
-    auto packed_root = transTable->getPacked(P.key());
+    auto packed_root = this->transTable->getPacked(P.key());
     if (packed_root.flags != 0) {
         if (packed_root.best_move < WIDTH) best_move = packed_root.best_move;
     }
 
     depth_reached = d;
-    if (best_score > 32000 || best_score < -32000) {
-      break;
-    }
+    if (best_score > 32000 || best_score < -32000) break;
   }
-  nodeCount.fetch_add(heuristicTlNodeCount, std::memory_order_relaxed);
-  heuristicTlNodeCount = 0;
-  return {best_score, best_move, depth_reached, getNodeCount()};
+  this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
+  return {best_score, best_move, depth_reached, getNodeCount(), this->stopSearch.load(std::memory_order_relaxed)};
 }
 
 template <int WIDTH, int HEIGHT>
 std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads, double end_time_ms) {
   std::vector<int> scores(WIDTH, -32000);
   int final_depth_reached = 0;
-  stopSearch.store(false, std::memory_order_relaxed);
+  this->stopSearch = false;
 
   int total_valid_cols = 0;
-  for (int i = 0; i < WIDTH; i++) {
-    if (P.canPlay(i)) total_valid_cols++;
-  }
+  for (int i = 0; i < WIDTH; i++) if (P.canPlay(i)) total_valid_cols++;
   if (total_valid_cols == 0) return {scores, 0};
 
   for (int d = 1; d <= max_depth; d++) {
     std::vector<int> current_scores = scores;
+    std::atomic<int> next_col{0};
 
 #ifdef USE_PTHREADS
-    std::atomic<int> next_col{0};
     auto worker = [&]() {
+      uint32_t localCount = 0;
       while (true) {
         int i = next_col.fetch_add(1, std::memory_order_relaxed);
         if (i >= WIDTH) break;
-        if (stopSearch.load(std::memory_order_relaxed)) break;
+        if (this->stopSearch.load(std::memory_order_relaxed)) break;
 
         int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
         if (P.canPlay(col)) {
-          if(P.isWinningMove(col)) {
-            current_scores[col] = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
+          if (P.isWinningMove(col)) {
+            current_scores[col] = 31000 + (WIDTH * HEIGHT + 1 - (P.nbMoves() + 1)) / 2;
           } else {
             GenericPosition<WIDTH, HEIGHT> P2(P);
             P2.playCol(col);
-            NNUEAccumulator<WIDTH, HEIGHT> local_acc;
-            local_acc.init(P2);
-            int score = -negamax_heuristic(P2, -32000, 32000, d - 1, end_time_ms, local_acc);
-            if (stopSearch.load(std::memory_order_relaxed)) break;
-            current_scores[col] = score;
+
+            bool book_hit = false;
+            if (this->book) {
+                if (int val = this->book->get(P2)) {
+                    int exact_score = val + GenericPosition<WIDTH, HEIGHT>::MIN_SCORE - 1;
+                    int heur_score = exact_score > 0 ? 31000 + exact_score : -31000 + exact_score;
+                    if (exact_score == 0) heur_score = 0;
+                    current_scores[col] = -heur_score;
+                    book_hit = true;
+                }
+            }
+
+            if (!book_hit) {
+                NNUEAccumulator<WIDTH, HEIGHT> local_acc;
+                local_acc.init(P2);
+                int score = -negamax_heuristic(P2, -32000, 32000, d - 1, end_time_ms, local_acc, localCount);
+                if (score >= 40000 || score <= -40000) break;
+                current_scores[col] = score;
+            }
           }
         }
       }
-      nodeCount.fetch_add(heuristicTlNodeCount, std::memory_order_relaxed);
-      heuristicTlNodeCount = 0;
+      this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
     };
 
     unsigned int num_threads = std::min((unsigned int)WIDTH, (unsigned int)threads);
     if (num_threads <= 1) {
       worker();
     } else {
-      pool->ensureCapacity(num_threads - 1);
+      this->pool->ensureCapacity(num_threads - 1);
       std::atomic<int> remaining(num_threads - 1);
-      std::promise<void> prom;
-      auto fut = prom.get_future();
-      
+      std::mutex mtx;
+      std::condition_variable cv;
       for (unsigned int i = 0; i < num_threads - 1; i++) {
-        pool->enqueue([&]() {
+        this->pool->enqueue([&]() {
           worker();
-          if (remaining.fetch_sub(1) == 1) {
-            prom.set_value();
+          if (remaining.fetch_sub(1, std::memory_order_seq_cst) == 1) {
+            std::lock_guard<std::mutex> lock(mtx);
+            cv.notify_one();
           }
         });
       }
       worker();
-      
-      fut.wait();
+      std::unique_lock<std::mutex> lock(mtx);
+      cv.wait(lock, [&] { return remaining.load(std::memory_order_seq_cst) == 0; });
     }
 #else
+    uint32_t localCount = 0;
     for (int i = 0; i < WIDTH; i++) {
-      if (stopSearch.load(std::memory_order_relaxed)) break;
-      int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
-      if (P.canPlay(col)) {
-        if(P.isWinningMove(col)) {
-          current_scores[col] = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
-        } else {
-          GenericPosition<WIDTH, HEIGHT> P2(P);
-          P2.playCol(col);
-          NNUEAccumulator<WIDTH, HEIGHT> local_acc;
-          local_acc.init(P2);
-          int score = -negamax_heuristic(P2, -32000, 32000, d - 1, end_time_ms, local_acc);
-          if (stopSearch.load(std::memory_order_relaxed)) break;
-          current_scores[col] = score;
+        int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
+        if (P.canPlay(col)) {
+            if(P.isWinningMove(col)) current_scores[col] = 31000 + (WIDTH * HEIGHT + 1 - (P.nbMoves() + 1)) / 2;
+            else {
+                GenericPosition<WIDTH, HEIGHT> P2(P);
+                P2.playCol(col);
+
+                bool book_hit = false;
+                if (this->book) {
+                    if (int val = this->book->get(P2)) {
+                        int exact_score = val + GenericPosition<WIDTH, HEIGHT>::MIN_SCORE - 1;
+                        int heur_score = exact_score > 0 ? 31000 + exact_score : -31000 + exact_score;
+                        if (exact_score == 0) heur_score = 0;
+                        current_scores[col] = -heur_score;
+                        book_hit = true;
+                    }
+                }
+
+                if (!book_hit) {
+                    NNUEAccumulator<WIDTH, HEIGHT> local_acc;
+                    local_acc.init(P2);
+                    int score = -negamax_heuristic(P2, -32000, 32000, d - 1, end_time_ms, local_acc, localCount);
+                    if (score >= 40000 || score <= -40000) break;
+                    current_scores[col] = score;
+                }
+            }
         }
-      }
     }
-    nodeCount.fetch_add(heuristicTlNodeCount, std::memory_order_relaxed);
-    heuristicTlNodeCount = 0;
+    this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
 #endif
 
-    if (stopSearch.load(std::memory_order_relaxed) && d > 1) break;
+    if (this->stopSearch.load(std::memory_order_relaxed) && d > 1) break;
     scores = current_scores;
     final_depth_reached = d;
+    
+    bool all_terminal = true;
+    for (int i = 0; i < WIDTH; i++) {
+      if (P.canPlay(i) && scores[i] < 31000 && scores[i] > -31000) all_terminal = false;
+    }
+    if (all_terminal) break;
   }
 
   return {scores, final_depth_reached};
-}
-
-template <int WIDTH, int HEIGHT>
-HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 2, uint64_t>> cache)
-    : transTable(cache), book(nullptr), nodeCount(0), isSearching{false}, pool(std::make_unique<ThreadPool>()) {
-  for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
-    history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
-  }
 }
 
 } // namespace Connect4

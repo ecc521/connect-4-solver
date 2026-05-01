@@ -1,5 +1,5 @@
+import { NodeConnect4Solver } from "./node";
 import {
-  NodeConnect4Solver,
   Outcome,
   OpeningBook,
   PositionAnalysis,

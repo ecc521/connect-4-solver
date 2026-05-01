@@ -12,6 +12,14 @@
       "types": "./dist/threaded.d.ts",
       "default": "./dist/threaded.js"
     },
+    "./sync": {
+      "types": "./dist/sync.d.ts",
+      "default": "./dist/sync.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
     "./native": {
       "types": "./dist/native.d.ts",
       "default": "./dist/native.js"
@@ -37,7 +45,8 @@
     "android",
     "ios",
     "native",
-    "connect-4-solver.podspec"
+    "connect-4-solver.podspec",
+    "binding.gyp"
   ],
   "scripts": {
     "install": "node-gyp rebuild --jobs max || echo 'Native Addon compilation skipped/failed. Falling back to WASM bundle.'",

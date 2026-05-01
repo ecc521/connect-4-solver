@@ -14,11 +14,11 @@ namespace Connect4 {
 template <int W, int H>
 class NNUE {
  public:
-  static int evaluate(const GenericPosition<W, H>& P) {
-    return P.getScore();
+  static int evaluate(const GenericPosition<W, H>& /* P */) {
+    return 0;
   }
-  static int evaluate_accumulated(const NNUEAccumulator<W, H>& /* acc */, const GenericPosition<W, H>& P) {
-    return P.heuristic_evaluate();
+  static int evaluate_accumulated(const NNUEAccumulator<W, H>& /* acc */, const GenericPosition<W, H>& /* P */) {
+    return 0;
   }
 };
 
@@ -68,6 +68,9 @@ class NNUE<8, 8> {
       }
     }
 
+    sum = sum / NNUE_8x8::QA;
+    if (sum > 30000) sum = 30000;
+    if (sum < -30000) sum = -30000;
     return sum;
   }
 };
@@ -118,6 +121,9 @@ class NNUE<7, 6> {
       }
     }
 
+    sum = sum / NNUE_7x6::QA;
+    if (sum > 30000) sum = 30000;
+    if (sum < -30000) sum = -30000;
     return sum;
   }
 };

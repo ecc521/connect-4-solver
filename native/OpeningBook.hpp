@@ -204,7 +204,7 @@ class DenseBook : public OpeningBookBase<W, H> {
     typename GenericPosition<W, H>::position_t target = P.key3();
     
     // Mask the target key to match the truncated keys stored in the book
-    if (sizeof(KeyT) < sizeof(target)) {
+    if constexpr (sizeof(KeyT) < sizeof(target)) {
         target &= (typename GenericPosition<W, H>::position_t(1) << (sizeof(KeyT) * 8)) - 1;
     }
 

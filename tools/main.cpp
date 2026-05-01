@@ -84,17 +84,30 @@ int main(int argc, char** argv) {
         }
         
         Position P;
-        if(P.play(current_line) != current_line.size()) {
+        int moves_played = P.play(current_line);
+        if(moves_played < current_line.size()) {
+          // Terminal state
+          int lastCol = current_line[moves_played] - '1';
+          int score = 0;
+          if (P.isWinningMove(lastCol)) {
+              score = (Position::WIDTH * Position::HEIGHT + 1 - (moves_played + 1)) / 2;
+          }
+          std::string result = current_line;
+          if (analyze) {
+              for (int i = 0; i < Position::WIDTH; i++) result += " " + std::to_string(score);
+          } else {
+              result += " " + std::to_string(score);
+          }
           std::lock_guard<std::mutex> lock(io_mutex);
-          std::cerr << "Invalid move \"" << current_line << "\"" << std::endl;
+          std::cout << result << "\n";
         } else {
           std::string result = current_line;
           if(analyze) {
             std::vector<int> scores = local_solver->analyze(P, weak, 1, book.get());
             for(int i = 0; i < Position::WIDTH; i++) result += " " + std::to_string(scores[i]);
           } else {
-            int score = local_solver->solve(P, weak, book.get());
-            result += " " + std::to_string(score);
+            auto res = local_solver->solve(P, weak, book.get());
+            result += " " + std::to_string(res.score);
           }
           std::lock_guard<std::mutex> lock(io_mutex);
           std::cout << result << "\n";
@@ -115,8 +128,20 @@ int main(int argc, char** argv) {
     std::string line;
     for(int l = 1; std::getline(std::cin, line); l++) {
       Position P;
-      if(P.play(line) != line.size()) {
-        std::cerr << "Line " << l << ": Invalid move " << (P.nbMoves() + 1) << " \"" << line << "\"" << std::endl;
+      int moves_played = P.play(line);
+      if(moves_played < line.size()) {
+        int lastCol = line[moves_played] - '1';
+        int score = 0;
+        if (P.isWinningMove(lastCol)) {
+            score = (Position::WIDTH * Position::HEIGHT + 1 - (moves_played + 1)) / 2;
+        }
+        std::cout << line;
+        if (analyze) {
+            for (int i = 0; i < Position::WIDTH; i++) std::cout << " " << score;
+        } else {
+            std::cout << " " << score;
+        }
+        std::cout << "\n";
       } else {
         std::cout << line;
         if(analyze) {
@@ -124,8 +149,8 @@ int main(int argc, char** argv) {
           for(int i = 0; i < Position::WIDTH; i++) std::cout << " " << scores[i];
         }
         else {
-          int score = solver->solve(P, weak, book.get());
-          std::cout << " " << score;
+          auto res = solver->solve(P, weak, book.get());
+          std::cout << " " << res.score;
         }
         std::cout << "\n";
       }

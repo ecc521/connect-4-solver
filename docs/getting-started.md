@@ -12,12 +12,19 @@ npm install connect-4-solver
 
 ## Supported Environments
 
-The library exports explicit solver classes so you always know what engine architecture you are executing. All solvers implement [`BaseConnect4Solver`](/api/base-solver), ensuring consistent functionality across platforms, however there may be additional configuration options in the explicit solver classes:
+The library provides a universal factory function `createSolver()` that automatically detects your environment and dynamically loads the optimal execution engine. This ensures your application is fast and your bundle size remains small:
 
-- **`NodeConnect4Solver`**: (Node.js) Native N-API. Asynchronous.
-- **`ReactNativeConnect4Solver`**: (iOS/Android) Native JSI. Asynchronous. (Import from `"connect-4-solver/native"`).
-- **`WebWorkerWasmConnect4Solver`**: (Browser) WebWorker wrapper for WASM. Asynchronous.
-- **`SyncWasmConnect4Solver`**: Standard WASM execution. Blocks the current thread.
+- **Node.js**: Automatically loads the native C++ N-API addon.
+- **Modern Browsers**: Automatically loads the Threaded WASM module (if SAB/COOP/COEP are enabled).
+- **Legacy Browsers**: Falls back to the single-threaded WASM module.
+
+If you need explicit control over the engine architecture or are targeting specific platforms (e.g. React Native), you can bypass the factory and import explicit solver classes from their respective sub-paths:
+
+- **`NodeConnect4Solver`** (import from `"connect-4-solver/node"`)
+- **`SyncWasmConnect4Solver`** (import from `"connect-4-solver/threaded"`)
+- **`SyncWasmNoSABConnect4Solver`** (import from `"connect-4-solver/sync"`)
+- **`ReactNativeConnect4Solver`** (import from `"connect-4-solver/native"`)
+- **`WebWorkerWasmConnect4Solver`** (import from `"connect-4-solver/async"`)
 
 ## Quick Start
 
@@ -29,8 +36,8 @@ The library exports explicit solver classes so you always know what engine archi
 
 ::: code-group
 
-```typescript [Node.js]
-import { NodeConnect4Solver, OpeningBook, Outcome } from "connect-4-solver";
+```typescript [Universal Factory (Recommended)]
+import { createSolver, OpeningBook, Outcome } from "connect-4-solver";
 import fs from "fs";
 
 async function run() {
@@ -38,8 +45,8 @@ async function run() {
   const bookData = fs.readFileSync("7x6.book");
   const book = await OpeningBook.fromBuffer(bookData);
 
-  // Initialize the solver matching the book's board size
-  const solver = new NodeConnect4Solver({
+  // Automatically detects Node vs Browser and loads the correct engine
+  const solver = await createSolver({
     width: book.width,
     height: book.height,
   });
@@ -153,11 +160,8 @@ run();
 ```
 
 ```typescript [Browser (Sync)]
-import {
-  SyncWasmNoSABConnect4Solver,
-  OpeningBook,
-  Outcome,
-} from "connect-4-solver";
+import { SyncWasmNoSABConnect4Solver } from "connect-4-solver/sync";
+import { OpeningBook, Outcome } from "connect-4-solver";
 
 async function run() {
   // Fetch the binary opening book
@@ -211,6 +215,14 @@ console.log(`Nodes Searched: ${result.nodes}`);
 
 // Note: result.moveOptions will be empty [] when using solve()
 ```
+
+::: tip 💡 Weak Solving for Maximum Speed
+If you only care about the **outcome** (Win/Loss/Draw) and not finding the absolute fastest winning move, you can set `{ weak: true }`. This allows the solver to return even faster by stopping as soon as it confirms any winning path.
+
+- **Winning**: Returns `1` (instead of the exact moves-to-win score).
+- **Losing**: Returns `-1`.
+- **Draw**: Returns `0`.
+:::
 
 ## Next Steps
 

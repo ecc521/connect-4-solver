@@ -55,17 +55,20 @@ class Solver {
  public:
   static const int INVALID_MOVE = -1000;
 
-  virtual SolverResult solve(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
+  virtual ::GameSolver::Connect4::SolverResult solve(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
   virtual std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) = 0;
   virtual unsigned long long getNodeCount() const = 0;
   virtual void reset() = 0;
+  virtual void stop() = 0;
+  virtual void setTimeout(double end_time_ms) = 0;
   virtual bool isBusy() const = 0;
   virtual void setBusy(bool busy) = 0;
+  virtual bool isAborted() const = 0;
 
   virtual ~Solver() {}
 
-  static std::unique_ptr<Cache> createCache(size_t table_bytes);
-  static std::unique_ptr<Solver> createWithCache(Cache* cache);
+  static std::unique_ptr<::GameSolver::Connect4::Cache> createCache(size_t table_bytes);
+  static std::unique_ptr<Solver> createWithCache(::GameSolver::Connect4::Cache* cache);
   static std::unique_ptr<Solver> create(size_t table_bytes);
 };
 
@@ -78,6 +81,8 @@ class SolverImpl : public Solver {
   std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> transTable;
   std::atomic<unsigned long long> nodeCount;
   std::atomic<bool> isSearching{false};
+  std::atomic<bool> stopSearch{false};
+  std::atomic<double> endTime{0.0};
 
  private:
   mutable int32_t history[Position::WIDTH * (Position::HEIGHT + 1)];
@@ -87,24 +92,24 @@ class SolverImpl : public Solver {
  public:
 
   SolverImpl(size_t table_bytes) 
-    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0}, pool(std::make_unique<ThreadPool>()) {
+    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS>>(table_bytes)), nodeCount{0}, pool(std::make_unique<::GameSolver::Connect4::ThreadPool>()) {
     for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
       history[i] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[i];
     }
   }
 
   SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS>> cache)
-    : transTable(cache), nodeCount{0}, pool(std::make_unique<ThreadPool>()) {
+    : transTable(cache), nodeCount{0}, pool(std::make_unique<::GameSolver::Connect4::ThreadPool>()) {
     for (int i = 0; i < Position::WIDTH * (Position::HEIGHT + 1); i++) {
       history[i] = GenericPosition<Position::WIDTH, Position::HEIGHT>::TROMP_WEIGHTS[i];
     }
   }
 
-  SolverResult solve(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
+  ::GameSolver::Connect4::SolverResult solve(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
   std::vector<int> analyze(const Position &P, bool weak = false, int threads = 1, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book = nullptr) override;
 
  private:
-  SolverResult solve_single(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
+  ::GameSolver::Connect4::SolverResult solve_single(const Position &P, bool weak, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
 
   unsigned long long getNodeCount() const override {
     return nodeCount;
@@ -121,8 +126,12 @@ class SolverImpl : public Solver {
   bool isBusy() const override { return isSearching.load(std::memory_order_relaxed); }
   void setBusy(bool busy) override { isSearching.store(busy, std::memory_order_relaxed); }
 
+  void stop() override { stopSearch.store(true, std::memory_order_relaxed); }
+  void setTimeout(double end_time_ms) override { endTime.store(end_time_ms, std::memory_order_relaxed); }
+  bool isAborted() const override { return stopSearch.load(std::memory_order_relaxed); }
+
  private:
-  std::unique_ptr<ThreadPool> pool;
+  std::unique_ptr<::GameSolver::Connect4::ThreadPool> pool;
 };
 
 } // namespace Connect4

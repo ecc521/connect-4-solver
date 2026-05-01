@@ -25,9 +25,11 @@ namespace Connect4 {
 
 
 
+template <int WIDTH, int HEIGHT>
 class HeuristicCache : public Cache {
  public:
-  using TransTable = TranspositionTable<unsigned __int128, int16_t, 16, 7, 2, uint64_t>;
+  using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
+  using TransTable = TranspositionTable<unsigned __int128, int16_t, 16, 7, 0, position_t>;
   std::shared_ptr<TransTable> transTable;
   
   HeuristicCache(size_t table_bytes) : transTable(std::make_shared<TransTable>(table_bytes)) {}
@@ -44,11 +46,13 @@ class HeuristicSolver {
  private:
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
   
-  std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 2, uint64_t>> transTable;
+  using TransTable = TranspositionTable<unsigned __int128, int16_t, 16, 7, 0, position_t>;
+  std::shared_ptr<TransTable> transTable;
   OpeningBookBase<WIDTH, HEIGHT>* book;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
   std::atomic<bool> isSearching{false};
   std::atomic<bool> stopSearch;
+  std::atomic<double> endTime{0.0};
   std::unique_ptr<ThreadPool> pool;
 
   // Dynamic history heuristic table
@@ -57,10 +61,14 @@ class HeuristicSolver {
   /**
    * Heuristic negamax with depth limit.
    */
-  int negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc);
+  int negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc, uint32_t& localCount);
 
  public:
   static const int INVALID_MOVE = -1000000;
+
+  void stop() { stopSearch.store(true, std::memory_order_relaxed); }
+  void setTimeout(double end_time_ms) { endTime.store(end_time_ms, std::memory_order_relaxed); }
+  bool isAborted() const { return stopSearch.load(std::memory_order_relaxed); }
 
   // Returns the heuristic score of a position via iterative deepening
   SolverResult solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms = 0.0, bool reset_tt = true, NNUEAccumulator<WIDTH, HEIGHT>* acc = nullptr, int threads = 1);
@@ -91,14 +99,14 @@ class HeuristicSolver {
   bool isBusy() const { return isSearching.load(std::memory_order_relaxed); }
   void setBusy(bool busy) { isSearching.store(busy, std::memory_order_relaxed); }
 
-  HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 2, uint64_t>> cache);
+  HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 0, position_t>> cache);
 
-  static std::unique_ptr<Cache> createCache(size_t table_bytes) {
-    return std::make_unique<HeuristicCache>(table_bytes);
+  static std::unique_ptr<::GameSolver::Connect4::Cache> createCache(size_t table_bytes) {
+    return std::make_unique<HeuristicCache<WIDTH, HEIGHT>>(table_bytes);
   }
 
-  static std::unique_ptr<HeuristicSolver<WIDTH, HEIGHT>> createWithCache(Cache* cache) {
-    if (auto c = dynamic_cast<HeuristicCache*>(cache)) {
+  static std::unique_ptr<HeuristicSolver<WIDTH, HEIGHT>> createWithCache(::GameSolver::Connect4::Cache* cache) {
+    if (auto c = dynamic_cast<HeuristicCache<WIDTH, HEIGHT>*>(cache)) {
       return std::make_unique<HeuristicSolver<WIDTH, HEIGHT>>(c->transTable);
     }
     return nullptr;

@@ -9,6 +9,7 @@ struct SolverResult {
   int bestMove;
   int depth;
   unsigned long long nodes;
+  bool aborted = false;
 };
 
 }

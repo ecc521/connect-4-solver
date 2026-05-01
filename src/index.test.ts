@@ -1,4 +1,5 @@
-import { NodeConnect4Solver, Player, Outcome, OpeningBook } from "./index";
+import { NodeConnect4Solver } from "./node";
+import { Player, Outcome, OpeningBook } from "./index";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -58,9 +59,9 @@ async function runParityTest(
 
     if (
       result.evaluation?.outcome !== expectedOutcome ||
-      result.evaluation.winner !== expectedWinner ||
-      result.evaluation.movesToEnd !== expectedMoves ||
-      result.evaluation.score !== expectedRawScore
+      result.evaluation?.winner !== expectedWinner ||
+      result.evaluation?.movesToEnd !== expectedMoves ||
+      result.evaluation?.score !== expectedRawScore
     ) {
       throw new Error(
         `Mismatch at position ${pos}. Expected ${expectedOutcome}/${expectedWinner}/${expectedMoves} (score=${expectedRawScore}), got ${result.evaluation?.outcome}/${result.evaluation?.winner}/${result.evaluation?.movesToEnd} (score=${result.evaluation?.score})`,
