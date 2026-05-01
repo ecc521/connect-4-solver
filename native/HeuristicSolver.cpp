@@ -56,7 +56,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   if (moves == 0) return -(WIDTH * HEIGHT - P.nbMoves()) / 2;
 
   struct Move {
-    uint64_t move;
+    typename GenericPosition<WIDTH, HEIGHT>::position_t move;
     int score;
   };
   Move sorted_moves[WIDTH];
@@ -64,7 +64,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
 
   for (int i = 0; i < WIDTH; i++) {
     int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
-    uint64_t m = moves & GenericPosition<WIDTH, HEIGHT>::column_mask(col);
+    auto m = moves & GenericPosition<WIDTH, HEIGHT>::column_mask(col);
     if (m) {
       sorted_moves[n_moves++] = {m, (int)history[col]};
     }
@@ -80,8 +80,9 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   for (int i = 0; i < n_moves; i++) {
     GenericPosition<WIDTH, HEIGHT> P2(P);
     P2.play(sorted_moves[i].move);
-    NNUEAccumulator<WIDTH, HEIGHT> next_acc;
-    next_acc.init(P2);
+    NNUEAccumulator<WIDTH, HEIGHT> next_acc = acc;
+    unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(sorted_moves[i].move);
+    next_acc.addPiece(P.nbMoves() % 2, bit_idx / (HEIGHT + 1), bit_idx % (HEIGHT + 1));
 
     int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, next_acc, localCount);
     if (score >= 40000 || score <= -40000) return 40000;
@@ -212,20 +213,18 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
     } else {
       this->pool->ensureCapacity(num_threads - 1);
       std::atomic<int> remaining(num_threads - 1);
-      std::mutex mtx;
-      std::condition_variable cv;
+      std::promise<void> prom;
+      auto fut = prom.get_future();
       for (unsigned int i = 0; i < num_threads - 1; i++) {
         this->pool->enqueue([&]() {
           worker();
           if (remaining.fetch_sub(1, std::memory_order_seq_cst) == 1) {
-            std::lock_guard<std::mutex> lock(mtx);
-            cv.notify_one();
+            prom.set_value();
           }
         });
       }
       worker();
-      std::unique_lock<std::mutex> lock(mtx);
-      cv.wait(lock, [&] { return remaining.load(std::memory_order_seq_cst) == 0; });
+      fut.wait();
     }
 #else
     uint32_t localCount = 0;
