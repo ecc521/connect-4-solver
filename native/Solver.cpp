@@ -51,7 +51,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
 
   Position::position_t possible = P.possibleNonLosingMoves();
   if(possible == 0)     // if no possible non losing move, opponent wins next move
-    return -(Position::WIDTH * Position::HEIGHT - P.nbMoves()) / 2;
+    return -(Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
 
   if(P.nbMoves() >= Position::WIDTH * Position::HEIGHT - 2) // check for draw game
     return 0;
@@ -67,13 +67,13 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     return -negamax(P2, -beta, -alpha, book, abort_flag, thread_history);
   }
 
-  int min = -(Position::WIDTH * Position::HEIGHT - 2 - P.nbMoves()) / 2;	// lower bound of score as opponent cannot win next move
+  int min = -(Position::WIDTH * Position::HEIGHT - P.nbMoves()) / 2;	// lower bound of score as opponent cannot win next move
   if(alpha < min) {
     alpha = min;                     // there is no need to keep alpha below our max possible score.
     if(alpha >= beta) return alpha;  // prune the exploration if the [alpha;beta] window is empty.
   }
 
-  int max = (Position::WIDTH * Position::HEIGHT - 1 - P.nbMoves()) / 2;	// upper bound of score as current player cannot win next move
+  int max = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;	// upper bound of score as current player cannot win next move
   if(beta > max) {
     beta = max;                     // there is no need to keep beta above our max possible score.
     if(alpha >= beta) return beta;  // prune the exploration if the [alpha;beta] window is empty.
@@ -231,7 +231,7 @@ SolverResult SolverImpl<SlotType>::solve_single(const Position &P, bool weak, co
     if(int val = book->get(P))      return {val + Position::MIN_SCORE - 1, -1, (int)P.nbMoves(), getNodeCount()};
   }
 
-  int min = -(Position::WIDTH * Position::HEIGHT - P.nbMoves()) / 2;
+  int min = -(Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
   int max = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
   int score = 0;
   if (weak) {
@@ -413,9 +413,23 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
   bool col_valid[Position::WIDTH];
 
   for (int c = 0; c < Position::WIDTH; c++) {
-    col_done[c].store(true, std::memory_order_relaxed);   // default: done (not started)
     col_abort[c].store(false, std::memory_order_relaxed);
-    col_valid[c] = false;
+    if (P.canPlay(c)) {
+      if (P.isWinningMove(c)) {
+        scores[c] = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
+        col_done[c].store(true, std::memory_order_relaxed);
+        col_valid[c] = false;
+      } else {
+        Position P2(P);
+        P2.playCol(c);
+        col_positions[c] = P2;
+        col_valid[c] = true;
+        col_done[c].store(false, std::memory_order_relaxed); // default: false (in-progress) for valid playable columns
+      }
+    } else {
+      col_done[c].store(true, std::memory_order_relaxed); // default: true for invalid/completed
+      col_valid[c] = false;
+    }
   }
 
   std::atomic<int> next_col{0};
@@ -428,22 +442,12 @@ std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int
       int col = Position::COLUMN_ORDER[i];
       solverTlNodeCount = 0;
 
-      if (P.canPlay(col)) {
-        if (P.isWinningMove(col)) {
-          scores[col] = (Position::WIDTH * Position::HEIGHT + 1 - P.nbMoves()) / 2;
-        } else {
-          Position P2(P);
-          P2.playCol(col);
-          col_positions[col] = P2;
-          col_valid[col] = true;
-          col_done[col].store(false, std::memory_order_release);  // mark as in-progress
+      if (col_valid[col]) {
+        auto result = solve_single(col_positions[col], weak, book, &col_abort[col]);
+        scores[col] = -result.score;
 
-          auto result = solve_single(P2, weak, book, &col_abort[col]);
-          scores[col] = -result.score;
-
-          col_done[col].store(true, std::memory_order_release);   // mark as complete
-          col_abort[col].store(true, std::memory_order_release);  // abort any helpers
-        }
+        col_done[col].store(true, std::memory_order_release);   // mark as complete
+        col_abort[col].store(true, std::memory_order_release);  // abort any helpers
       }
       nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
       solverTlNodeCount = 0;

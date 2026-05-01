@@ -36,7 +36,7 @@ Computes the score for the current board state and evaluates all valid child mov
 
 > **Thread Limits:** Each Solver's thread count is internally capped at the lesser of one-per-column and platform-specific limits. While this guarantees threads never perform wasted effort, it means that some threads will exit early, resulting in sub-linear speedups with additional threads.
 
-### `solve(position: string, options?: { weak?: boolean, maxDepth?: number, timeoutMs?: number, book?: OpeningBook })`
+### `solve(position: string, options?: { weak?: boolean, threads?: number, maxDepth?: number, timeoutMs?: number, book?: OpeningBook })`
 
 Performs a **Fast Search** for the best move and score.
 
@@ -45,6 +45,7 @@ Unlike `analyze()`, which evaluates every possible column to create a heat-map, 
 **Options:**
 
 - `weak`: (Exact only) If `true`, the solver only determines if the position is a Win, Loss, or Draw, without calculating the exact number of moves to the end (default: `false`).
+- `threads`: Maximum number of worker threads allowed to search using Lazy SMP (default: `1`).
 - `maxDepth`: (Heuristic only) The maximum search depth.
 - `timeoutMs`: (Heuristic only) The search time limit.
 - `book`: An optional `OpeningBook` instance.
