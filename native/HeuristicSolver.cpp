@@ -36,7 +36,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   if (++localCount >= 16384) {
     this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
     localCount = 0;
-    if (this->stopSearch.load(std::memory_order_relaxed)) return 40000;
+    if (this->stopSearch.load(std::memory_order_relaxed)) [[unlikely]] return 40000;
     if (end_time_ms > 0) {
       auto now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
       if (now >= end_time_ms) { this->stopSearch = true; return 40000; }

@@ -39,7 +39,7 @@ namespace {
  */
 template <typename SlotType>
 int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, std::atomic<bool>* abort_flag, int32_t* thread_history) {
-  if (shouldAbort(abort_flag)) return 0;
+  if (shouldAbort(abort_flag)) [[unlikely]] return 0;
 
   assert(alpha < beta);
   assert(!P.canWinNext());
@@ -121,16 +121,12 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
 
     if(val > Position::MAX_SCORE - Position::MIN_SCORE + 1) { // we have an lower bound
       min = val + 2 * Position::MIN_SCORE - Position::MAX_SCORE - 2;
-      if(alpha < min) {
-        alpha = min;
-        if(alpha >= beta) return alpha;
-      }
+      alpha = std::max(alpha, min);
+      if(alpha >= beta) return alpha;
     } else { // we have an upper bound
       max = val + Position::MIN_SCORE - 1;
-      if(beta > max) {
-        beta = max;
-        if(alpha >= beta) return beta;
-      }
+      beta = std::min(beta, max);
+      if(alpha >= beta) return beta;
     }
   }
 
@@ -154,10 +150,8 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
             // so our_score >= -child_max. This is a lower bound for us!
             int child_max = child_val + Position::MIN_SCORE - 1;
             int our_min = -child_max;
-            if (alpha < our_min) {
-              alpha = our_min;
+              alpha = std::max(alpha, our_min);
               if (alpha >= beta) return alpha;
-            }
           }
         }
       }
@@ -219,7 +213,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
       transTable->put(key, best_score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves()), stored_move);
       return best_score;
     }
-    if(best_score > alpha) alpha = best_score;
+    alpha = std::max(alpha, best_score);
   }
 
   uint8_t work = std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves());

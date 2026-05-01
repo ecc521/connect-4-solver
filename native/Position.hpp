@@ -297,8 +297,7 @@ class GenericPosition {
 
     int safe_squares = popcount(empty_squares & ~all_threats_above);
     
-    if ((safe_squares % 2) != (moves % 2)) score += tempo_weight;
-    else score -= tempo_weight;
+    score += ((safe_squares % 2) != (moves % 2) ? tempo_weight : -tempo_weight);
     
     score += (popcount(lowest_my_threats & ~my_useless_threats) - popcount(lowest_opp_threats & ~opp_useless_threats)) * base_threat_weight;
     
