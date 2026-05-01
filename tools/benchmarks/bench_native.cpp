@@ -425,12 +425,16 @@ int main(int argc, char* argv[]) {
 
       // Strong solve
       DummyBook<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO> dummy;
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false);
+      
+      // We pass the DummyBook into the 1-thread and 8-thread tests.
+      // This is CRITICAL for Profile-Guided Optimization (PGO).
+      // C++ templates create entirely distinct functions at compile time.
+      // If we never ran a benchmark with a book, LLVM would record 0 executions
+      // for the HasBook<true> template branch and optimize it for size instead of speed!
+      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, &dummy);
       run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 2, false);
       run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, false);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 8, false);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, &dummy);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, false, &dummy);
+      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 8, false, &dummy);
     }
   } else if (do_exact_solve) {
     std::cout << "\n--- Skipping solve() benchmark (no suitable positions) ---\n";
