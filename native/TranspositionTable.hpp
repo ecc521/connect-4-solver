@@ -21,6 +21,11 @@
 
 #include <cstring>
 #include <atomic>
+#include <stdexcept>
+
+#if defined(__unix__) || defined(__APPLE__) || defined(__EMSCRIPTEN__)
+#include <cstdlib>
+#endif
 
 namespace GameSolver {
 namespace Connect4 {
@@ -86,11 +91,24 @@ class TranspositionTable {
     size_t bucket_size = sizeof(Bucket);
     num_buckets = next_prime(table_bytes / bucket_size);
     size = num_buckets * 2;
+    size_t total_bytes = num_buckets * bucket_size;
+
+#if defined(__unix__) || defined(__APPLE__) || defined(__EMSCRIPTEN__)
+    if (posix_memalign((void**)&Data, 128, total_bytes) != 0) {
+        throw std::runtime_error("posix_memalign failed for TranspositionTable");
+    }
+    std::memset(Data, 0, total_bytes);
+#else
     Data = new Bucket[num_buckets]();
+#endif
   }
 
   ~TranspositionTable() {
+#if defined(__unix__) || defined(__APPLE__) || defined(__EMSCRIPTEN__)
+    free(Data);
+#else
     delete[] Data;
+#endif
   }
 
   void reset() {
