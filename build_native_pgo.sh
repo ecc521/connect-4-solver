@@ -37,6 +37,6 @@ echo "Running optimized benchmark..."
 ./tools/benchmarks/bench_native_7x6_pgo_optimized
 
 echo "Cleaning up..."
-rm -f tools/benchmarks/bench_native_7x6_pgo default.profraw default.profdata
+rm -f tools/benchmarks/bench_native_7x6_pgo default.profraw
 
 echo "Done!"
