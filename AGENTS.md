@@ -36,6 +36,12 @@ When compiling the native C++ bindings for Node.js (especially during developmen
 npx node-gyp rebuild --jobs max
 ```
 
+To compile the native addon with Profile-Guided Optimization (PGO) and Link-Time Optimization (LTO) for maximum node-throughput, run:
+```bash
+npm run build:native:pgo
+```
+This generates the `default.profdata` profile via the C++ benchmark suite and automatically injects `-flto` and the profile data into `node-gyp`.
+
 ## Generating New Books
 
 The `TranspositionTable` cache sizes natively default to tight memory constraints optimized for WebAssembly, mobile environments, and browsers (e.g. `TABLE_SIZE=23` mapping to ~32MB, and `HEURISTIC_TABLE_SIZE=22` mapping to ~24MB).

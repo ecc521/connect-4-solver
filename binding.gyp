@@ -12,6 +12,9 @@
       "dependencies": [
         "<!(node -p \"require('node-addon-api').gyp\")"
       ],
+      "variables": {
+        "use_pgo%": "false"
+      },
       "cflags!": [ "-fno-exceptions" ],
       "cflags_cc!": [ "-fno-exceptions", "-fno-rtti" ],
       "cflags_cc": [ "-std=c++20", "-O3", "-march=native", "-DNDEBUG", "-pthread", "-frtti", "-DUSE_PTHREADS" ],
@@ -24,6 +27,16 @@
             "MACOSX_DEPLOYMENT_TARGET": "10.15",
             "OTHER_CPLUSPLUSFLAGS": ["-std=c++20", "-O3", "-march=native", "-DNDEBUG", "-pthread", "-frtti", "-DUSE_PTHREADS"]
           }
+        }],
+        ['use_pgo=="true" and OS=="mac"', {
+          "xcode_settings": {
+            "OTHER_CPLUSPLUSFLAGS": [ "-flto", "-fprofile-instr-use=default.profdata" ],
+            "OTHER_LDFLAGS": [ "-flto", "-fprofile-instr-use=default.profdata" ]
+          }
+        }],
+        ['use_pgo=="true" and OS!="mac"', {
+          "cflags_cc": [ "-flto", "-fprofile-use" ],
+          "ldflags": [ "-flto", "-fprofile-use" ]
         }]
       ]
     }
