@@ -37,9 +37,11 @@ npx node-gyp rebuild --jobs max
 ```
 
 To compile the native addon with Profile-Guided Optimization (PGO) and Link-Time Optimization (LTO) for maximum node-throughput, run:
+
 ```bash
 npm run build:native:pgo
 ```
+
 This generates the `default.profdata` profile via the C++ benchmark suite and automatically injects `-flto` and the profile data into `node-gyp`.
 
 ## Generating New Books

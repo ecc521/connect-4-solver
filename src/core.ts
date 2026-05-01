@@ -161,7 +161,12 @@ export interface SolverModule {
     timeout: number,
     bookPtr: number,
   ) => number;
-  _stopSolver: (w: number, h: number, solverPtr: number, is_heuristic: boolean) => void;
+  _stopSolver: (
+    w: number,
+    h: number,
+    solverPtr: number,
+    is_heuristic: boolean,
+  ) => void;
   _getNodeCount: (
     w: number,
     h: number,
@@ -258,7 +263,9 @@ export abstract class BaseConnect4Solver {
       timeoutMs < 0 ||
       !isFinite(timeoutMs)
     )
-      throw new Error("Invalid 'timeoutMs' parameter. Must be greater than or equal to 0.");
+      throw new Error(
+        "Invalid 'timeoutMs' parameter. Must be greater than or equal to 0.",
+      );
 
     const bookPtr = opts?.book?.ptr ?? 0;
     const isInvalid =

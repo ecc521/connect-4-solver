@@ -1,9 +1,5 @@
 import { NodeConnect4Solver } from "./node";
-import {
-  Outcome,
-  OpeningBook,
-  PositionAnalysis,
-} from "./index";
+import { Outcome, OpeningBook, PositionAnalysis } from "./index";
 import * as fs from "fs";
 import * as path from "path";
 

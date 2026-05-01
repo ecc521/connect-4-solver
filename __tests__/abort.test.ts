@@ -14,8 +14,8 @@ describe("Solver Abort/Timeout", () => {
 
   test("exact solver should abort on timeout", async () => {
     // A complex position that takes time to solve
-    const position = "444444"; 
-    
+    const position = "444444";
+
     // Set a very short timeout (1ms)
     const result = await solver.analyze(position, { timeoutMs: 1 });
 
@@ -25,14 +25,14 @@ describe("Solver Abort/Timeout", () => {
 
   test("manual stop should terminate search", async () => {
     const position = "444444";
-    
+
     const solvePromise = solver.analyze(position, { timeoutMs: 10000 });
-    
+
     // Stop immediately
     setTimeout(() => {
       solver.stop();
     }, 10);
-    
+
     const result = await solvePromise;
     expect(result.aborted).toBe(true);
     expect(result.evaluation).toBeNull();

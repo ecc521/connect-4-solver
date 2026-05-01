@@ -158,7 +158,7 @@ describe("Polymorphic Dense Book Packing", () => {
     // The heuristic solver should translate this to -31001
     // We use `solve` with a 1ms timeout. Without the book, 1ms would not find a deep loss.
     const result = await solver.solve("12", { book, timeoutMs: 1 });
-    
+
     // Heuristic bounds translate exact Loss to <= -31000
     expect(result.evaluation?.score).toBeLessThanOrEqual(-31000);
 

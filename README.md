@@ -42,12 +42,15 @@ npm install
 If you want to squeeze out every last drop of solving speed (yielding an extra ~15-20% throughput by optimizing branch prediction and instruction caching), you can build the library using Profile-Guided Optimization (PGO) and Link-Time Optimization (LTO).
 
 For the Node.js native extension:
+
 ```bash
 npm run build:native:pgo
 ```
-*Note: This will take a few minutes to run. It compiles an instrumented C++ binary, evaluates hundreds of millions of test nodes to generate an execution profile, and finally triggers `node-gyp rebuild` to inject the generated `default.profdata` profile back into the final addon with `-flto` enabled.*
+
+_Note: This will take a few minutes to run. It compiles an instrumented C++ binary, evaluates hundreds of millions of test nodes to generate an execution profile, and finally triggers `node-gyp rebuild` to inject the generated `default.profdata` profile back into the final addon with `-flto` enabled._
 
 For the WebAssembly binary:
+
 ```bash
 npm run build:wasm:pgo
 ```

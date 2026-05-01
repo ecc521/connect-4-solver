@@ -21,15 +21,15 @@ describe("Heuristic vs Perfect Connectivity Benchmark", () => {
 
       // Analyze heuristics up to depth 10 - Single Threaded
       const heuristicResult = await heuristicEngine.analyze(pos, {
-        threads: 1, maxDepth: 10,
+        threads: 1,
+        maxDepth: 10,
       });
 
       // Analyze heuristics up to depth 10 - Multi Threaded
       const heuristicThreaded = await heuristicEngine.analyze(pos, {
-        threads: 4, maxDepth: 10,
+        threads: 4,
+        maxDepth: 10,
       });
-
-
 
       // Ensure the evaluations are not null and returned valid move option structures
       expect(heuristicResult.moveOptions.length).toBe(

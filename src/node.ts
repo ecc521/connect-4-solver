@@ -54,7 +54,12 @@ export interface NativeModuleType {
     timeout: number,
     book: unknown,
   ): Promise<Int32Array>;
-  _stopSolver(w: number, h: number, solver: unknown, isHeuristic: boolean): void;
+  _stopSolver(
+    w: number,
+    h: number,
+    solver: unknown,
+    isHeuristic: boolean,
+  ): void;
   _createBook(w: number, h: number, path: string): unknown;
   _createBookFromBuffer(w: number, h: number, data: Uint8Array): unknown;
   _convertBookToDense(w: number, h: number, book: unknown): unknown;
@@ -261,12 +266,17 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         });
     });
   }
-  
+
   stop(): void {
     if (!this.initialized) return;
     const native = getNativeModule();
     if (native) {
-      native._stopSolver(this.width, this.height, this._solverPtr, this.isHeuristic);
+      native._stopSolver(
+        this.width,
+        this.height,
+        this._solverPtr,
+        this.isHeuristic,
+      );
     }
   }
 

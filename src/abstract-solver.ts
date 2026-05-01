@@ -209,11 +209,20 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       currentPosition = positionStr.slice(0, nbMoves + 1);
       const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
       const score = Math.floor((this.width * this.height - nbMoves) / 2);
-      
+
       evaluation = {
         eval: {
-          value: winner === Player.P1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY,
-          wdl: calculateWDL(winner === Player.P1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY, true, winner === Player.P1 ? Outcome.Win : Outcome.Loss),
+          value:
+            winner === Player.P1
+              ? Number.POSITIVE_INFINITY
+              : Number.NEGATIVE_INFINITY,
+          wdl: calculateWDL(
+            winner === Player.P1
+              ? Number.POSITIVE_INFINITY
+              : Number.NEGATIVE_INFINITY,
+            true,
+            winner === Player.P1 ? Outcome.Win : Outcome.Loss,
+          ),
         },
         outcome: winner === currentPlayer ? Outcome.Win : Outcome.Loss,
         winner: winner,

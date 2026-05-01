@@ -222,7 +222,7 @@ If you only care about the **outcome** (Win/Loss/Draw) and not finding the absol
 - **Winning**: Returns `1` (instead of the exact moves-to-win score).
 - **Losing**: Returns `-1`.
 - **Draw**: Returns `0`.
-:::
+  :::
 
 ## Next Steps
 

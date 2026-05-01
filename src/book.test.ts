@@ -17,7 +17,7 @@ describe("Opening Book Key Resizing", () => {
     const b1 = new native.BookBuilder(7, 6, 10);
     b1.add(BigInt(1), 0);
     const buf1 = b1.getDenseBuffer();
-    
+
     // Header (6) + Key (4) + Value (1) = 11 bytes
     expect(buf1.length).toBe(11);
 
@@ -34,7 +34,7 @@ describe("Opening Book Key Resizing", () => {
     const b3 = new native.BookBuilder(7, 6, 10);
     b3.add(BigInt("0x1234567890ABCDEF"), 0);
     const buf3 = b3.getDenseBuffer();
-    
+
     // Header (6) + Key (8) + Value (1) = 15 bytes
     expect(buf3.length).toBe(15);
   });
@@ -43,9 +43,9 @@ describe("Opening Book Key Resizing", () => {
     const builder = new native.BookBuilder(7, 6, 10);
     builder.add(BigInt(1), 1);
     builder.add(BigInt("0xFFFFFFFFFF"), 2); // 5 bytes
-    
+
     const buf = builder.getDenseBuffer();
-    // Two entries, largest is 5 bytes. 
+    // Two entries, largest is 5 bytes.
     // Header (6) + 2 * (Key (5) + Value (1)) = 6 + 12 = 18 bytes
     expect(buf.length).toBe(18);
   });
