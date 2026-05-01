@@ -436,27 +436,8 @@ int main(int argc, char* argv[]) {
 
     if (!solve_hard.empty()) {
       if (do_heuristic_solve) {
-        // Quick 30ms timeout (baseline)
-        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, 30);
-        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, 30);
-        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 8, 30);
-
-        // Deep think: 250ms timeout — tests whether LazySMP helps with larger trees
-        // Use first 10 positions to keep runtime ~10s per thread count
-        std::vector<BenchPos> deep_think(solve_hard.begin(),
-          solve_hard.begin() + std::min((size_t)10, solve_hard.size()));
-        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(deep_think, 1, 250);
-        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(deep_think, 2, 250);
-        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(deep_think, 4, 250);
-        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(deep_think, 8, 250);
-
-        // Long think: 2s timeout — stress-tests LazySMP at high depth
-        std::vector<BenchPos> long_think(solve_hard.begin(),
-          solve_hard.begin() + std::min((size_t)5, solve_hard.size()));
-        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(long_think, 1, 2000);
-        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(long_think, 2, 2000);
-        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(long_think, 4, 2000);
-        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(long_think, 8, 2000);
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 1, 30);
+        run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 4, 30);
       }
       if (do_exact_solve) {
         DummyBook<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO> dummy;
