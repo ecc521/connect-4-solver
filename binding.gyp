@@ -14,7 +14,7 @@
       ],
       "cflags!": [ "-fno-exceptions" ],
       "cflags_cc!": [ "-fno-exceptions", "-fno-rtti" ],
-      "cflags_cc": [ "-std=c++17", "-O3", "-march=native", "-DNDEBUG", "-pthread", "-frtti", "-DUSE_PTHREADS" ],
+      "cflags_cc": [ "-std=c++20", "-O3", "-march=native", "-DNDEBUG", "-pthread", "-frtti", "-DUSE_PTHREADS" ],
       "conditions": [
         ['OS=="mac"', {
           "xcode_settings": {
@@ -22,7 +22,7 @@
             "GCC_ENABLE_CPP_RTTI": "YES",
             "CLANG_CXX_LIBRARY": "libc++",
             "MACOSX_DEPLOYMENT_TARGET": "10.15",
-            "OTHER_CPLUSPLUSFLAGS": ["-std=c++17", "-O3", "-march=native", "-DNDEBUG", "-pthread", "-frtti", "-DUSE_PTHREADS"]
+            "OTHER_CPLUSPLUSFLAGS": ["-std=c++20", "-O3", "-march=native", "-DNDEBUG", "-pthread", "-frtti", "-DUSE_PTHREADS"]
           }
         }]
       ]
