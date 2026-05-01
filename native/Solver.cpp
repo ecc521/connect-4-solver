@@ -141,12 +141,11 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
       if (Position::position_t move = possible & Position::column_mask(col)) {
         Position child(P);
         child.play(move);
-        bool dummy = false;
         Position::position_t child_key;
         if (Position::WIDTH * Position::HEIGHT - child.nbMoves() <= TT_PROBE_DEPTH) {
           child_key = child.key();
         } else {
-          child_key = child.symmetric_key(dummy);
+          child_key = child.symmetric_key();
         }
         if (auto child_packed = transTable->getPacked(child_key); child_packed.value) {
           uint8_t child_val = child_packed.value;
@@ -183,6 +182,16 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
         score += thread_history[col * (Position::HEIGHT + 1)] * 100;
       }
       moves.add(move, score);
+      
+      Position child(P);
+      child.play(move);
+      Position::position_t child_key;
+      if (Position::WIDTH * Position::HEIGHT - child.nbMoves() <= TT_PROBE_DEPTH) {
+        child_key = child.key();
+      } else {
+        child_key = child.symmetric_key();
+      }
+      transTable->prefetch(child_key);
     }
   }
 

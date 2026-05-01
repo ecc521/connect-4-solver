@@ -163,6 +163,12 @@ class TranspositionTable {
     return size;
   }
 
+  void prefetch(KeyType key) const {
+#if defined(__GNUC__) || defined(__clang__)
+    __builtin_prefetch(&Data[index(key)]);
+#endif
+  }
+
   struct PackedResult {
     uint8_t best_move;
     uint8_t work;

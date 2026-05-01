@@ -200,6 +200,11 @@ class GenericPosition {
       }
   }
 
+  position_t symmetric_key() const {
+      bool dummy;
+      return symmetric_key(dummy);
+  }
+
   position_t key3(bool &is_reverse) const {
     position_t key_forward = 0;
     for(int i = 0; i < WIDTH; i++) partialKey3(key_forward, i);
