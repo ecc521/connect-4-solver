@@ -145,7 +145,7 @@ class EliasFanoBook : public OpeningBookBase<W, H> {
     }
 
   int get(const GenericPosition<W, H> &P) const override {
-    if (num_entries == 0) return 0;
+    if (num_entries == 0 || P.nbMoves() > depth) return 0;
     uint64_t x = P.key3();
     
     uint64_t low = 0;
@@ -199,7 +199,7 @@ class DenseBook : public OpeningBookBase<W, H> {
   DenseBook() : depth(-1) {}
   
   int get(const GenericPosition<W, H> &P) const override {
-    if(keys.empty()) return 0;
+    if(keys.empty() || P.nbMoves() > depth) return 0;
     
     typename GenericPosition<W, H>::position_t target = P.key3();
     
