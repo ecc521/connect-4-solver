@@ -67,6 +67,10 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     auto m = moves & GenericPosition<WIDTH, HEIGHT>::column_mask(col);
     if (m) {
       sorted_moves[n_moves++] = {m, (int)history[col]};
+
+      GenericPosition<WIDTH, HEIGHT> child(P);
+      child.play(m);
+      this->transTable->prefetch(child.key());
     }
   }
   std::sort(sorted_moves, sorted_moves + n_moves, [](const Move &a, const Move &b) {
