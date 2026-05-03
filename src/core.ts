@@ -211,9 +211,9 @@ export abstract class BaseConnect4Solver {
       if (widthOrOpts.height !== undefined) height = widthOrOpts.height;
     }
 
-    if (width < 4 || width > 12 || height < 4 || height > 12) {
+    if (width < 4 || width > 13 || height < 4 || height > 13) {
       throw new Error(
-        `Board size ${width}x${height} is outside the supported range (4x4 to 12x12).`,
+        `Board size ${width}x${height} is outside the supported range (4x4 to 13x13).`,
       );
     }
 
