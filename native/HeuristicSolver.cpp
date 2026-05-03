@@ -53,7 +53,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     }
   }
 
-  const uint64_t key = P.key();
+  const uint64_t key = (uint64_t)P.key();
   auto packed = this->transTable->getPacked(key);
   if (packed.flags != 0 && packed.work >= depth) {
     int16_t score = packed.value;
@@ -120,7 +120,15 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
 }
 
 template <int WIDTH, int HEIGHT>
-SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool /*reset_tt*/, NNUEAccumulator<WIDTH, HEIGHT>* acc, int /*threads*/) {
+SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool /*reset_tt*/, NNUEAccumulator<WIDTH, HEIGHT>* acc, int threads) {
+  if (this->isSearching.exchange(true, std::memory_order_acquire)) {
+    throw std::runtime_error("Solver is busy: concurrent execution on the same instance is strictly prohibited.");
+  }
+  struct LockGuard {
+    std::atomic<bool>& flag;
+    ~LockGuard() { flag.store(false, std::memory_order_release); }
+  } guard{this->isSearching};
+
   if(P.canWinNext()) {
     int score = 31000 + (WIDTH * HEIGHT + 1 - (P.nbMoves() + 1)) / 2;
     for (int i = 0; i < WIDTH; i++) {
@@ -138,37 +146,89 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
       }
   }
 
-  NNUEAccumulator<WIDTH, HEIGHT> local_acc;
-  if (!acc) {
-    local_acc.init(P);
-    acc = &local_acc;
-  }
-
-  int best_score = 0;
-  int best_move = -1;
-  int depth_reached = 0;
-  uint32_t localCount = 0;
   this->stopSearch = false;
 
-  for (int d = 1; d <= max_depth; d++) {
-    int current_score = negamax_heuristic(P, -32000, 32000, d, end_time_ms, *acc, localCount);
-    if (this->stopSearch.load(std::memory_order_relaxed)) break;
-    best_score = current_score;
+  auto solve_loop = [&](NNUEAccumulator<WIDTH, HEIGHT>* thread_acc, std::atomic<bool>* abort_flag = nullptr) -> SolverResult {
+    int best_score = 0;
+    int best_move = -1;
+    int depth_reached = 0;
+    uint32_t localCount = 0;
     
-    auto packed_root = this->transTable->getPacked(P.key());
-    if (packed_root.flags != 0) {
-        if (packed_root.best_move < WIDTH) best_move = packed_root.best_move;
+    NNUEAccumulator<WIDTH, HEIGHT> local_acc;
+    if (!thread_acc) {
+        local_acc.init(P);
+        thread_acc = &local_acc;
     }
 
-    depth_reached = d;
-    if (best_score > 32000 || best_score < -32000) break;
+    for (int d = 1; d <= max_depth; d++) {
+      int current_score = negamax_heuristic(P, -32000, 32000, d, end_time_ms, *thread_acc, localCount);
+      
+      if (this->stopSearch.load(std::memory_order_relaxed) || (abort_flag && abort_flag->load(std::memory_order_relaxed))) break;
+      
+      best_score = current_score;
+      auto packed_root = this->transTable->getPacked(P.key());
+      if (packed_root.flags != 0) {
+          if (packed_root.best_move < WIDTH) best_move = packed_root.best_move;
+      }
+      depth_reached = d;
+      if (best_score > 32000 || best_score < -32000) break;
+    }
+    this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
+    bool aborted = this->stopSearch.load(std::memory_order_relaxed) || (abort_flag && abort_flag->load(std::memory_order_relaxed));
+    return {best_score, best_move, depth_reached, getNodeCount(), aborted};
+  };
+
+  if (threads <= 1) {
+      return solve_loop(acc);
   }
-  this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
-  return {best_score, best_move, depth_reached, getNodeCount(), this->stopSearch.load(std::memory_order_relaxed)};
+
+  // --- Lazy SMP for Heuristic ---
+  this->pool->ensureCapacity(threads - 1);
+  std::atomic<bool> done{false};
+  SolverResult final_result{0, -1, (int)P.nbMoves(), 0};
+  std::mutex result_mutex;
+  std::atomic<int> remaining(threads - 1);
+  std::promise<void> prom;
+  auto fut = prom.get_future();
+
+  for (int t = 1; t < threads; t++) {
+    this->pool->enqueue([&]() {
+      // Each thread gets its own NNUE accumulator if needed
+      NNUEAccumulator<WIDTH, HEIGHT> thread_acc;
+      thread_acc.init(P);
+      
+      SolverResult r = solve_loop(&thread_acc, &done);
+      
+      if (!done.exchange(true)) {
+        std::lock_guard<std::mutex> lock(result_mutex);
+        final_result = r;
+      }
+      if (remaining.fetch_sub(1) == 1) {
+        prom.set_value();
+      }
+    });
+  }
+
+  SolverResult r = solve_loop(acc, &done);
+  if (!done.exchange(true)) {
+    std::lock_guard<std::mutex> lock(result_mutex);
+    final_result = r;
+  }
+
+  fut.wait();
+  final_result.nodes = getNodeCount();
+  return final_result;
 }
 
 template <int WIDTH, int HEIGHT>
 std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads, double end_time_ms) {
+  if (this->isSearching.exchange(true, std::memory_order_acquire)) {
+    throw std::runtime_error("Solver is busy: concurrent execution on the same instance is strictly prohibited.");
+  }
+  struct LockGuard {
+    std::atomic<bool>& flag;
+    ~LockGuard() { flag.store(false, std::memory_order_release); }
+  } guard{this->isSearching};
   std::vector<int> scores(WIDTH, -32000);
   int final_depth_reached = 0;
   this->stopSearch = false;

@@ -76,12 +76,106 @@ namespace Connect4 {
  * non-ambigous representation of the position.
  */
 
+#if defined(__EMSCRIPTEN__)
+struct wasm_uint128_t {
+    uint64_t low;
+    uint64_t high;
+
+    constexpr wasm_uint128_t() : low(0), high(0) {}
+    template <typename T, typename std::enable_if<std::is_integral<T>::value && sizeof(T) <= 8, int>::type = 0>
+    constexpr wasm_uint128_t(T l) : low(l), high(0) {}
+    constexpr wasm_uint128_t(uint64_t l, uint64_t h) : low(l), high(h) {}
+    explicit constexpr wasm_uint128_t(unsigned __int128 v) : low((uint64_t)v), high((uint64_t)(v >> 64)) {}
+
+    explicit constexpr operator uint64_t() const { return low; }
+    explicit constexpr operator unsigned __int128() const { return ((unsigned __int128)high << 64) | low; }
+    
+    template<typename T, typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+    explicit constexpr operator T() const { return static_cast<T>(low); }
+
+    explicit constexpr operator bool() const { return low || high; }
+
+    constexpr wasm_uint128_t operator&(const wasm_uint128_t& o) const { return {low & o.low, high & o.high}; }
+    constexpr wasm_uint128_t operator|(const wasm_uint128_t& o) const { return {low | o.low, high | o.high}; }
+    constexpr wasm_uint128_t operator^(const wasm_uint128_t& o) const { return {low ^ o.low, high ^ o.high}; }
+
+    constexpr uint64_t operator%(uint64_t rhs) const { 
+        if (high == 0) return low % rhs;
+        // In this solver we only mod by primes or bucket sizes that fit in 64-bit,
+        // and usually we only care about the lower 64 bits for transposition keys.
+        // But for correctness if high != 0, since we avoid compiler-rt __int128, 
+        // we'll just fall back to it for %.
+        return (uint64_t)(((unsigned __int128)*this) % rhs);
+    }
+    constexpr wasm_uint128_t operator~() const { return {~low, ~high}; }
+
+    constexpr wasm_uint128_t& operator&=(const wasm_uint128_t& o) { low &= o.low; high &= o.high; return *this; }
+    constexpr wasm_uint128_t& operator|=(const wasm_uint128_t& o) { low |= o.low; high |= o.high; return *this; }
+    constexpr wasm_uint128_t& operator^=(const wasm_uint128_t& o) { low ^= o.low; high ^= o.high; return *this; }
+
+    constexpr wasm_uint128_t operator<<(int shift) const {
+        if (shift == 0) return *this;
+        if (shift < 64) return {low << shift, (high << shift) | (low >> (64 - shift))};
+        return {0, low << (shift - 64)};
+    }
+    constexpr wasm_uint128_t operator>>(int shift) const {
+        if (shift == 0) return *this;
+        if (shift < 64) return {(low >> shift) | (high << (64 - shift)), high >> shift};
+        return {high >> (shift - 64), 0};
+    }
+    constexpr wasm_uint128_t& operator<<=(int shift) { *this = *this << shift; return *this; }
+    constexpr wasm_uint128_t& operator>>=(int shift) { *this = *this >> shift; return *this; }
+
+    constexpr wasm_uint128_t operator+(const wasm_uint128_t& o) const {
+        uint64_t l = low + o.low;
+        return {l, high + o.high + (l < low)};
+    }
+    constexpr wasm_uint128_t operator-(const wasm_uint128_t& o) const {
+        uint64_t l = low - o.low;
+        return {l, high - o.high - (low < o.low)};
+    }
+    constexpr wasm_uint128_t operator+(uint64_t v) const { return *this + wasm_uint128_t(v); }
+    constexpr wasm_uint128_t operator-(uint64_t v) const { return *this - wasm_uint128_t(v); }
+
+    constexpr wasm_uint128_t& operator+=(const wasm_uint128_t& o) { *this = *this + o; return *this; }
+    constexpr wasm_uint128_t& operator-=(const wasm_uint128_t& o) { *this = *this - o; return *this; }
+
+    constexpr wasm_uint128_t operator*(uint64_t v) const {
+        // Fast multiply for small constants like 3
+        if (v == 3) {
+            return *this + (*this << 1);
+        }
+        return wasm_uint128_t( (unsigned __int128)(*this) * v );
+    }
+    
+    constexpr wasm_uint128_t operator*(const wasm_uint128_t& o) const {
+        return wasm_uint128_t( (unsigned __int128)(*this) * (unsigned __int128)(o) );
+    }
+    constexpr wasm_uint128_t& operator*=(uint64_t v) { *this = *this * v; return *this; }
+
+    constexpr wasm_uint128_t operator/(uint64_t v) const {
+        return wasm_uint128_t( (unsigned __int128)(*this) / v );
+    }
+
+    constexpr bool operator==(const wasm_uint128_t& o) const { return low == o.low && high == o.high; }
+    constexpr bool operator!=(const wasm_uint128_t& o) const { return !(*this == o); }
+    constexpr bool operator<(const wasm_uint128_t& o) const { return high < o.high || (high == o.high && low < o.low); }
+    constexpr bool operator<=(const wasm_uint128_t& o) const { return high < o.high || (high == o.high && low <= o.low); }
+    constexpr bool operator>(const wasm_uint128_t& o) const { return !(*this <= o); }
+    constexpr bool operator>=(const wasm_uint128_t& o) const { return !(*this < o); }
+};
+#endif
+
 template <int W, int H>
 class GenericPosition {
  public:
 
   // Board size is 64bits or 128 bits depending on W and H
+#if defined(__EMSCRIPTEN__)
+  using position_t = typename std::conditional < W * (H + 1) <= 64, uint64_t, wasm_uint128_t>::type;
+#else
   using position_t = typename std::conditional < W * (H + 1) <= 64, uint64_t, unsigned __int128>::type;
+#endif
 
   static constexpr int WIDTH = W;
   static constexpr int HEIGHT = H;
@@ -161,7 +255,7 @@ class GenericPosition {
   }
 
   bool canWinNext() const {
-    return winning_position() & possible();
+    return (bool)(winning_position() & possible());
   }
 
   int nbMoves() const {
@@ -319,7 +413,7 @@ class GenericPosition {
   }
 
   bool isWinningMove(int col) const {
-    return winning_position() & possible() & column_mask(col);
+    return (bool)(winning_position() & possible() & column_mask(col));
   }
 
   static GenericPosition fromKey(position_t key) {
@@ -460,7 +554,7 @@ class GenericPosition {
     if (moves % 2 != 0) return 1000;
     position_t color0 = current_position;
     position_t color1 = current_position ^ mask;
-    position_t xe = color1 | (ALTX & ~(2 * color0 + color1 + bottom_mask));
+    position_t xe = color1 | (ALTX & ~(color0 * 2 + color1 + bottom_mask));
     position_t oe = board_mask - xe;
     if (haswond(oe, 1)) return 1000;
     position_t xeh = haswond(xe, HEIGHT + 1);

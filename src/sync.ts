@@ -78,7 +78,9 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
   ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
     const mod = getNoSABModule();
-    const resArr = this.executeWasmSolve(mod, positionStr, opts);
+    // Force 1 thread since it's NoSAB
+    const finalOpts = { ...opts, threads: 1 };
+    const resArr = this.executeWasmSolve(mod, positionStr, finalOpts);
     return Promise.resolve(this.parseSolveResArr(resArr, positionStr));
   }
 

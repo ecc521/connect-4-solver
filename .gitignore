@@ -12,21 +12,22 @@ native/c4solver
 native/generator
 native/.depend
 
-# Tools binaries and large log files
+# Tools binaries and generated files
 tools/pos*.txt
 tools/scored*.txt
 tools/c4solver*
 tools/bench_*
+tools/verify_book
+tools/generator_*
+tools/pack_dense_book
+tools/.depend
 !tools/benchmarks/
 tools/benchmarks/bench_native*
 tools/benchmarks/gen*
 !tools/benchmarks/*.ts
 !tools/benchmarks/*.cpp
-tools/test_*
-tools/verify_book
-tools/generator_*
-tools/pack_dense_book
-tools/.depend
+!tools/benchmarks/*.sh
+
 native_old/
 
 # Library Native Android Builds
@@ -50,3 +51,14 @@ data/
 # VitePress Generated
 docs/.vitepress/dist
 docs/.vitepress/cache
+
+# PGO artifacts
+*.profraw
+*.profdata
+bench_native_*_pgo
+bench_native_*_pgo_optimized
+
+# Stale scratch files (should not exist)
+patch*.js
+test-ptrs.*
+venv/

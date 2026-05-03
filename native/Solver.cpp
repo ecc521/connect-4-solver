@@ -122,7 +122,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   }
   uint8_t table_move = Position::WIDTH;
 
-  if(auto packed = transTable->getPacked(key); packed.value) {
+  if(auto packed = transTable->getPacked((SlotType)key); packed.value) {
     uint8_t val = packed.value;
     table_move = packed.best_move;
     if (table_move < Position::WIDTH && is_reverse) table_move = Position::WIDTH - 1 - table_move;
@@ -151,7 +151,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
         } else {
           child_key = child.symmetric_key();
         }
-        if (auto child_packed = transTable->getPacked(child_key); child_packed.value) {
+        if (auto child_packed = transTable->getPacked((SlotType)child_key); child_packed.value) {
           uint8_t child_val = child_packed.value;
           if (child_val <= Position::MAX_SCORE - Position::MIN_SCORE + 1) {
             // child upper bound means child_score <= child_max
@@ -195,7 +195,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
       } else {
         child_key = child.symmetric_key();
       }
-      transTable->prefetch(child_key);
+      transTable->prefetch((SlotType)child_key);
     }
   }
 
@@ -220,7 +220,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
     if(best_score >= beta) {
       uint8_t stored_move = best_move;
       if (stored_move < Position::WIDTH && is_reverse) stored_move = Position::WIDTH - 1 - stored_move;
-      transTable->put(key, best_score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves()), stored_move);
+      transTable->put((SlotType)key, best_score + Position::MAX_SCORE - 2 * Position::MIN_SCORE + 2, std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves()), stored_move);
       return best_score;
     }
     alpha = std::max(alpha, best_score);
@@ -229,7 +229,7 @@ int SolverImpl<SlotType>::negamax(const Position &P, int alpha, int beta, const 
   uint8_t work = std::min(31, Position::WIDTH * Position::HEIGHT - P.nbMoves());
   uint8_t stored_move = best_move;
   if (stored_move < Position::WIDTH && is_reverse) stored_move = Position::WIDTH - 1 - stored_move;
-  transTable->put(key, best_score - Position::MIN_SCORE + 1, work, stored_move);
+  transTable->put((SlotType)key, best_score - Position::MIN_SCORE + 1, work, stored_move);
   return best_score;
 }
 
@@ -315,7 +315,7 @@ flush:
   solverTlNodeCount = 0;
 
   if (shouldAbort(abort_flag)) {
-    return {score, -1, (int)P.nbMoves(), getNodeCount()};
+    return {score, -1, (int)P.nbMoves(), getNodeCount(), true};
   }
 
   int bestMove = -1;
@@ -366,6 +366,14 @@ flush:
  */
 template <typename SlotType>
 ::GameSolver::Connect4::SolverResult SolverImpl<SlotType>::solve(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, double timeout_ms) {
+  if (isSearching.exchange(true, std::memory_order_acquire)) {
+    throw std::runtime_error("Solver is busy: concurrent execution on the same instance is strictly prohibited.");
+  }
+  struct LockGuard {
+    std::atomic<bool>& flag;
+    ~LockGuard() { flag.store(false, std::memory_order_release); }
+  } guard{isSearching};
+
   // Reset all abort state, then configure timeout if requested
   stopSearch.store(false, std::memory_order_relaxed);
   if (timeout_ms > 0) {
@@ -442,6 +450,14 @@ template <typename SlotType>
 
 template <typename SlotType>
 std::vector<int> SolverImpl<SlotType>::analyze(const Position &P, bool weak, int threads, const OpeningBookBase<Position::WIDTH, Position::HEIGHT>* book, double timeout_ms) {
+  if (isSearching.exchange(true, std::memory_order_acquire)) {
+    throw std::runtime_error("Solver is busy: concurrent execution on the same instance is strictly prohibited.");
+  }
+  struct LockGuard {
+    std::atomic<bool>& flag;
+    ~LockGuard() { flag.store(false, std::memory_order_release); }
+  } guard{isSearching};
+
   // Reset all abort state, then configure timeout if requested
   stopSearch.store(false, std::memory_order_relaxed);
   if (timeout_ms > 0) {

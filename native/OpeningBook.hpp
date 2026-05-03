@@ -146,7 +146,7 @@ class EliasFanoBook : public OpeningBookBase<W, H> {
 
   int get(const GenericPosition<W, H> &P) const override {
     if (num_entries == 0 || P.nbMoves() > depth) return 0;
-    uint64_t x = P.key3();
+    uint64_t x = (uint64_t)P.key3();
     
     uint64_t low = 0;
     uint64_t high = num_entries;

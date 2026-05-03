@@ -140,7 +140,6 @@ export interface SolverModule {
     threads: number,
     max_depth: number,
     timeout: number,
-    bookPtr: number,
   ) => number;
   _solveExact: (
     w: number,
@@ -158,6 +157,7 @@ export interface SolverModule {
     solverPtr: number,
     posPtr: number,
     depth: number,
+    threads: number,
     timeout: number,
     bookPtr: number,
   ) => number;

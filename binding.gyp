@@ -30,8 +30,8 @@
         }],
         ['use_pgo=="true" and OS=="mac"', {
           "xcode_settings": {
-            "OTHER_CPLUSPLUSFLAGS": [ "-flto", "-fprofile-instr-use=default.profdata" ],
-            "OTHER_LDFLAGS": [ "-flto", "-fprofile-instr-use=default.profdata" ]
+            "OTHER_CPLUSPLUSFLAGS": [ "-flto", "-fprofile-instr-use=<(module_root_dir)/default.profdata" ],
+            "OTHER_LDFLAGS": [ "-flto", "-fprofile-instr-use=<(module_root_dir)/default.profdata" ]
           }
         }],
         ['use_pgo=="true" and OS!="mac"', {

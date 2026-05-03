@@ -1,4 +1,4 @@
-import { NodeConnect4Solver, getNativeModule } from "../src/node";
+import { NodeConnect4Solver, NativeCache, getNativeModule } from "../src/node";
 import { OpeningBook } from "../src/index";
 import * as path from "path";
 import * as fs from "fs";
@@ -135,19 +135,17 @@ async function run() {
   };
 
   process.on("SIGINT", saveAndExit);
-  process.on("SIGTERM", saveAndExit);
+  process.env.UV_THREADPOOL_SIZE = threads.toString();
 
-  // process.env.UV_THREADPOOL_SIZE = threads.toString(); // No longer needed!
+  const sharedCache = new NativeCache(width, height, cacheSizeMb, false);
+  const solvers: NodeConnect4Solver[] = [];
+  for (let i = 0; i < threads; i++) {
+    const s = new NodeConnect4Solver({ width, height, sharedCache, heuristic: false });
+    await s.init();
+    solvers.push(s);
+  }
 
-  const solver = new NodeConnect4Solver({
-    width,
-    height,
-    cacheSizeMb,
-    heuristic: false,
-  });
-  await solver.init();
-
-  console.log(`[+] Created native solver sharing a ${cacheSizeMb}MB cache.`);
+  console.log(`[+] Created ${threads} native solvers sharing a ${cacheSizeMb}MB cache.`);
   console.log(
     `[+] Crunching ${weak ? "WEAK " : ""}Alpha-Beta evaluations using ${threads} concurrent workers...`,
   );
@@ -159,16 +157,23 @@ async function run() {
 
   const bookPtr = bootstrapBook ? bootstrapBook.ptr : undefined;
 
-  const worker = async () => {
+  const worker = async (workerId: number) => {
+    const solver = solvers[workerId];
     while (true) {
       const pos = positions.pop();
       if (!pos) break;
 
-      const analysis = await solver.analyze(pos, {
-        threads: 1, // Use 1 thread per position for maximum throughput
-        weak,
-        book: bookPtr ? { ptr: bookPtr } : undefined,
-      } as any);
+      let analysis;
+      try {
+        analysis = await solver.analyze(pos, {
+          threads: 1,
+          weak,
+          book: bookPtr ? { ptr: bookPtr } : undefined,
+        } as any);
+      } catch (e) {
+        console.error(`Worker ${workerId} failed:`, e);
+        throw e;
+      }
 
       if (analysis.evaluation) {
         builder.addPosition(pos, analysis.evaluation.score - minScore + 1);
@@ -191,7 +196,7 @@ async function run() {
   };
 
   // Launch concurrent workers
-  await Promise.all(Array.from({ length: threads }, () => worker()));
+  await Promise.all(Array.from({ length: threads }, (_, i) => worker(i)));
 
   console.log(""); // Final newline
   const elapsedTotal = (Date.now() - start) / 1000;
@@ -207,7 +212,8 @@ async function run() {
   }
   console.log(`[+] Book successfully saved to ${outputFile}`);
   if (bootstrapBook) bootstrapBook.unload();
-  solver.release();
+  solvers.forEach(s => s.release());
+  sharedCache.destroy();
   process.exit(0);
 }
 

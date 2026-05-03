@@ -42,6 +42,7 @@ export interface NativeModuleType {
     solver: unknown,
     pos: string,
     weak: boolean,
+    threads: number,
     book: unknown,
     timeout: number,
   ): Promise<Int32Array>;
@@ -50,6 +51,7 @@ export interface NativeModuleType {
     h: number,
     solver: unknown,
     pos: string,
+    threads: number,
     depth: number,
     timeout: number,
     book: unknown,
@@ -142,8 +144,35 @@ export function getNativeModule(): NativeModuleType | null {
   return NativeModule;
 }
 
+export class NativeCache {
+  public ptr: unknown;
+  constructor(public width: number, public height: number, public cacheSizeMb: number, public isHeuristic: boolean) {
+    const native = getNativeModule();
+    if (!native) throw new Error("Native module not loaded");
+    this.ptr = native._createCache(width, height, cacheSizeMb * 1024 * 1024, isHeuristic);
+  }
+  destroy(): void {
+    const native = getNativeModule();
+    if (native && this.ptr) native._destroyCache(this.ptr);
+    this.ptr = null;
+  }
+}
+
+import { Connect4SolverOptions } from "./core";
+export interface NodeConnect4SolverOptions extends Connect4SolverOptions {
+  sharedCache?: NativeCache;
+}
+
 export class NodeConnect4Solver extends AbstractSyncSolver {
   private _analysisQueue: Promise<void> = Promise.resolve();
+  private _sharedCache?: NativeCache;
+
+  constructor(opts?: NodeConnect4SolverOptions | number, heightOpt?: number) {
+    super(opts as NodeConnect4SolverOptions, heightOpt);
+    if (opts && typeof opts === "object" && 'sharedCache' in opts && opts.sharedCache) {
+      this._sharedCache = opts.sharedCache;
+    }
+  }
 
   async init(): Promise<void> {
     if (this.initialized) return Promise.resolve();
@@ -153,12 +182,18 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         "NodeConnect4Solver can only be executed in a Node.js environment where 'connect4.node' successfully compiled.",
       );
     }
-    this._cachePtr = native._createCache(
-      this.width,
-      this.height,
-      this.cacheSizeMb * 1024 * 1024,
-      this.isHeuristic,
-    ) as number;
+    
+    if (this._sharedCache) {
+      this._cachePtr = this._sharedCache.ptr as number;
+    } else {
+      this._cachePtr = native._createCache(
+        this.width,
+        this.height,
+        this.cacheSizeMb * 1024 * 1024,
+        this.isHeuristic,
+      ) as number;
+    }
+    
     this._solverPtr = native._createSolver(
       this.width,
       this.height,
@@ -177,9 +212,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
 
     return new Promise<PositionAnalysis>((resolve, reject) => {
       this._analysisQueue = this._analysisQueue
-        .catch(() => {
-          /* ignore */
-        })
+        .catch(() => { /* ignore */ })
         .then(async () => {
           try {
             const native = getNativeModule();
@@ -188,7 +221,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
               this.sanitizeOpts(opts);
 
             let resArr: Int32Array | number[];
-            if (this.isHeuristic)
+            if (this.isHeuristic) {
               resArr = await native._analyzeHeuristic(
                 this.width,
                 this.height,
@@ -199,7 +232,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
                 timeoutMs,
                 bookPtr === 0 ? null : bookPtr,
               );
-            else
+            } else {
               resArr = await native._analyzeExact(
                 this.width,
                 this.height,
@@ -210,10 +243,10 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
                 bookPtr === 0 ? null : bookPtr,
                 timeoutMs,
               );
-
+            }
             resolve(this.parseResArr(resArr, positionStr));
-          } catch (err: unknown) {
-            reject(err instanceof Error ? err : new Error(String(err)));
+          } catch (e) {
+            reject(e instanceof Error ? e : new Error(String(e)));
           }
         });
     });
@@ -227,41 +260,44 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
 
     return new Promise<PositionAnalysis>((resolve, reject) => {
       this._analysisQueue = this._analysisQueue
-        .catch(() => {
-          /* ignore */
-        })
+        .catch(() => { /* ignore */ })
         .then(async () => {
           try {
             const native = getNativeModule();
             if (!native) throw new Error("Native module not loaded");
-            const { maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
+            const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
             const weak = opts?.weak ?? false;
 
             let resArr: Int32Array | number[];
-            if (this.isHeuristic)
+            if (this.isHeuristic) {
+              // Heuristic solve() does not benefit from LazySMP threading:
+              // deterministic NNUE evaluation = no search diversity between threads.
+              // analyze_heuristic() root-splitting still benefits from threads.
               resArr = await native._solveHeuristic(
                 this.width,
                 this.height,
                 this._solverPtr,
                 positionStr,
+                1, // force single-thread for heuristic solve
                 maxDepth,
                 timeoutMs,
                 bookPtr === 0 ? null : bookPtr,
               );
-            else
+            } else {
               resArr = await native._solveExact(
                 this.width,
                 this.height,
                 this._solverPtr,
                 positionStr,
                 weak,
+                threads,
                 bookPtr === 0 ? null : bookPtr,
                 timeoutMs,
               );
-
+            }
             resolve(this.parseSolveResArr(resArr, positionStr));
-          } catch (err: unknown) {
-            reject(err instanceof Error ? err : new Error(String(err)));
+          } catch (e) {
+            reject(e instanceof Error ? e : new Error(String(e)));
           }
         });
     });
@@ -271,41 +307,28 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     if (!this.initialized) return;
     const native = getNativeModule();
     if (native) {
-      native._stopSolver(
-        this.width,
-        this.height,
-        this._solverPtr,
-        this.isHeuristic,
-      );
+      native._stopSolver(this.width, this.height, this._solverPtr, this.isHeuristic);
     }
-  }
-
-  getNodeCount(): number {
-    if (!this.initialized) return 0;
-    const native = getNativeModule();
-    if (!native) return 0;
-    return native._getNodeCount(
-      this.width,
-      this.height,
-      this._solverPtr,
-      this.isHeuristic,
-    );
   }
 
   release(): void {
     if (!this.initialized) return;
     const native = getNativeModule();
-    if (!native) return;
-    if (this._solverPtr !== 0)
-      native._destroySolver(
-        this.width,
-        this.height,
-        this._solverPtr,
-        this.isHeuristic,
-      );
-    if (this._cachePtr !== 0) native._destroyCache(this._cachePtr);
-    this._solverPtr = 0;
-    this._cachePtr = 0;
+    if (native) {
+      native._destroySolver(this.width, this.height, this._solverPtr, this.isHeuristic);
+      if (!this._sharedCache) {
+        native._destroyCache(this._cachePtr);
+      }
+    }
     this.initialized = false;
+  }
+  
+  getNodeCount(): number {
+    if (!this.initialized) return 0;
+    const native = getNativeModule();
+    if (native) {
+      return Number(native._getNodeCount(this.width, this.height, this._solverPtr, this.isHeuristic));
+    }
+    return 0;
   }
 }

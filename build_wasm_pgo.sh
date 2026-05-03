@@ -1,25 +1,41 @@
 #!/bin/bash
 set -e
 
-# Clean any stale profiling data from previous runs to prevent out-of-date warnings
-rm -f *.profraw *.profdata default.profraw default.profdata
+# PGO pipeline for WebAssembly.
+# Generates profile data using the native benchmark (faster & avoids WASM indirect call crashes),
+# then feeds it into emcc via -fprofile-use.
+#
+# NOTE: This requires both clang++ and emcc to use compatible LLVM versions.
+# If they diverge, the profile data may be silently ignored by emcc.
 
-echo "Building WASM Benchmarks with PGO Instrumentation..."
-emcc -O3 -flto -std=c++17 -fprofile-generate -DCACHE_BUCKET_SIZE=2 -DNDEBUG -DUSE_PTHREADS -s WASM=1 -s SINGLE_FILE=1 -s NODERAWFS=1 -s ALLOW_MEMORY_GROWTH=1 tools/benchmarks/bench_native.cpp native/Solver.cpp -o build/bench_native_pgo.js -s ENVIRONMENT=node -s EXIT_RUNTIME=1
+echo "═══════════════════════════════════════════════"
+echo " WASM PGO Pipeline"
+echo "═══════════════════════════════════════════════"
 
-echo "Running WASM Benchmarks to Generate Profile Data..."
-node build/bench_native_pgo.js
+# Check LLVM version compatibility
+if command -v clang++ &> /dev/null && command -v emcc &> /dev/null; then
+    CLANG_VER=$(clang++ --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1 || echo "unknown")
+    EMCC_VER=$(emcc --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1 || echo "unknown")
+    echo "  clang++ LLVM version: ${CLANG_VER}"
+    echo "  emcc LLVM version:    ${EMCC_VER}"
+    if [ "$CLANG_VER" != "$EMCC_VER" ] && [ "$CLANG_VER" != "unknown" ] && [ "$EMCC_VER" != "unknown" ]; then
+        echo ""
+        echo "  ⚠  WARNING: LLVM versions differ (clang++ ${CLANG_VER} vs emcc ${EMCC_VER})"
+        echo "  ⚠  Profile data may be partially or fully ignored by emcc."
+        echo ""
+    fi
+fi
 
-echo "Merging Profile Data..."
-llvm-profdata merge -output=default.profdata default.profraw
+echo ""
+echo "Phase 1/2: Generating PGO profile data using native bindings..."
+bash build_native_pgo.sh
 
-
-
-echo "Building Final WASM with PGO..."
+echo ""
+echo "Phase 2/2: Building WASM with PGO profile data..."
 export PGO_FLAGS="-fprofile-use=default.profdata"
 bash build.sh
 
-echo "Cleaning up..."
-rm build/bench_native_pgo.js default.profraw default.profdata
-
-echo "WASM PGO Build Complete!"
+echo ""
+echo "═══════════════════════════════════════════════"
+echo " WASM PGO pipeline complete!"
+echo "═══════════════════════════════════════════════"

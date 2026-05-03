@@ -262,18 +262,20 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     positionStr: string,
     opts?: AnalyzeOptions & { weak?: boolean },
   ): Int32Array {
-    const { maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
+    const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
     const weak = opts?.weak ?? false;
 
     const allocatedMemory = mod.stringToNewUTF8(positionStr);
     let outputPointer: number;
     if (this.isHeuristic)
+      // Heuristic solve() does not benefit from LazySMP threading
       outputPointer = mod._solveHeuristic(
         this.width,
         this.height,
         this._solverPtr,
         allocatedMemory,
         maxDepth,
+        1, // force single-thread for heuristic solve
         timeoutMs,
         bookPtr,
       );
@@ -284,7 +286,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         this._solverPtr,
         allocatedMemory,
         weak,
-        1,
+        threads,
         bookPtr,
         timeoutMs,
       );
@@ -318,7 +320,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         threads,
         maxDepth,
         timeoutMs,
-        bookPtr,
       );
     else
       outputPointer = mod._analyzeExact(

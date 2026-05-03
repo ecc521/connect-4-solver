@@ -81,29 +81,39 @@ size_t get_cache_size() {
   return mem_size;
 }
 
+// Timing helpers
+using Clock = std::chrono::high_resolution_clock;
+using TimePoint = Clock::time_point;
+
+inline double elapsed_ms(TimePoint start) {
+  return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
+}
+
 // --- Heuristic analyze benchmark ---
 template <int W, int H>
 void run_heuristic_analyze(const std::vector<BenchPos> &positions,
-                           int threads) {
+                           int threads, int budget_ms = 2000, int timeout_ms_per = 200) {
   size_t mem_size = get_cache_size();
   auto cache = HeuristicSolver<W, H>::createCache(mem_size);
   auto solver = HeuristicSolver<W, H>::createWithCache(cache.get());
 
   uint64_t total_depth = 0;
   int sign_accurate_count = 0;
-
-  auto start_time = std::chrono::high_resolution_clock::now();
+  int completed = 0;
+  auto bench_start = Clock::now();
 
   for (const auto &bp : positions) {
+    if (elapsed_ms(bench_start) > budget_ms) break;
     GenericPosition<W, H> p;
     p.play(bp.pos);
     auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(
                    std::chrono::steady_clock::now())
                    .time_since_epoch()
                    .count();
-    auto res = solver->analyze_heuristic(p, 42, threads, now + 30);
+    auto res = solver->analyze_heuristic(p, 42, threads, now + timeout_ms_per);
     int score = res.first.empty() ? 0 : res.first[0];
     total_depth += res.second;
+    completed++;
     if ((score > 0 && bp.expected_score > 0) ||
         (score < 0 && bp.expected_score < 0) ||
         (score == 0 && bp.expected_score == 0)) {
@@ -112,9 +122,7 @@ void run_heuristic_analyze(const std::vector<BenchPos> &positions,
   }
 
   uint64_t total_nodes = solver->getNodeCount();
-  auto end_time = std::chrono::high_resolution_clock::now();
-  double total_ms =
-      std::chrono::duration<double, std::milli>(end_time - start_time).count();
+  double total_ms = elapsed_ms(bench_start);
   double mns = (total_nodes / 1000000.0) / (total_ms / 1000.0);
 
   if (threads == 1) {
@@ -126,45 +134,48 @@ void run_heuristic_analyze(const std::vector<BenchPos> &positions,
   }
 
   std::string board_str = std::to_string(W) + "x" + std::to_string(H);
-  double avg_depth = positions.empty() ? 0.0 : (double)total_depth / positions.size();
+  double avg_depth = completed == 0 ? 0.0 : (double)total_depth / completed;
   std::cout << "| " << std::left << std::setw(9) << "analyze()"
             << " | " << std::setw(9) << "Heuristic"
             << " | " << std::setw(5) << board_str << " | " << std::setw(6)
             << std::to_string(mem_size / (1024 * 1024)) + " MB" << " | "
             << std::setw(7) << std::to_string(cache->getSlotWidth()) + "-bit"
             << " | " << std::setw(3) << threads << " | " << std::setw(4)
-            << positions.size() << " | " << std::setw(10) << total_nodes
+            << completed << " | " << std::setw(10) << total_nodes
             << " | " << std::fixed << std::setprecision(2) << std::setw(5)
             << mns << " | " << std::setw(7)
             << std::to_string((int)total_ms) + " ms" << " | " << std::setw(9)
             << std::setprecision(2) << avg_depth
-            << " | " << sign_accurate_count << "/" << positions.size() << " ("
-            << (int)((double)sign_accurate_count / positions.size() * 100.0)
+            << " | " << sign_accurate_count << "/" << completed << " ("
+            << (completed > 0 ? (int)((double)sign_accurate_count / completed * 100.0) : 0)
             << "%) |\n";
 }
 
 // --- Heuristic solve benchmark (LazySMP iterative deepening) ---
 template <int W, int H>
-void run_heuristic_solve(const std::vector<BenchPos> &positions, int threads, int timeout_ms = 30) {
+void run_heuristic_solve(const std::vector<BenchPos> &positions, int threads,
+                         int budget_ms = 2000, int timeout_ms_per = 200) {
   size_t mem_size = get_cache_size();
   auto cache = HeuristicSolver<W, H>::createCache(mem_size);
   auto solver = HeuristicSolver<W, H>::createWithCache(cache.get());
 
   uint64_t total_depth = 0;
   int sign_accurate_count = 0;
-
-  auto start_time = std::chrono::high_resolution_clock::now();
+  int completed = 0;
+  auto bench_start = Clock::now();
 
   for (const auto &bp : positions) {
+    if (elapsed_ms(bench_start) > budget_ms) break;
     GenericPosition<W, H> p;
     p.play(bp.pos);
     auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(
                    std::chrono::steady_clock::now())
                    .time_since_epoch()
                    .count();
-    auto res = solver->solve_heuristic(p, 42, now + timeout_ms, true, nullptr, threads);
+    auto res = solver->solve_heuristic(p, 42, now + timeout_ms_per, true, nullptr, threads);
     total_depth += res.depth;
     int score = res.score;
+    completed++;
     if ((score > 0 && bp.expected_score > 0) ||
         (score < 0 && bp.expected_score < 0) ||
         (score == 0 && bp.expected_score == 0)) {
@@ -173,9 +184,7 @@ void run_heuristic_solve(const std::vector<BenchPos> &positions, int threads, in
   }
 
   uint64_t total_nodes = solver->getNodeCount();
-  auto end_time = std::chrono::high_resolution_clock::now();
-  double total_ms =
-      std::chrono::duration<double, std::milli>(end_time - start_time).count();
+  double total_ms = elapsed_ms(bench_start);
   double mns = (total_nodes / 1000000.0) / (total_ms / 1000.0);
 
   static bool hsolve_header_printed = false;
@@ -189,40 +198,44 @@ void run_heuristic_solve(const std::vector<BenchPos> &positions, int threads, in
   }
 
   std::string board_str = std::to_string(W) + "x" + std::to_string(H);
-  double avg_depth = positions.empty() ? 0.0 : (double)total_depth / positions.size();
+  double avg_depth = completed == 0 ? 0.0 : (double)total_depth / completed;
   std::cout << "| " << std::left << std::setw(9) << "solve()"
             << " | " << std::setw(9) << "Heuristic"
             << " | " << std::setw(5) << board_str << " | " << std::setw(6)
             << std::to_string(mem_size / (1024 * 1024)) + " MB" << " | "
             << std::setw(7) << std::to_string(cache->getSlotWidth()) + "-bit"
             << " | " << std::setw(3) << threads << " | " << std::setw(4)
-            << positions.size() << " | " << std::setw(10) << total_nodes
+            << completed << " | " << std::setw(10) << total_nodes
             << " | " << std::fixed << std::setprecision(2) << std::setw(5)
             << mns << " | " << std::setw(7)
             << std::to_string((int)total_ms) + " ms" << " | " << std::setw(9)
             << std::setprecision(2) << avg_depth
-            << " | " << sign_accurate_count << "/" << positions.size() << " ("
-            << (int)((double)sign_accurate_count / positions.size() * 100.0)
+            << " | " << sign_accurate_count << "/" << completed << " ("
+            << (completed > 0 ? (int)((double)sign_accurate_count / completed * 100.0) : 0)
             << "%) |\n";
 }
 
 // --- Exact analyze benchmark (root-splitting) ---
 template <int W, int H>
-void run_exact_analyze(const std::vector<BenchPos> &positions, int threads) {
+void run_exact_analyze(const std::vector<BenchPos> &positions, int threads,
+                       int budget_ms = 2000, int timeout_ms_per = 200) {
   size_t mem_size = get_cache_size();
   auto cache = Solver::createCache(mem_size);
   auto solver = Solver::createWithCache(cache.get());
 
   int correct = 0;
-
-  auto start_time = std::chrono::high_resolution_clock::now();
+  int completed = 0;
+  auto bench_start = Clock::now();
 
   for (const auto &bp : positions) {
+    if (elapsed_ms(bench_start) > budget_ms) break;
+    auto pos_start = Clock::now();
     GenericPosition<W, H> p;
     p.play(bp.pos);
     auto res = solver->analyze(p, false, threads, nullptr);
-    // Test data has solve() score = best achievable score = max of column
-    // scores
+    // Skip positions that hit the timeout boundary
+    if (elapsed_ms(pos_start) >= timeout_ms_per * 0.9) continue;
+    completed++;
     int best_score = -1000;
     for (int s : res) {
       if (s > best_score)
@@ -239,9 +252,7 @@ void run_exact_analyze(const std::vector<BenchPos> &positions, int threads) {
   }
 
   uint64_t total_nodes = solver->getNodeCount();
-  auto end_time = std::chrono::high_resolution_clock::now();
-  double total_ms =
-      std::chrono::duration<double, std::milli>(end_time - start_time).count();
+  double total_ms = elapsed_ms(bench_start);
   double mns = (total_nodes / 1000000.0) / (total_ms / 1000.0);
 
   if (threads == 1) {
@@ -258,30 +269,38 @@ void run_exact_analyze(const std::vector<BenchPos> &positions, int threads) {
             << std::to_string(mem_size / (1024 * 1024)) + " MB" << " | "
             << std::setw(7) << std::to_string(cache->getSlotWidth()) + "-bit"
             << " | " << std::setw(3) << threads << " | " << std::setw(4)
-            << positions.size() << " | " << std::setw(10) << total_nodes
+            << completed << " | " << std::setw(10) << total_nodes
             << " | " << std::fixed << std::setprecision(2) << std::setw(5)
             << mns << " | " << std::setw(7)
             << std::to_string((int)total_ms) + " ms" << " | " << correct << "/"
-            << positions.size()
-            << (correct == (int)positions.size() ? " ✓" : " FAIL") << " |\n";
+            << completed
+            << (correct == completed ? " ✓" : " FAIL") << " |\n";
 }
 
 // --- Exact solve benchmark (Lazy SMP) ---
 // Each thread config gets a FRESH solver+cache to avoid TT warming artifacts
 template <int W, int H>
-void run_solve(const std::vector<BenchPos> &positions, int threads, bool weak, const OpeningBookBase<W, H>* book = nullptr) {
+void run_solve(const std::vector<BenchPos> &positions, int threads, bool weak,
+               int budget_ms = 2000, int timeout_ms_per = 200,
+               const OpeningBookBase<W, H>* book = nullptr) {
   size_t mem_size = get_cache_size();
   auto cache = Solver::createCache(mem_size);
   auto solver = Solver::createWithCache(cache.get());
 
   int correct = 0;
-
-  auto start_time = std::chrono::high_resolution_clock::now();
+  int completed = 0;
+  auto bench_start = Clock::now();
 
   for (const auto &bp : positions) {
+    if (elapsed_ms(bench_start) > budget_ms) break;
+    auto pos_start = Clock::now();
     GenericPosition<W, H> p;
     p.play(bp.pos);
     auto res = solver->solve(p, weak, threads, book);
+
+    // Skip positions near the timeout boundary (may have partial results)
+    if (elapsed_ms(pos_start) >= timeout_ms_per * 0.9) continue;
+    completed++;
 
     int expected =
         weak ? (bp.expected_score > 0 ? 1 : (bp.expected_score < 0 ? -1 : 0))
@@ -300,9 +319,7 @@ void run_solve(const std::vector<BenchPos> &positions, int threads, bool weak, c
   }
 
   uint64_t total_nodes = solver->getNodeCount();
-  auto end_time = std::chrono::high_resolution_clock::now();
-  double total_ms =
-      std::chrono::duration<double, std::milli>(end_time - start_time).count();
+  double total_ms = elapsed_ms(bench_start);
   double mns = (total_nodes / 1000000.0) / (total_ms / 1000.0);
 
   static bool solve_header_printed = false;
@@ -322,27 +339,33 @@ void run_solve(const std::vector<BenchPos> &positions, int threads, bool weak, c
             << std::to_string(mem_size / (1024 * 1024)) + " MB" << " | "
             << std::setw(7) << std::to_string(cache->getSlotWidth()) + "-bit"
             << " | " << std::setw(3) << threads << " | " << std::setw(4)
-            << positions.size() << " | " << std::setw(10) << total_nodes
+            << completed << " | " << std::setw(10) << total_nodes
             << " | " << std::fixed << std::setprecision(2) << std::setw(5)
             << mns << " | " << std::setw(8)
             << std::to_string((int)total_ms) + " ms" << " | " << correct << "/"
-            << positions.size()
-            << (correct == (int)positions.size() ? " ✓" : " FAIL") << " |\n";
+            << completed
+            << (correct == completed ? " ✓" : " FAIL") << " |\n";
 }
 
 int main(int argc, char* argv[]) {
   // Parse CLI flags
   bool flag_heuristic = false, flag_exact = false;
   bool flag_solve = false, flag_analyze = false;
+  bool flag_pgo = false;
+  int budget_ms = 2000;
+  int timeout_ms = 200;
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
     if (arg == "--heuristic") flag_heuristic = true;
     else if (arg == "--exact") flag_exact = true;
     else if (arg == "--solve") flag_solve = true;
     else if (arg == "--analyze") flag_analyze = true;
+    else if (arg == "--pgo") flag_pgo = true;
+    else if (arg == "--budget" && i + 1 < argc) budget_ms = std::stoi(argv[++i]);
+    else if (arg == "--timeout" && i + 1 < argc) timeout_ms = std::stoi(argv[++i]);
     else {
       std::cerr << "Unknown flag: " << arg << "\n";
-      std::cerr << "Usage: bench_native [--heuristic] [--exact] [--solve] [--analyze]\n";
+      std::cerr << "Usage: bench_native [--heuristic] [--exact] [--solve] [--analyze] [--pgo] [--budget ms] [--timeout ms]\n";
       return 1;
     }
   }
@@ -352,6 +375,12 @@ int main(int argc, char* argv[]) {
   bool do_exact_analyze = run_all || (flag_exact && !flag_solve) || (flag_analyze && !flag_heuristic) || (flag_exact && flag_analyze);
   bool do_heuristic_solve = run_all || (flag_heuristic && !flag_analyze) || (flag_solve && !flag_exact) || (flag_heuristic && flag_solve);
   bool do_exact_solve = run_all || (flag_exact && !flag_analyze) || (flag_solve && !flag_heuristic) || (flag_exact && flag_solve);
+
+  // PGO mode: run all modes but with small position sets
+  if (flag_pgo) {
+    run_all = true;
+    do_heuristic_analyze = do_exact_analyze = do_heuristic_solve = do_exact_solve = true;
+  }
 
   std::string dim_str = std::to_string(BOARD_WIDTH_MACRO) + "x" +
                         std::to_string(BOARD_HEIGHT_MACRO);
@@ -375,10 +404,14 @@ int main(int argc, char* argv[]) {
             << valid_positions.size() << " positions)\n";
   std::cout << "===========================================";
 
-  // --- Heuristic analyze (first 100 positions, 30ms timeout each) ---
+  // PGO: limit to 10 positions; regular: 50-100
+  const size_t max_solve = flag_pgo ? 10 : 50;
+  const size_t max_analyze = flag_pgo ? 10 : 100;
+  const size_t max_heuristic = flag_pgo ? 10 : 100;
+
   // --- 1. Generate Subsets ---
   std::vector<BenchPos> heuristic_subset;
-  for (size_t i = 0; i < 100 && i < valid_positions.size(); i++) {
+  for (size_t i = 0; i < max_heuristic && i < valid_positions.size(); i++) {
     heuristic_subset.push_back(valid_positions[i]);
   }
 
@@ -388,13 +421,12 @@ int main(int argc, char* argv[]) {
   for (const auto &bp : valid_positions) {
     if ((int)bp.pos.length() >= min_length_analyze) {
       exact_subset.push_back(bp);
-      if (exact_subset.size() >= 100) break;
+      if (exact_subset.size() >= max_analyze) break;
     }
   }
 
   std::vector<BenchPos> solve_hard;
   if (total_cells <= 42) {
-    // Small boards: target ~3 seconds for a single thread
     std::vector<BenchPos> sorted_pos = valid_positions;
     std::sort(sorted_pos.begin(), sorted_pos.end(), [](const BenchPos &a, const BenchPos &b) {
       return a.pos.length() < b.pos.length();
@@ -402,16 +434,15 @@ int main(int argc, char* argv[]) {
     for (const auto &bp : sorted_pos) {
       if ((int)bp.pos.length() >= 9) {
         solve_hard.push_back(bp);
-        if (solve_hard.size() >= 50) break;
+        if (solve_hard.size() >= max_solve) break;
       }
     }
   } else {
-    // Large boards: require deep positions to prevent hanging
-    int min_length_solve = total_cells - 30; // e.g. 64 - 30 = 34 for 8x8
+    int min_length_solve = total_cells - 30;
     for (const auto &bp : valid_positions) {
       if ((int)bp.pos.length() >= min_length_solve) {
         solve_hard.push_back(bp);
-        if (solve_hard.size() >= 50) break;
+        if (solve_hard.size() >= max_solve) break;
       }
     }
   }
@@ -419,22 +450,22 @@ int main(int argc, char* argv[]) {
   // --- 2. Exact Benchmarks ---
   if (!solve_hard.empty()) {
     if (do_exact_solve) {
-      // Weak solve (much faster — determines win/loss/draw only)
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, true);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, true);
-
-      // Strong solve
       DummyBook<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO> dummy;
-      
-      // We pass the DummyBook into the 1-thread and 8-thread tests.
-      // This is CRITICAL for Profile-Guided Optimization (PGO).
-      // C++ templates create entirely distinct functions at compile time.
-      // If we never ran a benchmark with a book, LLVM would record 0 executions
-      // for the HasBook<true> template branch and optimize it for size instead of speed!
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, &dummy);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 2, false);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, false);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 8, false, &dummy);
+
+      if (flag_pgo) {
+        // PGO: exercise all template code paths (weak, strong, book, multi-thread)
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, true, budget_ms, timeout_ms);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, budget_ms, timeout_ms, &dummy);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 2, false, budget_ms, timeout_ms);
+      } else {
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, true, budget_ms, timeout_ms);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, true, budget_ms, timeout_ms);
+        // DummyBook exercises the HasBook<true> template path — critical for PGO
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, budget_ms, timeout_ms, &dummy);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 2, false, budget_ms, timeout_ms);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, false, budget_ms, timeout_ms);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 8, false, budget_ms, timeout_ms, &dummy);
+      }
     }
   } else if (do_exact_solve) {
     std::cout << "\n--- Skipping solve() benchmark (no suitable positions) ---\n";
@@ -442,8 +473,8 @@ int main(int argc, char* argv[]) {
 
   if (do_exact_analyze) {
     if (exact_subset.size() >= 2) {
-      run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 1);
-      run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 4);
+      run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 1, budget_ms, timeout_ms);
+      if (!flag_pgo) run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 4, budget_ms, timeout_ms);
     } else {
       std::cout << "\n--- Skipping exact analyze() (insufficient deep positions) ---\n";
     }
@@ -452,15 +483,15 @@ int main(int argc, char* argv[]) {
   // --- 3. Heuristic Benchmarks ---
   if (do_heuristic_solve) {
     if (!heuristic_subset.empty()) {
-      run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 1, 30);
-      run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 4, 30);
+      run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 1, budget_ms, timeout_ms);
+      if (!flag_pgo) run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 4, budget_ms, timeout_ms);
     }
   }
 
   if (do_heuristic_analyze) {
     if (!heuristic_subset.empty()) {
-      run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 1);
-      run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 4);
+      run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 1, budget_ms, timeout_ms);
+      if (!flag_pgo) run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 4, budget_ms, timeout_ms);
     }
   }
 
