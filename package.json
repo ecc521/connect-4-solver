@@ -74,7 +74,8 @@
     "docker:build:wasm:pgo": "docker run --rm -v $(pwd):/workspace connect-4-wasm-builder bash build_wasm_pgo.sh",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "prepublishOnly": "npm run lint && npm run build:ts && npm run format:check && npm test",
+    "build:release": "npm run build:wasm:pgo && npm run build:ts",
+    "prepublishOnly": "npm run lint && npm run format:check && npm run build:release && npm test",
     "example:ios": "cd example && npx react-native run-ios --simulator=\"iPhone 15\"",
     "example:android": "cd example && npx react-native run-android"
   },

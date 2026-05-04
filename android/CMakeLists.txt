@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_library(connect4solver SHARED
     cpp/react-native-connect-4-solver.cpp
+    ../native/Solver.cpp
+    ../native/HeuristicSolver.cpp
 )
 
 find_library(log-lib log)
