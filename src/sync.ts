@@ -58,9 +58,6 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
 
   release(): void {
     if (!this.initialized) return;
-    console.log(
-      `Releasing solver ${this.width}x${this.height} (heuristic: ${this.isHeuristic}) - SolverPtr: ${this._solverPtr}, CachePtr: ${this._cachePtr}`,
-    );
     const mod = getNoSABModule();
     if (this._solverPtr !== 0)
       mod._destroySolver(
@@ -89,9 +86,6 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
 
   stop(): void {
     if (!this.initialized) return;
-    console.log(
-      `Releasing solver ${this.width}x${this.height} (heuristic: ${this.isHeuristic}) - SolverPtr: ${this._solverPtr}, CachePtr: ${this._cachePtr}`,
-    );
     const mod = getNoSABModule();
     mod._stopSolver(this.width, this.height, this._solverPtr, this.isHeuristic);
   }
