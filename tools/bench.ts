@@ -302,19 +302,6 @@ async function runBenchmark(
         totalDepth += result.depthReached || 0;
         if (!result.moveOptions || result.moveOptions.length === 0) continue;
 
-        // For exact solver: if the per-position time exceeded ~90% of timeout,
-        // the result may be partial (some columns timed out mid-search).
-        // Skip these for parity counting to avoid false failures.
-        const posElapsed = performance.now() - posStart;
-        if (
-          !isHeuristic &&
-          opts.timeout > 0 &&
-          posElapsed >= opts.timeout * 0.9
-        ) {
-          skipped++;
-          continue; // likely partial result
-        }
-
         for (const opt of result.moveOptions) {
           if (opt && opt.score > bestScore) bestScore = opt.score;
         }
@@ -325,17 +312,6 @@ async function runBenchmark(
         });
         if (!result || result.aborted || !result.evaluation) continue;
         totalDepth += result.depthReached || 0;
-
-        // Same timeout proximity check for solve
-        const posElapsed = performance.now() - posStart;
-        if (
-          !isHeuristic &&
-          opts.timeout > 0 &&
-          posElapsed >= opts.timeout * 0.9
-        ) {
-          skipped++;
-          continue;
-        }
 
         bestScore = result.evaluation.score;
       }
