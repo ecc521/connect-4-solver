@@ -82,6 +82,7 @@ interface BenchResult {
   timeMs: number;
   avgDepth: number | null;
   parityOk: boolean;
+  positionsAttempted: number;
 }
 
 // ─── Seeded RNG ─────────────────────────────────────────────────
@@ -274,6 +275,7 @@ async function runBenchmark(
   isHeuristic: boolean,
   positions: BenchPos[],
   mode: "solve" | "analyze",
+  enforceBudget: boolean = true,
 ): Promise<BenchResult> {
   const dimStr = `${width}x${height}`;
 
@@ -285,8 +287,7 @@ async function runBenchmark(
   const startTime = Date.now();
 
   for (const bp of positions) {
-    // Enforce exact same positions across all runs by ignoring time budget
-    // if (Date.now() - startTime > opts.budget) break;
+    if (enforceBudget && Date.now() - startTime > opts.budget) break;
     totalAttempted++;
 
     try {
@@ -384,6 +385,7 @@ async function runBenchmark(
     timeMs: totalMs,
     avgDepth: isHeuristic && completed > 0 ? totalDepth / completed : null,
     parityOk,
+    positionsAttempted: totalAttempted,
   };
 }
 
@@ -537,31 +539,42 @@ async function main(): Promise<void> {
       engines.push({ name: "Heuristic", heuristic: true });
 
     for (const engine of engines) {
-      for (const tCount of opts.threads) {
-        // Create a fresh solver per combo to avoid TT warming artifacts
-        let solver: any;
-        if (opts.runtime === "native") {
-          const { NodeConnect4Solver } = await import("../src/node");
-          solver = new NodeConnect4Solver({
-            width: w,
-            height: h,
-            heuristic: engine.heuristic,
-          });
-        } else {
-          const { SyncWasmNoSABConnect4Solver } = await import("../src/sync");
-          solver = new SyncWasmNoSABConnect4Solver({
-            width: w,
-            height: h,
-            heuristic: engine.heuristic,
-          });
-        }
-        await solver.init();
+      const modes: ("solve" | "analyze")[] = [];
+      if (opts.runSolve) modes.push("solve");
+      if (opts.runAnalyze) modes.push("analyze");
 
-        const modes: ("solve" | "analyze")[] = [];
-        if (opts.runSolve) modes.push("solve");
-        if (opts.runAnalyze) modes.push("analyze");
+      for (const mode of modes) {
+        // Track baseline (first thread count) position count per mode
+        // so subsequent thread counts use identical position sets
+        let baselinePositionCount = 0;
 
-        for (const mode of modes) {
+        for (const tCount of opts.threads) {
+          // Create a fresh solver per combo to avoid TT warming artifacts
+          let solver: any;
+          if (opts.runtime === "native") {
+            const { NodeConnect4Solver } = await import("../src/node");
+            solver = new NodeConnect4Solver({
+              width: w,
+              height: h,
+              heuristic: engine.heuristic,
+            });
+          } else {
+            const { SyncWasmNoSABConnect4Solver } = await import("../src/sync");
+            solver = new SyncWasmNoSABConnect4Solver({
+              width: w,
+              height: h,
+              heuristic: engine.heuristic,
+            });
+          }
+          await solver.init();
+
+          // First thread count: apply budget to determine position set
+          // Subsequent thread counts: use the exact same positions (no budget)
+          const isBaseline = baselinePositionCount === 0;
+          const positionsForRun = isBaseline
+            ? sampled
+            : sampled.slice(0, baselinePositionCount);
+
           const result = await runBenchmark(
             opts,
             solver,
@@ -569,10 +582,15 @@ async function main(): Promise<void> {
             h,
             tCount,
             engine.heuristic,
-            sampled,
+            positionsForRun,
             mode,
+            isBaseline, // only enforce budget on baseline
           );
           allResults.push(result);
+
+          if (isBaseline) {
+            baselinePositionCount = result.positionsAttempted;
+          }
 
           if (!result.parityOk) parityFailures++;
 
@@ -594,9 +612,9 @@ async function main(): Promise<void> {
               `| ${pad(result.mode, 10)} | ${pad(result.engine, 10)} | ${pad(result.board, 5)} | ${pad(String(result.threads), 3, false)} | ${pad(accStr, 7, false)} | ${accColor}${pad(accPctStr, 8, false)}${RESET} | ${pad(depthStr, 6, false)} | ${pad(result.nodes.toLocaleString(), 14, false)} | ${pad(result.mns.toFixed(2), 6, false)} | ${pad(result.timeMs + "ms", 8, false)} |${parityMark}`,
             );
           }
-        }
 
-        solver.release();
+          solver.release();
+        }
       }
     }
   }

@@ -162,7 +162,7 @@ Value CreateCache(const CallbackInfo& info) {
 }
 
 Value DestroyCache(const CallbackInfo& info) {
-    auto cache = UnwrapPointer<GameSolver::Connect4::Cache>(info[2]);
+    auto cache = UnwrapPointer<GameSolver::Connect4::Cache>(info[0]);
     delete cache;
     return info.Env().Undefined();
 }
