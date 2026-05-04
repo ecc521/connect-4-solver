@@ -275,7 +275,7 @@ async function runBenchmark(
   isHeuristic: boolean,
   positions: BenchPos[],
   mode: "solve" | "analyze",
-  enforceBudget: boolean = true,
+  budget: number,
 ): Promise<BenchResult> {
   const dimStr = `${width}x${height}`;
 
@@ -287,7 +287,7 @@ async function runBenchmark(
   const startTime = Date.now();
 
   for (const bp of positions) {
-    if (enforceBudget && Date.now() - startTime > opts.budget) break;
+    if (Date.now() - startTime > budget) break;
     totalAttempted++;
 
     try {
@@ -584,7 +584,7 @@ async function main(): Promise<void> {
             engine.heuristic,
             positionsForRun,
             mode,
-            isBaseline, // only enforce budget on baseline
+            isBaseline ? opts.budget : Number.MAX_SAFE_INTEGER,
           );
           allResults.push(result);
 

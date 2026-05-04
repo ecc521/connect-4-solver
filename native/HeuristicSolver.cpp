@@ -147,77 +147,112 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
   }
 
   this->stopSearch = false;
+  int best_score = 0;
+  int best_move = -1;
+  int depth_reached = 0;
 
-  auto solve_loop = [&](NNUEAccumulator<WIDTH, HEIGHT>* thread_acc, std::atomic<bool>* abort_flag = nullptr) -> SolverResult {
-    int best_score = 0;
-    int best_move = -1;
-    int depth_reached = 0;
-    uint32_t localCount = 0;
-    
-    NNUEAccumulator<WIDTH, HEIGHT> local_acc;
-    if (!thread_acc) {
-        local_acc.init(P);
-        thread_acc = &local_acc;
-    }
-
-    for (int d = 1; d <= max_depth; d++) {
-      int current_score = negamax_heuristic(P, -32000, 32000, d, end_time_ms, *thread_acc, localCount);
-      
-      if (this->stopSearch.load(std::memory_order_relaxed) || (abort_flag && abort_flag->load(std::memory_order_relaxed))) break;
-      
-      best_score = current_score;
-      auto packed_root = this->transTable->getPacked(P.key());
-      if (packed_root.flags != 0) {
-          if (packed_root.best_move < WIDTH) best_move = packed_root.best_move;
-      }
-      depth_reached = d;
-      if (best_score > 32000 || best_score < -32000) break;
-    }
-    this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
-    bool aborted = this->stopSearch.load(std::memory_order_relaxed) || (abort_flag && abort_flag->load(std::memory_order_relaxed));
-    return {best_score, best_move, depth_reached, getNodeCount(), aborted};
+  struct RootMove {
+    int col;
+    int score;
   };
-
-  if (threads <= 1) {
-      return solve_loop(acc);
+  std::vector<RootMove> root_moves;
+  for (int i = 0; i < WIDTH; i++) {
+    int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
+    if (P.canPlay(col)) {
+      root_moves.push_back({col, -40000});
+    }
   }
 
-  // --- Lazy SMP for Heuristic ---
-  this->pool->ensureCapacity(threads - 1);
-  std::atomic<bool> done{false};
-  SolverResult final_result{0, -1, (int)P.nbMoves(), 0};
-  std::mutex result_mutex;
-  std::atomic<int> remaining(threads - 1);
-  std::promise<void> prom;
-  auto fut = prom.get_future();
+  for (int d = 1; d <= max_depth; d++) {
+    if (root_moves.empty()) break;
 
-  for (int t = 1; t < threads; t++) {
-    this->pool->enqueue([&]() {
-      // Each thread gets its own NNUE accumulator if needed
-      NNUEAccumulator<WIDTH, HEIGHT> thread_acc;
-      thread_acc.init(P);
-      
-      SolverResult r = solve_loop(&thread_acc, &done);
-      
-      if (!done.exchange(true)) {
-        std::lock_guard<std::mutex> lock(result_mutex);
-        final_result = r;
+    std::atomic<int> next_move_idx{0};
+    std::mutex root_mutex;
+    
+    auto worker = [&]() {
+      uint32_t localCount = 0;
+      while (true) {
+        int idx = next_move_idx.fetch_add(1, std::memory_order_relaxed);
+        if (idx >= (int)root_moves.size()) break;
+        if (this->stopSearch.load(std::memory_order_relaxed)) break;
+
+        int col = root_moves[idx].col;
+        int score = -40000;
+
+        if (P.isWinningMove(col)) {
+          score = 31000 + (WIDTH * HEIGHT + 1 - (P.nbMoves() + 1)) / 2;
+        } else {
+          GenericPosition<WIDTH, HEIGHT> P2(P);
+          P2.playCol(col);
+
+          bool book_hit = false;
+          if (this->book) {
+            if (int val = this->book->get(P2)) {
+              int exact_score = val + GenericPosition<WIDTH, HEIGHT>::MIN_SCORE - 1;
+              int heur_score = exact_score > 0 ? 31000 + exact_score : -31000 + exact_score;
+              if (exact_score == 0) heur_score = 0;
+              score = -heur_score;
+              book_hit = true;
+            }
+          }
+
+          if (!book_hit) {
+            NNUEAccumulator<WIDTH, HEIGHT> local_acc;
+            local_acc.init(P2);
+            score = -negamax_heuristic(P2, -32000, 32000, d - 1, end_time_ms, local_acc, localCount);
+          }
+        }
+        
+        {
+          std::lock_guard<std::mutex> lock(root_mutex);
+          root_moves[idx].score = score;
+        }
       }
-      if (remaining.fetch_sub(1) == 1) {
-        prom.set_value();
+      this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
+    };
+
+    if (threads <= 1 || root_moves.size() <= 1) {
+      worker();
+    } else {
+      int num_threads = std::min((int)threads, (int)root_moves.size());
+      this->pool->ensureCapacity(num_threads - 1);
+      std::atomic<int> remaining(num_threads - 1);
+      std::promise<void> prom;
+      auto fut = prom.get_future();
+      for (int i = 0; i < num_threads - 1; i++) {
+        this->pool->enqueue([&]() {
+          worker();
+          if (remaining.fetch_sub(1, std::memory_order_seq_cst) == 1) {
+            prom.set_value();
+          }
+        });
       }
+      worker();
+      fut.wait();
+    }
+
+    if (this->stopSearch.load(std::memory_order_relaxed) && d > 1) break;
+
+    // Iterative move ordering: sort by this depth's scores for better TT warmth at d+1
+    std::sort(root_moves.begin(), root_moves.end(), [](const RootMove& a, const RootMove& b) {
+      return a.score > b.score;
     });
+
+    int current_best_score = root_moves.front().score;
+    int current_best_move = root_moves.front().col;
+
+    if (current_best_move != -1) {
+      best_score = current_best_score;
+      best_move = current_best_move;
+      depth_reached = d;
+      // Store best result in TT for next iteration's move ordering
+      this->transTable->put(P.key(), (int16_t)best_score, (uint8_t)d, (uint8_t)best_move, 1);
+    }
+
+    if (best_score >= 31000 || best_score <= -31000) break;
   }
 
-  SolverResult r = solve_loop(acc, &done);
-  if (!done.exchange(true)) {
-    std::lock_guard<std::mutex> lock(result_mutex);
-    final_result = r;
-  }
-
-  fut.wait();
-  final_result.nodes = getNodeCount();
-  return final_result;
+  return {best_score, best_move, depth_reached, getNodeCount(), this->stopSearch.load(std::memory_order_relaxed)};
 }
 
 template <int WIDTH, int HEIGHT>
