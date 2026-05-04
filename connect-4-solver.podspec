@@ -18,5 +18,10 @@ Pod::Spec.new do |s|
   # Exclude the Emscripten/WASM bindings entirely from the iOS compiled framework
   s.exclude_files = "native/analyze.cpp"
 
+  s.pod_target_xcconfig = {
+    "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",
+    "CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES" => "YES"
+  }
+
   s.dependency "React-Core"
 end
