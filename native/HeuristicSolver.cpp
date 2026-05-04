@@ -63,7 +63,10 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   }
 
   auto moves = P.possibleNonLosingMoves();
-  if (moves == 0) return -31000 - (WIDTH * HEIGHT + 2 - P.nbMoves()) / 2;
+  if (moves == 0) {
+      if (P.nbMoves() == WIDTH * HEIGHT) return 0; // Board is full, it's a draw.
+      return -31000 - (WIDTH * HEIGHT + 2 - P.nbMoves()) / 2;
+  }
 
   struct Move {
     typename GenericPosition<WIDTH, HEIGHT>::position_t move;
@@ -135,6 +138,10 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
         if (P.canPlay(i) && P.isWinningMove(i)) return {score, i, (int)P.nbMoves(), getNodeCount()};
     }
     return {score, -1, (int)P.nbMoves(), getNodeCount()};
+  }
+  
+  if (P.nbMoves() == WIDTH * HEIGHT) {
+      return {0, -1, (int)P.nbMoves(), getNodeCount()};
   }
   
   if (this->book) {

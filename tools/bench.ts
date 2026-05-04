@@ -85,6 +85,7 @@ interface BenchResult {
   parityOk: boolean;
   positionsAttempted: number;
   skipped: number;
+  unsupported: boolean;
 }
 
 // ─── Seeded RNG ─────────────────────────────────────────────────
@@ -282,6 +283,7 @@ async function runBenchmark(
   let skipped = 0;
   let totalAttempted = 0;
   let totalDepth = 0;
+  let heuristicFatalFailures = 0;
   const startNodes: number = solver.getNodeCount();
   const startTime = performance.now();
 
@@ -332,16 +334,50 @@ async function runBenchmark(
                   : -1;
         const expectedOutcome =
           bp.expectedScore > 0 ? 1 : bp.expectedScore < 0 ? -1 : 0;
-        if (outcome === expectedOutcome) correct++;
+        if (outcome === expectedOutcome) {
+          correct++;
+        } else {
+          // If the heuristic claims an EXACT forced mate but the outcome is wrong, it's a fatal hallucination
+          if (bestScore >= 31000 || bestScore <= -31000) {
+            heuristicFatalFailures++;
+            if (opts.verbose) {
+              console.log(
+                `${RED}  FATAL HEURISTIC FAIL: pos="${bp.pos}" expected=${bp.expectedScore} got=${bestScore}${RESET}`,
+              );
+            }
+          }
+        }
       } else {
-        if (bestScore === bp.expectedScore) correct++;
-        else if (opts.verbose) {
+        if (bestScore === bp.expectedScore) {
+          correct++;
+        } else if (opts.verbose) {
           console.log(
             `${RED}  PARITY FAIL: pos="${bp.pos}" expected=${bp.expectedScore} got=${bestScore}${RESET}`,
           );
         }
       }
     } catch (e) {
+      if (e instanceof Error && e.message.includes("Unsupported board size")) {
+        return {
+          runtime: opts.runtime,
+          mode: mode === "solve" ? "solve()" : "analyze()",
+          engine: isHeuristic ? "Heuristic" : "Exact",
+          board: dimStr,
+          threads,
+          completed: 0,
+          total: 0,
+          accuracy: 0,
+          accuracyPct: 0,
+          nodes: 0,
+          mns: 0,
+          timeMs: 0,
+          avgDepth: null,
+          parityOk: true,
+          positionsAttempted: 0,
+          skipped: 0,
+          unsupported: true,
+        };
+      }
       if (opts.verbose) console.log(`${RED}  Error at ${bp.pos}: ${e}${RESET}`);
     }
   }
@@ -353,8 +389,11 @@ async function runBenchmark(
       ? totalNodes / 1_000_000 / (totalMs / 1000)
       : 0;
   const accuracyPct = completed > 0 ? (correct / completed) * 100 : 0;
-  // Parity is only enforced for exact solver — must be 100% on completed positions
-  const parityOk = isHeuristic ? true : correct === completed;
+  // Parity is strictly enforced for exact solver (100% required)
+  // For heuristic solver, parity only fails if it hallucinates an exact forced mate
+  const parityOk = isHeuristic
+    ? heuristicFatalFailures === 0
+    : correct === completed;
 
   return {
     runtime: opts.runtime,
@@ -373,6 +412,7 @@ async function runBenchmark(
     parityOk,
     positionsAttempted: totalAttempted,
     skipped,
+    unsupported: false,
   };
 }
 
@@ -573,27 +613,41 @@ async function main(): Promise<void> {
           if (!result.parityOk) parityFailures++;
 
           if (!opts.json) {
-            const accStr =
+            let accStr =
               result.skipped > 0
                 ? `${result.completed}(${result.skipped})/${result.positionsAttempted}`
                 : `${result.completed}/${result.positionsAttempted}`;
-            const accPctStr = `${result.accuracyPct.toFixed(1)}%`;
-            const parityMark = result.parityOk ? "" : ` ${RED}FAIL${RESET}`;
-            const accColor =
+            let accPctStr = `${result.accuracyPct.toFixed(1)}%`;
+            let parityMark = result.parityOk ? "" : ` ${RED}FAIL${RESET}`;
+            let accColor =
               result.accuracyPct >= 100
                 ? GREEN
                 : result.accuracyPct >= 80
                   ? YELLOW
                   : RED;
-            const depthStr =
+            let depthStr =
               result.avgDepth !== null ? result.avgDepth.toFixed(1) : "-";
 
-            const timeStr =
+            let timeStr =
               result.timeMs < 1
                 ? `${result.timeMs.toFixed(3)}ms`
                 : `${Math.round(result.timeMs)}ms`;
+
+            let nodesStr = result.nodes.toLocaleString();
+            let mnsStr = result.mns.toFixed(2);
+
+            if (result.unsupported) {
+              accStr = "N/A";
+              accPctStr = "N/A";
+              accColor = DIM;
+              depthStr = "-";
+              nodesStr = "N/A";
+              mnsStr = "N/A";
+              timeStr = "N/A";
+            }
+
             console.log(
-              `| ${pad(result.mode, 10)} | ${pad(result.engine, 10)} | ${pad(result.board, 5)} | ${pad(String(result.threads), 3, false)} | ${pad(accStr, 7, false)} | ${accColor}${pad(accPctStr, 8, false)}${RESET} | ${pad(depthStr, 6, false)} | ${pad(result.nodes.toLocaleString(), 14, false)} | ${pad(result.mns.toFixed(2), 6, false)} | ${pad(timeStr, 8, false)} |${parityMark}`,
+              `| ${pad(result.mode, 10)} | ${pad(result.engine, 10)} | ${pad(result.board, 5)} | ${pad(String(result.threads), 3, false)} | ${pad(accStr, 7, false)} | ${accColor}${pad(accPctStr, 8, false)}${RESET} | ${pad(depthStr, 6, false)} | ${pad(nodesStr, 14, false)} | ${pad(mnsStr, 6, false)} | ${pad(timeStr, 8, false)} |${parityMark}`,
             );
           }
 

@@ -48,7 +48,7 @@ class HeuristicSolver : public ::GameSolver::Connect4::Solver<WIDTH, HEIGHT> {
   
   using TransTable = TranspositionTable<position_t, int16_t, 16, 7, 2, 5, position_t>;
   std::shared_ptr<TransTable> transTable;
-  OpeningBookBase<WIDTH, HEIGHT>* book;
+  OpeningBookBase<WIDTH, HEIGHT>* book = nullptr;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
   std::atomic<bool> isSearching{false};
   std::atomic<bool> stopSearch;
