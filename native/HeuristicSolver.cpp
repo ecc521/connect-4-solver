@@ -16,7 +16,7 @@ namespace GameSolver {
 namespace Connect4 {
 
 namespace {
-  [[gnu::cold]] bool checkTimeout(double end_time_ms) {
+  [[gnu::cold]] bool checkHeuristicTimeout(double end_time_ms) {
     if (end_time_ms > 0.0) {
       double now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
       if (now >= end_time_ms) return true;
@@ -26,7 +26,7 @@ namespace {
 }
 
 template <int WIDTH, int HEIGHT>
-HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 0, position_t>> cache)
+HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TransTable> cache)
     : transTable(cache), nodeCount(0), pool(std::make_unique<ThreadPool>()) {
   for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
     history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
@@ -47,13 +47,13 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
     localCount = 0;
     if (this->stopSearch.load(std::memory_order_relaxed)) [[unlikely]] return 40000;
-    if (checkTimeout(end_time_ms)) {
+    if (checkHeuristicTimeout(end_time_ms)) {
       this->stopSearch = true;
       return 40000;
     }
   }
 
-  const uint64_t key = (uint64_t)P.key();
+  const position_t key = P.key();
   auto packed = this->transTable->getPacked(key);
   if (packed.flags != 0 && packed.work >= depth) {
     int16_t score = packed.value;
@@ -346,6 +346,19 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
   }
 
   return {scores, final_depth_reached};
+}
+
+
+template <int WIDTH, int HEIGHT>
+::GameSolver::Connect4::SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve(const GenericPosition<WIDTH, HEIGHT> &P, bool /*weak*/, int threads, const OpeningBookBase<WIDTH, HEIGHT>* book, double timeout_ms) {
+  if (book) loadBook(book);
+  return solve_heuristic(P, 100, timeout_ms, true, nullptr, threads);
+}
+
+template <int WIDTH, int HEIGHT>
+std::vector<int> HeuristicSolver<WIDTH, HEIGHT>::analyze(const GenericPosition<WIDTH, HEIGHT> &P, bool /*weak*/, int threads, const OpeningBookBase<WIDTH, HEIGHT>* book, double timeout_ms) {
+  if (book) loadBook(book);
+  return analyze_heuristic(P, 100, threads, timeout_ms).first;
 }
 
 } // namespace Connect4

@@ -19,7 +19,7 @@
 #include "NNUE.hpp"
 #include "SolverResult.hpp"
 #include "ThreadPool.hpp"
-
+#include "Solver.hpp"
 namespace GameSolver {
 namespace Connect4 {
 
@@ -29,7 +29,7 @@ template <int WIDTH, int HEIGHT>
 class HeuristicCache : public Cache {
  public:
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
-  using TransTable = TranspositionTable<unsigned __int128, int16_t, 16, 7, 0, position_t>;
+  using TransTable = TranspositionTable<position_t, int16_t, 16, 7, 2, position_t>;
   std::shared_ptr<TransTable> transTable;
   
   HeuristicCache(size_t table_bytes) : transTable(std::make_shared<TransTable>(table_bytes)) {}
@@ -42,11 +42,11 @@ class HeuristicCache : public Cache {
 #endif
 
 template <int WIDTH, int HEIGHT>
-class HeuristicSolver {
+class HeuristicSolver : public ::GameSolver::Connect4::Solver<WIDTH, HEIGHT> {
  private:
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
   
-  using TransTable = TranspositionTable<unsigned __int128, int16_t, 16, 7, 0, position_t>;
+  using TransTable = TranspositionTable<position_t, int16_t, 16, 7, 2, position_t>;
   std::shared_ptr<TransTable> transTable;
   OpeningBookBase<WIDTH, HEIGHT>* book;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.
@@ -66,24 +66,28 @@ class HeuristicSolver {
  public:
   static const int INVALID_MOVE = -1000000;
 
-  void stop() { stopSearch.store(true, std::memory_order_relaxed); }
-  void setTimeout(double end_time_ms) { endTime.store(end_time_ms, std::memory_order_relaxed); }
-  bool isAborted() const { return stopSearch.load(std::memory_order_relaxed); }
+  void stop() override { stopSearch.store(true, std::memory_order_relaxed); }
+  void setTimeout(double end_time_ms) override { endTime.store(end_time_ms, std::memory_order_relaxed); }
+  bool isAborted() const override { return stopSearch.load(std::memory_order_relaxed); }
 
   // Returns the heuristic score of a position via iterative deepening
-  SolverResult solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms = 0.0, bool reset_tt = true, NNUEAccumulator<WIDTH, HEIGHT>* acc = nullptr, int threads = 1);
+  ::GameSolver::Connect4::SolverResult solve(const GenericPosition<WIDTH, HEIGHT> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) override;
 
-  /**
-   * Evaluate possible heuristic moves for current player
-   * @return a vector of heuristic scores for each column
-   */
+  // Evaluate possible heuristic moves for current player
+  std::vector<int> analyze(const GenericPosition<WIDTH, HEIGHT> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) override;
+
+  // Legacy alias for compatibility (calling the new solve)
+  ::GameSolver::Connect4::SolverResult solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms = 0.0, bool reset_tt = true, NNUEAccumulator<WIDTH, HEIGHT>* acc = nullptr, int threads = 1);
+
+
+  // Legacy alias for compatibility
   std::pair<std::vector<int>, int> analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads = 1, double end_time_ms = 0.0);
 
-  unsigned long long getNodeCount() const {
+  unsigned long long getNodeCount() const override {
     return nodeCount;
   }
 
-  void reset() {
+  void reset() override {
     nodeCount = 0;
     stopSearch = false;
     transTable->reset();
@@ -92,14 +96,15 @@ class HeuristicSolver {
     }
   }
 
-  void loadBook(OpeningBookBase<WIDTH, HEIGHT>* b) {
-    book = b;
+  void loadBook(const OpeningBookBase<WIDTH, HEIGHT>* b) override {
+    book = const_cast<OpeningBookBase<WIDTH, HEIGHT>*>(b);
   }
 
-  bool isBusy() const { return isSearching.load(std::memory_order_relaxed); }
-  void setBusy(bool busy) { isSearching.store(busy, std::memory_order_relaxed); }
+  bool isBusy() const override { return isSearching.load(std::memory_order_relaxed); }
+  void setBusy(bool busy) override { isSearching.store(busy, std::memory_order_relaxed); }
 
-  HeuristicSolver(std::shared_ptr<TranspositionTable<unsigned __int128, int16_t, 16, 7, 0, position_t>> cache);
+  HeuristicSolver(std::shared_ptr<TransTable> cache);
+  HeuristicSolver() : HeuristicSolver(std::make_shared<TransTable>((1ULL << HEURISTIC_TABLE_SIZE) * 16ULL)) {}
 
   static std::unique_ptr<::GameSolver::Connect4::Cache> createCache(size_t table_bytes) {
     return std::make_unique<HeuristicCache<WIDTH, HEIGHT>>(table_bytes);
