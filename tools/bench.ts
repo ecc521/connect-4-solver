@@ -283,7 +283,7 @@ async function runBenchmark(
   let skipped = 0;
   let totalAttempted = 0;
   let totalDepth = 0;
-  let heuristicFatalFailures = 0;
+  let hardFailures = 0;
   const startNodes: number = solver.getNodeCount();
   const startTime = performance.now();
 
@@ -339,7 +339,7 @@ async function runBenchmark(
         } else {
           // If the heuristic claims an EXACT forced mate but the outcome is wrong, it's a fatal hallucination
           if (bestScore >= 31000 || bestScore <= -31000) {
-            heuristicFatalFailures++;
+            hardFailures++;
             if (opts.verbose) {
               console.log(
                 `${RED}  FATAL HEURISTIC FAIL: pos="${bp.pos}" expected=${bp.expectedScore} got=${bestScore}${RESET}`,
@@ -350,10 +350,13 @@ async function runBenchmark(
       } else {
         if (bestScore === bp.expectedScore) {
           correct++;
-        } else if (opts.verbose) {
-          console.log(
-            `${RED}  PARITY FAIL: pos="${bp.pos}" expected=${bp.expectedScore} got=${bestScore}${RESET}`,
-          );
+        } else {
+          hardFailures++;
+          if (opts.verbose) {
+            console.log(
+              `${RED}  PARITY FAIL: pos="${bp.pos}" expected=${bp.expectedScore} got=${bestScore}${RESET}`,
+            );
+          }
         }
       }
     } catch (e) {
@@ -391,9 +394,7 @@ async function runBenchmark(
   const accuracyPct = completed > 0 ? (correct / completed) * 100 : 0;
   // Parity is strictly enforced for exact solver (100% required)
   // For heuristic solver, parity only fails if it hallucinates an exact forced mate
-  const parityOk = isHeuristic
-    ? heuristicFatalFailures === 0
-    : correct === completed;
+  const parityOk = hardFailures === 0;
 
   return {
     runtime: opts.runtime,
