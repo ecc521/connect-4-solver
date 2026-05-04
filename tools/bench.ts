@@ -80,6 +80,7 @@ interface BenchResult {
   nodes: number;
   mns: number;
   timeMs: number;
+  avgDepth: number | null;
   parityOk: boolean;
 }
 
@@ -279,11 +280,13 @@ async function runBenchmark(
   let correct = 0;
   let completed = 0; // positions that finished without abort/timeout
   let totalAttempted = 0;
+  let totalDepth = 0;
   const startNodes: number = solver.getNodeCount();
   const startTime = Date.now();
 
   for (const bp of positions) {
-    if (Date.now() - startTime > opts.budget) break;
+    // Enforce exact same positions across all runs by ignoring time budget
+    // if (Date.now() - startTime > opts.budget) break;
     totalAttempted++;
 
     try {
@@ -296,6 +299,7 @@ async function runBenchmark(
           timeoutMs: opts.timeout,
         });
         if (!result || result.aborted) continue;
+        totalDepth += result.depthReached || 0;
         if (!result.moveOptions || result.moveOptions.length === 0) continue;
 
         // For exact solver: if the per-position time exceeded ~90% of timeout,
@@ -315,6 +319,7 @@ async function runBenchmark(
           timeoutMs: opts.timeout,
         });
         if (!result || result.aborted || !result.evaluation) continue;
+        totalDepth += result.depthReached || 0;
 
         // Same timeout proximity check for solve
         const posElapsed = Date.now() - posStart;
@@ -377,6 +382,7 @@ async function runBenchmark(
     nodes: totalNodes,
     mns: parseFloat(mns.toFixed(2)),
     timeMs: totalMs,
+    avgDepth: isHeuristic && completed > 0 ? totalDepth / completed : null,
     parityOk,
   };
 }
@@ -505,10 +511,10 @@ async function main(): Promise<void> {
 
   if (!opts.json) {
     console.log(
-      `| ${pad("Mode", 10)} | ${pad("Engine", 10)} | ${pad("Board", 5)} | ${pad("Thr", 3, false)} | ${pad("Pos", 7, false)} | ${pad("Accuracy", 8, false)} | ${pad("Nodes", 14, false)} | ${pad("MN/s", 6, false)} | ${pad("Time", 8, false)} |`,
+      `| ${pad("Mode", 10)} | ${pad("Engine", 10)} | ${pad("Board", 5)} | ${pad("Thr", 3, false)} | ${pad("Pos", 7, false)} | ${pad("Accuracy", 8, false)} | ${pad("AvgDpt", 6, false)} | ${pad("Nodes", 14, false)} | ${pad("MN/s", 6, false)} | ${pad("Time", 8, false)} |`,
     );
     console.log(
-      `|${"-".repeat(12)}|${"-".repeat(12)}|${"-".repeat(7)}|${"-".repeat(5)}|${"-".repeat(9)}|${"-".repeat(10)}|${"-".repeat(16)}|${"-".repeat(8)}|${"-".repeat(10)}|`,
+      `|${"-".repeat(12)}|${"-".repeat(12)}|${"-".repeat(7)}|${"-".repeat(5)}|${"-".repeat(9)}|${"-".repeat(10)}|${"-".repeat(8)}|${"-".repeat(16)}|${"-".repeat(8)}|${"-".repeat(10)}|`,
     );
   }
 
@@ -582,9 +588,10 @@ async function main(): Promise<void> {
                 : result.accuracyPct >= 80
                   ? YELLOW
                   : RED;
+            const depthStr = result.avgDepth !== null ? result.avgDepth.toFixed(1) : "-";
 
             console.log(
-              `| ${pad(result.mode, 10)} | ${pad(result.engine, 10)} | ${pad(result.board, 5)} | ${pad(String(result.threads), 3, false)} | ${pad(accStr, 7, false)} | ${accColor}${pad(accPctStr, 8, false)}${RESET} | ${pad(result.nodes.toLocaleString(), 14, false)} | ${pad(result.mns.toFixed(2), 6, false)} | ${pad(result.timeMs + "ms", 8, false)} |${parityMark}`,
+              `| ${pad(result.mode, 10)} | ${pad(result.engine, 10)} | ${pad(result.board, 5)} | ${pad(String(result.threads), 3, false)} | ${pad(accStr, 7, false)} | ${accColor}${pad(accPctStr, 8, false)}${RESET} | ${pad(depthStr, 6, false)} | ${pad(result.nodes.toLocaleString(), 14, false)} | ${pad(result.mns.toFixed(2), 6, false)} | ${pad(result.timeMs + "ms", 8, false)} |${parityMark}`,
             );
           }
         }

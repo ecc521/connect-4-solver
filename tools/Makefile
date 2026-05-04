@@ -1,7 +1,7 @@
 CXX=g++
 CXXFLAGS=--std=c++17 -W -Wall -O3 -DNDEBUG -I../native -march=native -pthread
 
-SRCS=../native/Solver.cpp
+SRCS=
 OBJS=$(subst .cpp,.o,$(SRCS))
 
 all: c4solver generator pack_book pack_dense_book benchmark_book test_nps generate_nnue_data

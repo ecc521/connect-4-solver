@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
             std::vector<int> scores = local_solver->analyze(P, weak, 1, book.get());
             for(int i = 0; i < Position::WIDTH; i++) result += " " + std::to_string(scores[i]);
           } else {
-            auto res = local_solver->solve(P, weak, book.get());
+            auto res = local_solver->solve(P, weak, 1, book.get());
             result += " " + std::to_string(res.score);
           }
           std::lock_guard<std::mutex> lock(io_mutex);
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
           for(int i = 0; i < Position::WIDTH; i++) std::cout << " " << scores[i];
         }
         else {
-          auto res = solver->solve(P, weak, book.get());
+          auto res = solver->solve(P, weak, 1, book.get());
           std::cout << " " << res.score;
         }
         std::cout << "\n";
