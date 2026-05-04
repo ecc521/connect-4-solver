@@ -129,7 +129,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
   }
   uint8_t table_move = WIDTH;
 
-  if(auto packed = transTable->getPacked((SlotType)key); packed.value) {
+  if(auto packed = transTable->getPacked(key); packed.value) {
     uint8_t val = packed.value;
     table_move = packed.best_move;
     if (table_move < WIDTH && is_reverse) table_move = WIDTH - 1 - table_move;
@@ -158,7 +158,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
         } else {
           child_key = child.symmetric_key();
         }
-        if (auto child_packed = transTable->getPacked((SlotType)child_key); child_packed.value) {
+        if (auto child_packed = transTable->getPacked(child_key); child_packed.value) {
           uint8_t child_val = child_packed.value;
           if (child_val <= GenericPosition<WIDTH, HEIGHT>::MAX_SCORE - GenericPosition<WIDTH, HEIGHT>::MIN_SCORE + 1) {
             // child upper bound means child_score <= child_max
@@ -179,7 +179,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
     }
   }
 
-  MoveSorter moves;
+  GenericMoveSorter<WIDTH, HEIGHT> moves;
 
   for(int i = WIDTH; i--;) {
     if(typename GenericPosition<WIDTH, HEIGHT>::position_t move = possible & GenericPosition<WIDTH, HEIGHT>::column_mask(GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i])) {
@@ -202,7 +202,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
       } else {
         child_key = child.symmetric_key();
       }
-      transTable->prefetch((SlotType)child_key);
+      transTable->prefetch(child_key);
     }
   }
 
@@ -227,7 +227,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
     if(best_score >= beta) {
       uint8_t stored_move = best_move;
       if (stored_move < WIDTH && is_reverse) stored_move = WIDTH - 1 - stored_move;
-      transTable->put((SlotType)key, best_score + GenericPosition<WIDTH, HEIGHT>::MAX_SCORE - 2 * GenericPosition<WIDTH, HEIGHT>::MIN_SCORE + 2, WIDTH * HEIGHT - P.nbMoves(), stored_move);
+      transTable->put(key, best_score + GenericPosition<WIDTH, HEIGHT>::MAX_SCORE - 2 * GenericPosition<WIDTH, HEIGHT>::MIN_SCORE + 2, WIDTH * HEIGHT - P.nbMoves(), stored_move);
       return best_score;
     }
     alpha = std::max(alpha, best_score);
@@ -236,7 +236,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
   uint8_t work = WIDTH * HEIGHT - P.nbMoves();
   uint8_t stored_move = best_move;
   if (stored_move < WIDTH && is_reverse) stored_move = WIDTH - 1 - stored_move;
-  transTable->put((SlotType)key, best_score - GenericPosition<WIDTH, HEIGHT>::MIN_SCORE + 1, work, stored_move);
+  transTable->put(key, best_score - GenericPosition<WIDTH, HEIGHT>::MIN_SCORE + 1, work, stored_move);
   return best_score;
 }
 
@@ -608,13 +608,14 @@ template <int WIDTH, int HEIGHT, typename SlotType>
 class TypedCache : public ::GameSolver::Connect4::Cache {
  public:
   static constexpr int VALUE_BITS = getRequiredValueBits<WIDTH, HEIGHT>();
-  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, typename GenericPosition<WIDTH, HEIGHT>::position_t>> transTable;
+  static constexpr int MOVE_BITS = WIDTH >= 16 ? 5 : (WIDTH >= 8 ? 4 : 3);
+  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, typename GenericPosition<WIDTH, HEIGHT>::position_t>> transTable;
 
   TypedCache(size_t table_bytes)
-    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, typename GenericPosition<WIDTH, HEIGHT>::position_t>>(table_bytes)) {
+    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, typename GenericPosition<WIDTH, HEIGHT>::position_t>>(table_bytes)) {
 
       // Calculate CRT safety
-      int shift_amount = VALUE_BITS + 7 + 4; // ValueBits + WorkBits + MoveBits
+      int shift_amount = VALUE_BITS + 7 + MOVE_BITS; // ValueBits + WorkBits + MoveBits
       int available_bits = sizeof(SlotType) * 8 - shift_amount;
       int board_bits = WIDTH * (HEIGHT + 1);
 

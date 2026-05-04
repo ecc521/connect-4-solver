@@ -22,15 +22,15 @@ On Node.js, the native C++ addon will automatically compile for maximum performa
 ## Quick Start
 
 ```typescript
-import { createSolver } from 'connect-4-solver';
+import { createSolver } from "connect-4-solver";
 
 const solver = await createSolver();
 await solver.init();
 
 // Analyze all columns from a position (moves are 1-indexed columns)
 const result = await solver.analyze("44445223");
-console.log(result.evaluation);       // { outcome: 'Win', score: 5, ... }
-console.log(result.moveOptions);      // Per-column evaluations
+console.log(result.evaluation); // { outcome: 'Win', score: 5, ... }
+console.log(result.moveOptions); // Per-column evaluations
 
 // Solve for the optimal score
 const solve = await solver.solve("44445223");
@@ -40,7 +40,7 @@ console.log(solve.evaluation?.score); // Exact minimax score
 ### Heuristic Mode
 
 ```typescript
-import { createSolver } from 'connect-4-solver';
+import { createSolver } from "connect-4-solver";
 
 const solver = await createSolver({ heuristic: true });
 await solver.init();
@@ -56,7 +56,7 @@ const result = await solver.analyze("44445223", {
 ### Custom Board Sizes
 
 ```typescript
-import { NodeConnect4Solver } from 'connect-4-solver/node';
+import { NodeConnect4Solver } from "connect-4-solver/node";
 
 const solver = new NodeConnect4Solver({ width: 8, height: 8 });
 await solver.init();
@@ -122,32 +122,32 @@ npm run bench:pgo:wasm
 
 ## npm Scripts Reference
 
-| Script | Description |
-|--------|-------------|
-| `npm run build` | Build WASM + TypeScript |
-| `npm run build:ts` | TypeScript compilation only |
-| `npm run build:native` | Recompile native C++ addon |
-| `npm run build:native:pgo` | PGO-optimized native build |
-| `npm run build:wasm` | Compile WASM module |
-| `npm run build:wasm:pgo` | PGO-optimized WASM build |
-| `npm test` | Lint + Jest unit tests |
-| `npm run bench` / `bench:node` | Benchmark via Node.js native addon |
-| `npm run bench:wasm` | Benchmark via WASM |
-| `npm run bench:cpp` | Benchmark raw C++ engine (no Node.js) |
-| `npm run bench:book` | Opening book benchmark |
-| `npm run bench:pgo:native` | PGO A/B comparison (native) |
-| `npm run bench:pgo:wasm` | PGO A/B comparison (WASM) |
-| `npm run docs:dev` | Local VitePress dev server |
+| Script                         | Description                           |
+| ------------------------------ | ------------------------------------- |
+| `npm run build`                | Build WASM + TypeScript               |
+| `npm run build:ts`             | TypeScript compilation only           |
+| `npm run build:native`         | Recompile native C++ addon            |
+| `npm run build:native:pgo`     | PGO-optimized native build            |
+| `npm run build:wasm`           | Compile WASM module                   |
+| `npm run build:wasm:pgo`       | PGO-optimized WASM build              |
+| `npm test`                     | Lint + Jest unit tests                |
+| `npm run bench` / `bench:node` | Benchmark via Node.js native addon    |
+| `npm run bench:wasm`           | Benchmark via WASM                    |
+| `npm run bench:cpp`            | Benchmark raw C++ engine (no Node.js) |
+| `npm run bench:book`           | Opening book benchmark                |
+| `npm run bench:pgo:native`     | PGO A/B comparison (native)           |
+| `npm run bench:pgo:wasm`       | PGO A/B comparison (WASM)             |
+| `npm run docs:dev`             | Local VitePress dev server            |
 
 ## Board Size Support
 
-| Board | Position Bits | Status |
-|-------|--------------|--------|
-| 7×6 | 56-bit (u64) | ✅ Primary — NNUE, opening books |
-| 8×8 | 72-bit (u128) | ✅ Primary — NNUE, full support |
-| 6×5, 6×6, 8×6 | ≤56-bit | ✅ Supported |
-| 9×7, 7×7, 7×8 | >56-bit | ✅ 128-bit fallback |
-| Up to 12×12 | ≤128-bit | ✅ Generic template |
+| Board         | Position Bits | Status                           |
+| ------------- | ------------- | -------------------------------- |
+| 7×6           | 56-bit (u64)  | ✅ Primary — NNUE, opening books |
+| 8×8           | 72-bit (u128) | ✅ Primary — NNUE, full support  |
+| 6×5, 6×6, 8×6 | ≤56-bit       | ✅ Supported                     |
+| 9×7, 7×7, 7×8 | >56-bit       | ✅ 128-bit fallback              |
+| Up to 12×12   | ≤128-bit      | ✅ Generic template              |
 
 ## Credits & License
 

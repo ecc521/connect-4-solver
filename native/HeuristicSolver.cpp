@@ -63,7 +63,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   }
 
   auto moves = P.possibleNonLosingMoves();
-  if (moves == 0) return -(WIDTH * HEIGHT - P.nbMoves()) / 2;
+  if (moves == 0) return -31000 - (WIDTH * HEIGHT + 2 - P.nbMoves()) / 2;
 
   struct Move {
     typename GenericPosition<WIDTH, HEIGHT>::position_t move;
@@ -130,7 +130,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
   } guard{this->isSearching};
 
   if(P.canWinNext()) {
-    int score = 31000 + (WIDTH * HEIGHT + 1 - (P.nbMoves() + 1)) / 2;
+    int score = 31000 + (WIDTH * HEIGHT + 2 - (P.nbMoves() + 1)) / 2;
     for (int i = 0; i < WIDTH; i++) {
         if (P.canPlay(i) && P.isWinningMove(i)) return {score, i, (int)P.nbMoves(), getNodeCount()};
     }
@@ -187,7 +187,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
         int score = -40000;
 
         if (P.isWinningMove(col)) {
-          score = 31000 + (WIDTH * HEIGHT + 1 - (P.nbMoves() + 1)) / 2;
+          score = 31000 + (WIDTH * HEIGHT + 2 - (P.nbMoves() + 1)) / 2;
         } else {
           GenericPosition<WIDTH, HEIGHT> P2(P);
           P2.playCol(col);

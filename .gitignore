@@ -62,3 +62,4 @@ bench_native_*_pgo_optimized
 patch*.js
 test-ptrs.*
 venv/
+__pycache__/

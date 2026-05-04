@@ -140,12 +140,19 @@ async function run() {
   const sharedCache = new NativeCache(width, height, cacheSizeMb, false);
   const solvers: NodeConnect4Solver[] = [];
   for (let i = 0; i < threads; i++) {
-    const s = new NodeConnect4Solver({ width, height, sharedCache, heuristic: false });
+    const s = new NodeConnect4Solver({
+      width,
+      height,
+      sharedCache,
+      heuristic: false,
+    });
     await s.init();
     solvers.push(s);
   }
 
-  console.log(`[+] Created ${threads} native solvers sharing a ${cacheSizeMb}MB cache.`);
+  console.log(
+    `[+] Created ${threads} native solvers sharing a ${cacheSizeMb}MB cache.`,
+  );
   console.log(
     `[+] Crunching ${weak ? "WEAK " : ""}Alpha-Beta evaluations using ${threads} concurrent workers...`,
   );
@@ -212,7 +219,7 @@ async function run() {
   }
   console.log(`[+] Book successfully saved to ${outputFile}`);
   if (bootstrapBook) bootstrapBook.unload();
-  solvers.forEach(s => s.release());
+  solvers.forEach((s) => s.release());
   sharedCache.destroy();
   process.exit(0);
 }

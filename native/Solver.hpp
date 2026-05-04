@@ -80,8 +80,9 @@ template <int WIDTH, int HEIGHT, typename SlotType>
 class SolverImpl : public Solver<WIDTH, HEIGHT> {
  public:
   static constexpr int VALUE_BITS = getRequiredValueBits<WIDTH, HEIGHT>();
+  static constexpr int MOVE_BITS = WIDTH >= 16 ? 5 : (WIDTH >= 8 ? 4 : 3);
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
-  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, position_t>> transTable;
+  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, position_t>> transTable;
   std::atomic<unsigned long long> nodeCount;
   std::atomic<bool> isSearching{false};
   std::atomic<bool> stopSearch{false};
@@ -98,13 +99,13 @@ class SolverImpl : public Solver<WIDTH, HEIGHT> {
  public:
 
   SolverImpl(size_t table_bytes) 
-    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, position_t>>(table_bytes)), nodeCount{0}, pool(std::make_unique<::GameSolver::Connect4::ThreadPool>()) {
+    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, position_t>>(table_bytes)), nodeCount{0}, pool(std::make_unique<::GameSolver::Connect4::ThreadPool>()) {
     for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
       history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
     }
   }
 
-  SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, position_t>> cache)
+  SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, position_t>> cache)
     : transTable(cache), nodeCount{0}, pool(std::make_unique<::GameSolver::Connect4::ThreadPool>()) {
     for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
       history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];

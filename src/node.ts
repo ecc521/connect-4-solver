@@ -146,10 +146,20 @@ export function getNativeModule(): NativeModuleType | null {
 
 export class NativeCache {
   public ptr: unknown;
-  constructor(public width: number, public height: number, public cacheSizeMb: number, public isHeuristic: boolean) {
+  constructor(
+    public width: number,
+    public height: number,
+    public cacheSizeMb: number,
+    public isHeuristic: boolean,
+  ) {
     const native = getNativeModule();
     if (!native) throw new Error("Native module not loaded");
-    this.ptr = native._createCache(width, height, cacheSizeMb * 1024 * 1024, isHeuristic);
+    this.ptr = native._createCache(
+      width,
+      height,
+      cacheSizeMb * 1024 * 1024,
+      isHeuristic,
+    );
   }
   destroy(): void {
     const native = getNativeModule();
@@ -169,7 +179,12 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
 
   constructor(opts?: NodeConnect4SolverOptions | number, heightOpt?: number) {
     super(opts as NodeConnect4SolverOptions, heightOpt);
-    if (opts && typeof opts === "object" && 'sharedCache' in opts && opts.sharedCache) {
+    if (
+      opts &&
+      typeof opts === "object" &&
+      "sharedCache" in opts &&
+      opts.sharedCache
+    ) {
       this._sharedCache = opts.sharedCache;
     }
   }
@@ -182,7 +197,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         "NodeConnect4Solver can only be executed in a Node.js environment where 'connect4.node' successfully compiled.",
       );
     }
-    
+
     if (this._sharedCache) {
       this._cachePtr = this._sharedCache.ptr as number;
     } else {
@@ -193,7 +208,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         this.isHeuristic,
       ) as number;
     }
-    
+
     this._solverPtr = native._createSolver(
       this.width,
       this.height,
@@ -212,7 +227,9 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
 
     return new Promise<PositionAnalysis>((resolve, reject) => {
       this._analysisQueue = this._analysisQueue
-        .catch(() => { /* ignore */ })
+        .catch(() => {
+          /* ignore */
+        })
         .then(async () => {
           try {
             const native = getNativeModule();
@@ -260,12 +277,15 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
 
     return new Promise<PositionAnalysis>((resolve, reject) => {
       this._analysisQueue = this._analysisQueue
-        .catch(() => { /* ignore */ })
+        .catch(() => {
+          /* ignore */
+        })
         .then(async () => {
           try {
             const native = getNativeModule();
             if (!native) throw new Error("Native module not loaded");
-            const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
+            const { threads, maxDepth, timeoutMs, bookPtr } =
+              this.sanitizeOpts(opts);
             const weak = opts?.weak ?? false;
 
             let resArr: Int32Array | number[];
@@ -307,7 +327,12 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     if (!this.initialized) return;
     const native = getNativeModule();
     if (native) {
-      native._stopSolver(this.width, this.height, this._solverPtr, this.isHeuristic);
+      native._stopSolver(
+        this.width,
+        this.height,
+        this._solverPtr,
+        this.isHeuristic,
+      );
     }
   }
 
@@ -315,19 +340,31 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     if (!this.initialized) return;
     const native = getNativeModule();
     if (native) {
-      native._destroySolver(this.width, this.height, this._solverPtr, this.isHeuristic);
+      native._destroySolver(
+        this.width,
+        this.height,
+        this._solverPtr,
+        this.isHeuristic,
+      );
       if (!this._sharedCache) {
         native._destroyCache(this._cachePtr);
       }
     }
     this.initialized = false;
   }
-  
+
   getNodeCount(): number {
     if (!this.initialized) return 0;
     const native = getNativeModule();
     if (native) {
-      return Number(native._getNodeCount(this.width, this.height, this._solverPtr, this.isHeuristic));
+      return Number(
+        native._getNodeCount(
+          this.width,
+          this.height,
+          this._solverPtr,
+          this.isHeuristic,
+        ),
+      );
     }
     return 0;
   }

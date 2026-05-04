@@ -120,6 +120,21 @@ int32_t* runHeuristicAnalysis(Solver<W, H>& solver, const char* positionCharArr,
   return result;
 }
 
+template <int W, int H>
+void runHeuristicStop(HeuristicSolver<W, H>& solver, bool /*dummy*/) {
+    solver.stop();
+}
+
+template <int W, int H>
+double runHeuristicGetNodeCount(HeuristicSolver<W, H>& solver, bool /*dummy*/) {
+    return (double)solver.getNodeCount();
+}
+
+template <int W, int H>
+void runHeuristicDelete(HeuristicSolver<W, H>& solver, bool /*dummy*/) {
+    delete &solver;
+}
+
 extern "C" {
 
 #include "dispatch_table.hpp"
@@ -135,7 +150,9 @@ void* createCache(int w, int h, size_t bytes, bool is_heuristic) {
 
 EMSCRIPTEN_KEEPALIVE
 void destroyCache(void* cache) {
-    // Shared pointer destruction handled in TS wrapper for TTs
+    if (cache) {
+        delete static_cast<::GameSolver::Connect4::Cache*>(cache);
+    }
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -148,13 +165,21 @@ void* createSolver(int w, int h, void* cache_ptr, bool is_heuristic) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-void destroySolver(void* solver, int w, int h, bool is_heuristic) {
-    DISPATCH_DELETE(w, h, solver);
+void destroySolver(int w, int h, void* solver, bool is_heuristic) {
+    if (is_heuristic) {
+        DISPATCH_HEURISTIC_VOID(runHeuristicDelete, false);
+    } else {
+        DISPATCH_DELETE(w, h, solver);
+    }
 }
 
 EMSCRIPTEN_KEEPALIVE
-void stopSolver(void* solver, int w, int h) {
-    DISPATCH_EXACT_VOID(w, h, stop, solver);
+void stopSolver(int w, int h, void* solver, bool is_heuristic) {
+    if (is_heuristic) {
+        DISPATCH_HEURISTIC_VOID(runHeuristicStop, false);
+    } else {
+        DISPATCH_EXACT_VOID(w, h, stop, solver);
+    }
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -163,33 +188,38 @@ void* createBook(int w, int h, const uint8_t* data, size_t size) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-void destroyBook(void* book, int w, int h) {
+void destroyBook(int w, int h, void* book) {
     DISPATCH_DELETE_BOOK(w, h, book);
 }
 
 EMSCRIPTEN_KEEPALIVE
-int32_t* solveExact(void* solver, int w, int h, const char* position, bool weak, int threads, void* book_ptr, double timeout_ms) {
+int32_t* solveExact(int w, int h, void* solver, const char* position, bool weak, int threads, void* book_ptr, double timeout_ms) {
     DISPATCH_EXACT(runSolve, position, weak, threads, book_ptr, timeout_ms);
 }
 
 EMSCRIPTEN_KEEPALIVE
-int32_t* solveHeuristic(void* solver, int w, int h, const char* position, int max_depth, int threads, void* book_ptr, double timeout_ms) {
+int32_t* solveHeuristic(int w, int h, void* solver, const char* position, int max_depth, int threads, double timeout_ms, void* book_ptr) {
     DISPATCH_HEURISTIC(runSolveHeuristic, position, max_depth, threads, book_ptr, timeout_ms);
 }
 
 EMSCRIPTEN_KEEPALIVE
-int32_t* analyzeExact(void* solver, int w, int h, const char* position, bool weak, int threads, void* book_ptr, double timeout_ms) {
+int32_t* analyzeExact(int w, int h, void* solver, const char* position, bool weak, int threads, void* book_ptr, double timeout_ms) {
     DISPATCH_EXACT(runAnalysis, position, weak, threads, book_ptr, timeout_ms);
 }
 
 EMSCRIPTEN_KEEPALIVE
-int32_t* analyzeHeuristic(void* solver, int w, int h, const char* position, int max_depth, int threads, double timeout_ms) {
+int32_t* analyzeHeuristic(int w, int h, void* solver, const char* position, int max_depth, int threads, double timeout_ms) {
     DISPATCH_HEURISTIC(runHeuristicAnalysis, position, max_depth, threads, timeout_ms);
 }
 
 EMSCRIPTEN_KEEPALIVE
-double getNodeCount(void* solver, int w, int h) {
-    DISPATCH_EXACT_RETURN(w, h, getNodeCount, solver);
+double getNodeCount(int w, int h, void* solver, bool is_heuristic) {
+    if (is_heuristic) {
+        DISPATCH_HEURISTIC_DOUBLE(runHeuristicGetNodeCount, false);
+    } else {
+        DISPATCH_EXACT_RETURN(w, h, getNodeCount, solver);
+    }
 }
 
 }
+

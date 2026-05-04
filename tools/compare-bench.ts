@@ -36,7 +36,9 @@ function pad(val: string | number, len: number, left = true): string {
 function main(): void {
   const args = process.argv.slice(2);
   if (args.length < 2) {
-    console.error("Usage: npx ts-node tools/compare-bench.ts <baseline.json> <pgo.json>");
+    console.error(
+      "Usage: npx ts-node tools/compare-bench.ts <baseline.json> <pgo.json>",
+    );
     process.exit(1);
   }
 
@@ -44,12 +46,15 @@ function main(): void {
   const pgo: BenchResult[] = JSON.parse(fs.readFileSync(args[1], "utf-8"));
 
   // Build lookup for PGO results
-  const key = (r: BenchResult): string => `${r.mode}|${r.engine}|${r.board}|${r.threads}`;
+  const key = (r: BenchResult): string =>
+    `${r.mode}|${r.engine}|${r.board}|${r.threads}`;
   const pgoMap = new Map<string, BenchResult>();
   for (const r of pgo) pgoMap.set(key(r), r);
 
   console.log(`\n${BOLD}PGO Performance Comparison${RESET}`);
-  console.log(`${DIM}────────────────────────────────────────────────────────────────${RESET}\n`);
+  console.log(
+    `${DIM}────────────────────────────────────────────────────────────────${RESET}\n`,
+  );
 
   console.log(
     `| ${pad("Mode", 10)} | ${pad("Engine", 10)} | ${pad("Board", 5)} | ${pad("Thr", 3, false)} | ${pad("Base MN/s", 10, false)} | ${pad("PGO MN/s", 10, false)} | ${pad("Delta", 8, false)} |`,

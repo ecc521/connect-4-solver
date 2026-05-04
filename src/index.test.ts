@@ -70,10 +70,17 @@ describe("NodeConnect4Solver", () => {
     });
 
     it("should correctly instantiate an 8x8 board (128-bit)", async () => {
-      const testSolver = new NodeConnect4Solver({ width: 8, height: 8, heuristic: true });
+      const testSolver = new NodeConnect4Solver({
+        width: 8,
+        height: 8,
+        heuristic: true,
+      });
       await testSolver.init();
       // Use heuristic with shallow depth to avoid timeout — this is a structural smoke test
-      const result = await testSolver.analyze("12345678", { maxDepth: 4, timeoutMs: 2000 });
+      const result = await testSolver.analyze("12345678", {
+        maxDepth: 4,
+        timeoutMs: 2000,
+      });
       expect(result.evaluation).not.toBeNull();
       testSolver.release();
     });

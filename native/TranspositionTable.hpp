@@ -64,10 +64,9 @@ template<int S> using uint_t =
  * designed for L1/L3 Cache utilization. It packs a partial key
  * and an 8-bit value into a single atomic slot.
  */
-template<typename SlotType, typename ValueType = uint8_t, unsigned int ValueBits = 8, unsigned int WorkBits = 7, unsigned int FlagBits = 0, typename KeyType = uint64_t>
+template<typename SlotType, typename ValueType = uint8_t, unsigned int ValueBits = 8, unsigned int WorkBits = 7, unsigned int FlagBits = 0, unsigned int MoveBits = 4, typename KeyType = uint64_t>
 class TranspositionTable {
  public:
-  static constexpr unsigned int MoveBits = 4;
  private:
   struct Slot {
     std::atomic<SlotType> data;
@@ -83,7 +82,7 @@ class TranspositionTable {
   Bucket *Data;
 
   size_t index(KeyType key) const {
-    return (key % num_buckets);
+    return static_cast<size_t>(static_cast<uint64_t>(key % num_buckets));
   }
 
  public:
@@ -124,7 +123,7 @@ class TranspositionTable {
       int available_bits = sizeof(SlotType) * 8 - shift_amount;
       
       if (available_bits >= (int)(sizeof(KeyType) * 8)) return static_cast<SlotType>(partial);
-      KeyType mask = (available_bits >= 64) ? ~static_cast<KeyType>(0) : ((static_cast<KeyType>(1) << available_bits) - 1);
+      KeyType mask = (available_bits >= (int)(sizeof(KeyType) * 8)) ? ~static_cast<KeyType>(0) : ((static_cast<KeyType>(1) << available_bits) - 1);
       return static_cast<SlotType>(partial & mask);
   }
 

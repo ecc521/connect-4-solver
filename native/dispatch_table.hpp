@@ -84,7 +84,92 @@
     if (w == 13 && h == 8) return ACTION<13, 8>(*static_cast<C4_13x8::Solver*>(solver), __VA_ARGS__); \
     return nullptr;
 
-#define DISPATCH_HEURISTIC(ACTION, ...) \
+#define DISPATCH_HEURISTIC_VOID(ACTION, ...) \
+    if (w == 4 && h == 4) { ACTION<4, 4>(*static_cast<C4_4x4::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 4 && h == 5) { ACTION<4, 5>(*static_cast<C4_4x5::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 4 && h == 6) { ACTION<4, 6>(*static_cast<C4_4x6::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 4 && h == 7) { ACTION<4, 7>(*static_cast<C4_4x7::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 4 && h == 8) { ACTION<4, 8>(*static_cast<C4_4x8::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 4 && h == 9) { ACTION<4, 9>(*static_cast<C4_4x9::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 4 && h == 10) { ACTION<4, 10>(*static_cast<C4_4x10::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 4 && h == 11) { ACTION<4, 11>(*static_cast<C4_4x11::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 4 && h == 12) { ACTION<4, 12>(*static_cast<C4_4x12::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 5 && h == 4) { ACTION<5, 4>(*static_cast<C4_5x4::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 5 && h == 5) { ACTION<5, 5>(*static_cast<C4_5x5::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 5 && h == 6) { ACTION<5, 6>(*static_cast<C4_5x6::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 5 && h == 7) { ACTION<5, 7>(*static_cast<C4_5x7::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 5 && h == 8) { ACTION<5, 8>(*static_cast<C4_5x8::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 5 && h == 9) { ACTION<5, 9>(*static_cast<C4_5x9::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 5 && h == 10) { ACTION<5, 10>(*static_cast<C4_5x10::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 5 && h == 11) { ACTION<5, 11>(*static_cast<C4_5x11::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 5 && h == 12) { ACTION<5, 12>(*static_cast<C4_5x12::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 6 && h == 4) { ACTION<6, 4>(*static_cast<C4_6x4::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 6 && h == 5) { ACTION<6, 5>(*static_cast<C4_6x5::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 6 && h == 6) { ACTION<6, 6>(*static_cast<C4_6x6::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 6 && h == 7) { ACTION<6, 7>(*static_cast<C4_6x7::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 6 && h == 8) { ACTION<6, 8>(*static_cast<C4_6x8::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 6 && h == 9) { ACTION<6, 9>(*static_cast<C4_6x9::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 6 && h == 10) { ACTION<6, 10>(*static_cast<C4_6x10::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 6 && h == 11) { ACTION<6, 11>(*static_cast<C4_6x11::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 6 && h == 12) { ACTION<6, 12>(*static_cast<C4_6x12::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 7 && h == 4) { ACTION<7, 4>(*static_cast<C4_7x4::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 7 && h == 5) { ACTION<7, 5>(*static_cast<C4_7x5::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 7 && h == 6) { ACTION<7, 6>(*static_cast<C4_7x6::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 7 && h == 7) { ACTION<7, 7>(*static_cast<C4_7x7::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 7 && h == 8) { ACTION<7, 8>(*static_cast<C4_7x8::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 7 && h == 9) { ACTION<7, 9>(*static_cast<C4_7x9::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 7 && h == 10) { ACTION<7, 10>(*static_cast<C4_7x10::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 7 && h == 11) { ACTION<7, 11>(*static_cast<C4_7x11::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 7 && h == 12) { ACTION<7, 12>(*static_cast<C4_7x12::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 7 && h == 13) { ACTION<7, 13>(*static_cast<C4_7x13::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 8 && h == 4) { ACTION<8, 4>(*static_cast<C4_8x4::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 8 && h == 5) { ACTION<8, 5>(*static_cast<C4_8x5::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 8 && h == 6) { ACTION<8, 6>(*static_cast<C4_8x6::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 8 && h == 7) { ACTION<8, 7>(*static_cast<C4_8x7::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 8 && h == 8) { ACTION<8, 8>(*static_cast<C4_8x8::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 8 && h == 9) { ACTION<8, 9>(*static_cast<C4_8x9::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 8 && h == 10) { ACTION<8, 10>(*static_cast<C4_8x10::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 8 && h == 11) { ACTION<8, 11>(*static_cast<C4_8x11::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 8 && h == 12) { ACTION<8, 12>(*static_cast<C4_8x12::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 8 && h == 13) { ACTION<8, 13>(*static_cast<C4_8x13::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 9 && h == 4) { ACTION<9, 4>(*static_cast<C4_9x4::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 9 && h == 5) { ACTION<9, 5>(*static_cast<C4_9x5::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 9 && h == 6) { ACTION<9, 6>(*static_cast<C4_9x6::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 9 && h == 7) { ACTION<9, 7>(*static_cast<C4_9x7::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 9 && h == 8) { ACTION<9, 8>(*static_cast<C4_9x8::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 9 && h == 9) { ACTION<9, 9>(*static_cast<C4_9x9::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 9 && h == 10) { ACTION<9, 10>(*static_cast<C4_9x10::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 9 && h == 11) { ACTION<9, 11>(*static_cast<C4_9x11::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 9 && h == 12) { ACTION<9, 12>(*static_cast<C4_9x12::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 10 && h == 4) { ACTION<10, 4>(*static_cast<C4_10x4::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 10 && h == 5) { ACTION<10, 5>(*static_cast<C4_10x5::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 10 && h == 6) { ACTION<10, 6>(*static_cast<C4_10x6::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 10 && h == 7) { ACTION<10, 7>(*static_cast<C4_10x7::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 10 && h == 8) { ACTION<10, 8>(*static_cast<C4_10x8::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 10 && h == 9) { ACTION<10, 9>(*static_cast<C4_10x9::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 10 && h == 10) { ACTION<10, 10>(*static_cast<C4_10x10::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 10 && h == 11) { ACTION<10, 11>(*static_cast<C4_10x11::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 11 && h == 4) { ACTION<11, 4>(*static_cast<C4_11x4::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 11 && h == 5) { ACTION<11, 5>(*static_cast<C4_11x5::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 11 && h == 6) { ACTION<11, 6>(*static_cast<C4_11x6::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 11 && h == 7) { ACTION<11, 7>(*static_cast<C4_11x7::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 11 && h == 8) { ACTION<11, 8>(*static_cast<C4_11x8::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 11 && h == 9) { ACTION<11, 9>(*static_cast<C4_11x9::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 11 && h == 10) { ACTION<11, 10>(*static_cast<C4_11x10::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 12 && h == 4) { ACTION<12, 4>(*static_cast<C4_12x4::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 12 && h == 5) { ACTION<12, 5>(*static_cast<C4_12x5::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 12 && h == 6) { ACTION<12, 6>(*static_cast<C4_12x6::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 12 && h == 7) { ACTION<12, 7>(*static_cast<C4_12x7::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 12 && h == 8) { ACTION<12, 8>(*static_cast<C4_12x8::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 12 && h == 9) { ACTION<12, 9>(*static_cast<C4_12x9::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 13 && h == 4) { ACTION<13, 4>(*static_cast<C4_13x4::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 13 && h == 5) { ACTION<13, 5>(*static_cast<C4_13x5::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 13 && h == 6) { ACTION<13, 6>(*static_cast<C4_13x6::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 13 && h == 7) { ACTION<13, 7>(*static_cast<C4_13x7::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    if (w == 13 && h == 8) { ACTION<13, 8>(*static_cast<C4_13x8::HeuristicSolver*>(solver), __VA_ARGS__); return; } \
+    return;
+
+#define DISPATCH_HEURISTIC_RETURN(ACTION, ...) \
     if (w == 4 && h == 4) return ACTION<4, 4>(*static_cast<C4_4x4::HeuristicSolver*>(solver), __VA_ARGS__); \
     if (w == 4 && h == 5) return ACTION<4, 5>(*static_cast<C4_4x5::HeuristicSolver*>(solver), __VA_ARGS__); \
     if (w == 4 && h == 6) return ACTION<4, 6>(*static_cast<C4_4x6::HeuristicSolver*>(solver), __VA_ARGS__); \
@@ -168,6 +253,93 @@
     if (w == 13 && h == 7) return ACTION<13, 7>(*static_cast<C4_13x7::HeuristicSolver*>(solver), __VA_ARGS__); \
     if (w == 13 && h == 8) return ACTION<13, 8>(*static_cast<C4_13x8::HeuristicSolver*>(solver), __VA_ARGS__); \
     return nullptr;
+
+#define DISPATCH_HEURISTIC_DOUBLE(ACTION, ...) \
+    if (w == 4 && h == 4) return ACTION<4, 4>(*static_cast<C4_4x4::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 4 && h == 5) return ACTION<4, 5>(*static_cast<C4_4x5::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 4 && h == 6) return ACTION<4, 6>(*static_cast<C4_4x6::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 4 && h == 7) return ACTION<4, 7>(*static_cast<C4_4x7::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 4 && h == 8) return ACTION<4, 8>(*static_cast<C4_4x8::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 4 && h == 9) return ACTION<4, 9>(*static_cast<C4_4x9::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 4 && h == 10) return ACTION<4, 10>(*static_cast<C4_4x10::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 4 && h == 11) return ACTION<4, 11>(*static_cast<C4_4x11::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 4 && h == 12) return ACTION<4, 12>(*static_cast<C4_4x12::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 5 && h == 4) return ACTION<5, 4>(*static_cast<C4_5x4::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 5 && h == 5) return ACTION<5, 5>(*static_cast<C4_5x5::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 5 && h == 6) return ACTION<5, 6>(*static_cast<C4_5x6::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 5 && h == 7) return ACTION<5, 7>(*static_cast<C4_5x7::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 5 && h == 8) return ACTION<5, 8>(*static_cast<C4_5x8::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 5 && h == 9) return ACTION<5, 9>(*static_cast<C4_5x9::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 5 && h == 10) return ACTION<5, 10>(*static_cast<C4_5x10::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 5 && h == 11) return ACTION<5, 11>(*static_cast<C4_5x11::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 5 && h == 12) return ACTION<5, 12>(*static_cast<C4_5x12::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 6 && h == 4) return ACTION<6, 4>(*static_cast<C4_6x4::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 6 && h == 5) return ACTION<6, 5>(*static_cast<C4_6x5::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 6 && h == 6) return ACTION<6, 6>(*static_cast<C4_6x6::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 6 && h == 7) return ACTION<6, 7>(*static_cast<C4_6x7::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 6 && h == 8) return ACTION<6, 8>(*static_cast<C4_6x8::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 6 && h == 9) return ACTION<6, 9>(*static_cast<C4_6x9::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 6 && h == 10) return ACTION<6, 10>(*static_cast<C4_6x10::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 6 && h == 11) return ACTION<6, 11>(*static_cast<C4_6x11::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 6 && h == 12) return ACTION<6, 12>(*static_cast<C4_6x12::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 7 && h == 4) return ACTION<7, 4>(*static_cast<C4_7x4::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 7 && h == 5) return ACTION<7, 5>(*static_cast<C4_7x5::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 7 && h == 6) return ACTION<7, 6>(*static_cast<C4_7x6::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 7 && h == 7) return ACTION<7, 7>(*static_cast<C4_7x7::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 7 && h == 8) return ACTION<7, 8>(*static_cast<C4_7x8::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 7 && h == 9) return ACTION<7, 9>(*static_cast<C4_7x9::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 7 && h == 10) return ACTION<7, 10>(*static_cast<C4_7x10::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 7 && h == 11) return ACTION<7, 11>(*static_cast<C4_7x11::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 7 && h == 12) return ACTION<7, 12>(*static_cast<C4_7x12::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 7 && h == 13) return ACTION<7, 13>(*static_cast<C4_7x13::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 8 && h == 4) return ACTION<8, 4>(*static_cast<C4_8x4::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 8 && h == 5) return ACTION<8, 5>(*static_cast<C4_8x5::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 8 && h == 6) return ACTION<8, 6>(*static_cast<C4_8x6::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 8 && h == 7) return ACTION<8, 7>(*static_cast<C4_8x7::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 8 && h == 8) return ACTION<8, 8>(*static_cast<C4_8x8::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 8 && h == 9) return ACTION<8, 9>(*static_cast<C4_8x9::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 8 && h == 10) return ACTION<8, 10>(*static_cast<C4_8x10::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 8 && h == 11) return ACTION<8, 11>(*static_cast<C4_8x11::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 8 && h == 12) return ACTION<8, 12>(*static_cast<C4_8x12::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 8 && h == 13) return ACTION<8, 13>(*static_cast<C4_8x13::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 9 && h == 4) return ACTION<9, 4>(*static_cast<C4_9x4::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 9 && h == 5) return ACTION<9, 5>(*static_cast<C4_9x5::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 9 && h == 6) return ACTION<9, 6>(*static_cast<C4_9x6::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 9 && h == 7) return ACTION<9, 7>(*static_cast<C4_9x7::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 9 && h == 8) return ACTION<9, 8>(*static_cast<C4_9x8::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 9 && h == 9) return ACTION<9, 9>(*static_cast<C4_9x9::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 9 && h == 10) return ACTION<9, 10>(*static_cast<C4_9x10::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 9 && h == 11) return ACTION<9, 11>(*static_cast<C4_9x11::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 9 && h == 12) return ACTION<9, 12>(*static_cast<C4_9x12::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 10 && h == 4) return ACTION<10, 4>(*static_cast<C4_10x4::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 10 && h == 5) return ACTION<10, 5>(*static_cast<C4_10x5::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 10 && h == 6) return ACTION<10, 6>(*static_cast<C4_10x6::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 10 && h == 7) return ACTION<10, 7>(*static_cast<C4_10x7::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 10 && h == 8) return ACTION<10, 8>(*static_cast<C4_10x8::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 10 && h == 9) return ACTION<10, 9>(*static_cast<C4_10x9::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 10 && h == 10) return ACTION<10, 10>(*static_cast<C4_10x10::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 10 && h == 11) return ACTION<10, 11>(*static_cast<C4_10x11::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 11 && h == 4) return ACTION<11, 4>(*static_cast<C4_11x4::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 11 && h == 5) return ACTION<11, 5>(*static_cast<C4_11x5::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 11 && h == 6) return ACTION<11, 6>(*static_cast<C4_11x6::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 11 && h == 7) return ACTION<11, 7>(*static_cast<C4_11x7::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 11 && h == 8) return ACTION<11, 8>(*static_cast<C4_11x8::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 11 && h == 9) return ACTION<11, 9>(*static_cast<C4_11x9::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 11 && h == 10) return ACTION<11, 10>(*static_cast<C4_11x10::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 12 && h == 4) return ACTION<12, 4>(*static_cast<C4_12x4::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 12 && h == 5) return ACTION<12, 5>(*static_cast<C4_12x5::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 12 && h == 6) return ACTION<12, 6>(*static_cast<C4_12x6::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 12 && h == 7) return ACTION<12, 7>(*static_cast<C4_12x7::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 12 && h == 8) return ACTION<12, 8>(*static_cast<C4_12x8::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 12 && h == 9) return ACTION<12, 9>(*static_cast<C4_12x9::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 13 && h == 4) return ACTION<13, 4>(*static_cast<C4_13x4::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 13 && h == 5) return ACTION<13, 5>(*static_cast<C4_13x5::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 13 && h == 6) return ACTION<13, 6>(*static_cast<C4_13x6::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 13 && h == 7) return ACTION<13, 7>(*static_cast<C4_13x7::HeuristicSolver*>(solver), __VA_ARGS__); \
+    if (w == 13 && h == 8) return ACTION<13, 8>(*static_cast<C4_13x8::HeuristicSolver*>(solver), __VA_ARGS__); \
+    return 0.0;
+
+#define DISPATCH_HEURISTIC DISPATCH_HEURISTIC_RETURN
 
 #define DISPATCH_CREATE_EXACT(W, H, CACHE_PTR) \
     if (W == 4 && H == 4) return C4_4x4::Solver::createWithCache(static_cast<::GameSolver::Connect4::Cache*>(CACHE_PTR)).release(); \
@@ -932,5 +1104,89 @@
     if (W == 13 && H == 6) return ACTION<13, 6>(__VA_ARGS__); \
     if (W == 13 && H == 7) return ACTION<13, 7>(__VA_ARGS__); \
     if (W == 13 && H == 8) return ACTION<13, 8>(__VA_ARGS__); \
-    return nullptr;
+    return {};
 
+#define DISPATCH_VOID_STATIC(W, H, ACTION, ...) \
+    if (W == 4 && H == 4) { ACTION<4, 4>(__VA_ARGS__); return; } \
+    if (W == 4 && H == 5) { ACTION<4, 5>(__VA_ARGS__); return; } \
+    if (W == 4 && H == 6) { ACTION<4, 6>(__VA_ARGS__); return; } \
+    if (W == 4 && H == 7) { ACTION<4, 7>(__VA_ARGS__); return; } \
+    if (W == 4 && H == 8) { ACTION<4, 8>(__VA_ARGS__); return; } \
+    if (W == 4 && H == 9) { ACTION<4, 9>(__VA_ARGS__); return; } \
+    if (W == 4 && H == 10) { ACTION<4, 10>(__VA_ARGS__); return; } \
+    if (W == 4 && H == 11) { ACTION<4, 11>(__VA_ARGS__); return; } \
+    if (W == 4 && H == 12) { ACTION<4, 12>(__VA_ARGS__); return; } \
+    if (W == 5 && H == 4) { ACTION<5, 4>(__VA_ARGS__); return; } \
+    if (W == 5 && H == 5) { ACTION<5, 5>(__VA_ARGS__); return; } \
+    if (W == 5 && H == 6) { ACTION<5, 6>(__VA_ARGS__); return; } \
+    if (W == 5 && H == 7) { ACTION<5, 7>(__VA_ARGS__); return; } \
+    if (W == 5 && H == 8) { ACTION<5, 8>(__VA_ARGS__); return; } \
+    if (W == 5 && H == 9) { ACTION<5, 9>(__VA_ARGS__); return; } \
+    if (W == 5 && H == 10) { ACTION<5, 10>(__VA_ARGS__); return; } \
+    if (W == 5 && H == 11) { ACTION<5, 11>(__VA_ARGS__); return; } \
+    if (W == 5 && H == 12) { ACTION<5, 12>(__VA_ARGS__); return; } \
+    if (W == 6 && H == 4) { ACTION<6, 4>(__VA_ARGS__); return; } \
+    if (W == 6 && H == 5) { ACTION<6, 5>(__VA_ARGS__); return; } \
+    if (W == 6 && H == 6) { ACTION<6, 6>(__VA_ARGS__); return; } \
+    if (W == 6 && H == 7) { ACTION<6, 7>(__VA_ARGS__); return; } \
+    if (W == 6 && H == 8) { ACTION<6, 8>(__VA_ARGS__); return; } \
+    if (W == 6 && H == 9) { ACTION<6, 9>(__VA_ARGS__); return; } \
+    if (W == 6 && H == 10) { ACTION<6, 10>(__VA_ARGS__); return; } \
+    if (W == 6 && H == 11) { ACTION<6, 11>(__VA_ARGS__); return; } \
+    if (W == 6 && H == 12) { ACTION<6, 12>(__VA_ARGS__); return; } \
+    if (W == 7 && H == 4) { ACTION<7, 4>(__VA_ARGS__); return; } \
+    if (W == 7 && H == 5) { ACTION<7, 5>(__VA_ARGS__); return; } \
+    if (W == 7 && H == 6) { ACTION<7, 6>(__VA_ARGS__); return; } \
+    if (W == 7 && H == 7) { ACTION<7, 7>(__VA_ARGS__); return; } \
+    if (W == 7 && H == 8) { ACTION<7, 8>(__VA_ARGS__); return; } \
+    if (W == 7 && H == 9) { ACTION<7, 9>(__VA_ARGS__); return; } \
+    if (W == 7 && H == 10) { ACTION<7, 10>(__VA_ARGS__); return; } \
+    if (W == 7 && H == 11) { ACTION<7, 11>(__VA_ARGS__); return; } \
+    if (W == 7 && H == 12) { ACTION<7, 12>(__VA_ARGS__); return; } \
+    if (W == 7 && H == 13) { ACTION<7, 13>(__VA_ARGS__); return; } \
+    if (W == 8 && H == 4) { ACTION<8, 4>(__VA_ARGS__); return; } \
+    if (W == 8 && H == 5) { ACTION<8, 5>(__VA_ARGS__); return; } \
+    if (W == 8 && H == 6) { ACTION<8, 6>(__VA_ARGS__); return; } \
+    if (W == 8 && H == 7) { ACTION<8, 7>(__VA_ARGS__); return; } \
+    if (W == 8 && H == 8) { ACTION<8, 8>(__VA_ARGS__); return; } \
+    if (W == 8 && H == 9) { ACTION<8, 9>(__VA_ARGS__); return; } \
+    if (W == 8 && H == 10) { ACTION<8, 10>(__VA_ARGS__); return; } \
+    if (W == 8 && H == 11) { ACTION<8, 11>(__VA_ARGS__); return; } \
+    if (W == 8 && H == 12) { ACTION<8, 12>(__VA_ARGS__); return; } \
+    if (W == 8 && H == 13) { ACTION<8, 13>(__VA_ARGS__); return; } \
+    if (W == 9 && H == 4) { ACTION<9, 4>(__VA_ARGS__); return; } \
+    if (W == 9 && H == 5) { ACTION<9, 5>(__VA_ARGS__); return; } \
+    if (W == 9 && H == 6) { ACTION<9, 6>(__VA_ARGS__); return; } \
+    if (W == 9 && H == 7) { ACTION<9, 7>(__VA_ARGS__); return; } \
+    if (W == 9 && H == 8) { ACTION<9, 8>(__VA_ARGS__); return; } \
+    if (W == 9 && H == 9) { ACTION<9, 9>(__VA_ARGS__); return; } \
+    if (W == 9 && H == 10) { ACTION<9, 10>(__VA_ARGS__); return; } \
+    if (W == 9 && H == 11) { ACTION<9, 11>(__VA_ARGS__); return; } \
+    if (W == 9 && H == 12) { ACTION<9, 12>(__VA_ARGS__); return; } \
+    if (W == 10 && H == 4) { ACTION<10, 4>(__VA_ARGS__); return; } \
+    if (W == 10 && H == 5) { ACTION<10, 5>(__VA_ARGS__); return; } \
+    if (W == 10 && H == 6) { ACTION<10, 6>(__VA_ARGS__); return; } \
+    if (W == 10 && H == 7) { ACTION<10, 7>(__VA_ARGS__); return; } \
+    if (W == 10 && H == 8) { ACTION<10, 8>(__VA_ARGS__); return; } \
+    if (W == 10 && H == 9) { ACTION<10, 9>(__VA_ARGS__); return; } \
+    if (W == 10 && H == 10) { ACTION<10, 10>(__VA_ARGS__); return; } \
+    if (W == 10 && H == 11) { ACTION<10, 11>(__VA_ARGS__); return; } \
+    if (W == 11 && H == 4) { ACTION<11, 4>(__VA_ARGS__); return; } \
+    if (W == 11 && H == 5) { ACTION<11, 5>(__VA_ARGS__); return; } \
+    if (W == 11 && H == 6) { ACTION<11, 6>(__VA_ARGS__); return; } \
+    if (W == 11 && H == 7) { ACTION<11, 7>(__VA_ARGS__); return; } \
+    if (W == 11 && H == 8) { ACTION<11, 8>(__VA_ARGS__); return; } \
+    if (W == 11 && H == 9) { ACTION<11, 9>(__VA_ARGS__); return; } \
+    if (W == 11 && H == 10) { ACTION<11, 10>(__VA_ARGS__); return; } \
+    if (W == 12 && H == 4) { ACTION<12, 4>(__VA_ARGS__); return; } \
+    if (W == 12 && H == 5) { ACTION<12, 5>(__VA_ARGS__); return; } \
+    if (W == 12 && H == 6) { ACTION<12, 6>(__VA_ARGS__); return; } \
+    if (W == 12 && H == 7) { ACTION<12, 7>(__VA_ARGS__); return; } \
+    if (W == 12 && H == 8) { ACTION<12, 8>(__VA_ARGS__); return; } \
+    if (W == 12 && H == 9) { ACTION<12, 9>(__VA_ARGS__); return; } \
+    if (W == 13 && H == 4) { ACTION<13, 4>(__VA_ARGS__); return; } \
+    if (W == 13 && H == 5) { ACTION<13, 5>(__VA_ARGS__); return; } \
+    if (W == 13 && H == 6) { ACTION<13, 6>(__VA_ARGS__); return; } \
+    if (W == 13 && H == 7) { ACTION<13, 7>(__VA_ARGS__); return; } \
+    if (W == 13 && H == 8) { ACTION<13, 8>(__VA_ARGS__); return; } \
+    return;

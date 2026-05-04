@@ -29,7 +29,7 @@ template <int WIDTH, int HEIGHT>
 class HeuristicCache : public Cache {
  public:
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
-  using TransTable = TranspositionTable<position_t, int16_t, 16, 7, 2, position_t>;
+  using TransTable = TranspositionTable<position_t, int16_t, 16, 7, 2, 5, position_t>;
   std::shared_ptr<TransTable> transTable;
   
   HeuristicCache(size_t table_bytes) : transTable(std::make_shared<TransTable>(table_bytes)) {}
@@ -46,7 +46,7 @@ class HeuristicSolver : public ::GameSolver::Connect4::Solver<WIDTH, HEIGHT> {
  private:
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
   
-  using TransTable = TranspositionTable<position_t, int16_t, 16, 7, 2, position_t>;
+  using TransTable = TranspositionTable<position_t, int16_t, 16, 7, 2, 5, position_t>;
   std::shared_ptr<TransTable> transTable;
   OpeningBookBase<WIDTH, HEIGHT>* book;
   std::atomic<unsigned long long> nodeCount; // counter of explored nodes.

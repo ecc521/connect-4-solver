@@ -232,11 +232,7 @@ function loadPositions(filePath: string): BenchPos[] {
       let pos = parts[0];
       let expectedScore = 0;
       // Handle empty-board line format: " 1" where the position is empty
-      if (
-        !isNaN(Number(pos)) &&
-        parts.length === 1 &&
-        line.startsWith(" ")
-      ) {
+      if (!isNaN(Number(pos)) && parts.length === 1 && line.startsWith(" ")) {
         expectedScore = Number(pos);
         pos = "";
       } else {
@@ -310,7 +306,11 @@ async function runBenchmark(
         // the result may be partial (some columns timed out mid-search).
         // Skip these for parity counting to avoid false failures.
         const posElapsed = performance.now() - posStart;
-        if (!isHeuristic && opts.timeout > 0 && posElapsed >= opts.timeout * 0.9) {
+        if (
+          !isHeuristic &&
+          opts.timeout > 0 &&
+          posElapsed >= opts.timeout * 0.9
+        ) {
           skipped++;
           continue; // likely partial result
         }
@@ -328,7 +328,11 @@ async function runBenchmark(
 
         // Same timeout proximity check for solve
         const posElapsed = performance.now() - posStart;
-        if (!isHeuristic && opts.timeout > 0 && posElapsed >= opts.timeout * 0.9) {
+        if (
+          !isHeuristic &&
+          opts.timeout > 0 &&
+          posElapsed >= opts.timeout * 0.9
+        ) {
           skipped++;
           continue;
         }
@@ -362,16 +366,17 @@ async function runBenchmark(
         }
       }
     } catch (e) {
-      if (opts.verbose)
-        console.log(`${RED}  Error at ${bp.pos}: ${e}${RESET}`);
+      if (opts.verbose) console.log(`${RED}  Error at ${bp.pos}: ${e}${RESET}`);
     }
   }
 
   const totalNodes = Number(solver.getNodeCount()) - Number(startNodes);
   const totalMs = performance.now() - startTime;
-  const mns = (totalMs > 0 && totalNodes > 0) ? totalNodes / 1_000_000 / (totalMs / 1000) : 0;
-  const accuracyPct =
-    completed > 0 ? (correct / completed) * 100 : 0;
+  const mns =
+    totalMs > 0 && totalNodes > 0
+      ? totalNodes / 1_000_000 / (totalMs / 1000)
+      : 0;
+  const accuracyPct = completed > 0 ? (correct / completed) * 100 : 0;
   // Parity is only enforced for exact solver — must be 100% on completed positions
   const parityOk = isHeuristic ? true : correct === completed;
 
@@ -403,24 +408,16 @@ async function main(): Promise<void> {
   if (!opts.json) {
     console.log(`\n${BOLD}Connect 4 Benchmark${RESET}`);
     console.log(`${DIM}────────────────────────────────────────${RESET}`);
-    console.log(
-      `Runtime:   ${CYAN}${opts.runtime.toUpperCase()}${RESET}`,
-    );
+    console.log(`Runtime:   ${CYAN}${opts.runtime.toUpperCase()}${RESET}`);
     console.log(
       `Engines:   ${YELLOW}${[opts.testExact ? "exact" : null, opts.testHeuristic ? "heuristic" : null].filter(Boolean).join(", ")}${RESET}`,
     );
     console.log(
       `Modes:     ${YELLOW}${[opts.runSolve ? "solve" : null, opts.runAnalyze ? "analyze" : null, opts.runBook ? "book" : null].filter(Boolean).join(", ")}${RESET}`,
     );
-    console.log(
-      `Sizes:     ${YELLOW}${opts.sizes.join(", ")}${RESET}`,
-    );
-    console.log(
-      `Threads:   ${YELLOW}${opts.threads.join(", ")}${RESET}`,
-    );
-    console.log(
-      `Seed:      ${YELLOW}${opts.seed}${RESET}`,
-    );
+    console.log(`Sizes:     ${YELLOW}${opts.sizes.join(", ")}${RESET}`);
+    console.log(`Threads:   ${YELLOW}${opts.threads.join(", ")}${RESET}`);
+    console.log(`Seed:      ${YELLOW}${opts.seed}${RESET}`);
     console.log(
       `Budget:    ${YELLOW}${opts.budget}ms${RESET} per combo, ${YELLOW}${opts.timeout}ms${RESET} per position`,
     );
@@ -442,12 +439,7 @@ async function main(): Promise<void> {
     const { NodeConnect4Solver, getNativeModule } = await import("../src/node");
     const { OpeningBook } = await import("../src/index");
 
-    const bookPath = path.join(
-      __dirname,
-      "..",
-      "data",
-      "7x6_dense14.efbook",
-    );
+    const bookPath = path.join(__dirname, "..", "data", "7x6_dense14.efbook");
     if (!fs.existsSync(bookPath)) {
       console.log("Skipping book benchmark: 7x6_dense14.efbook not found");
     } else {
@@ -503,7 +495,9 @@ async function main(): Promise<void> {
         }
         const queryTime = Date.now() - start;
         const qps = Math.floor(totalQueries / (queryTime / 1000));
-        console.log(`${BOLD}${name} Book${RESET}: ${totalQueries.toLocaleString()} queries in ${queryTime}ms (${qps.toLocaleString()} QPS)`);
+        console.log(
+          `${BOLD}${name} Book${RESET}: ${totalQueries.toLocaleString()} queries in ${queryTime}ms (${qps.toLocaleString()} QPS)`,
+        );
       }
 
       efBook.destroy();
@@ -531,7 +525,10 @@ async function main(): Promise<void> {
     const posPath = path.join(dataDir, `positions_${sizeStr}.txt`);
     const allPositions = loadPositions(posPath);
     if (allPositions.length === 0) {
-      if (!opts.json) console.log(`${DIM}  No positions found for ${sizeStr}, skipping${RESET}`);
+      if (!opts.json)
+        console.log(
+          `${DIM}  No positions found for ${sizeStr}, skipping${RESET}`,
+        );
       continue;
     }
 
@@ -539,8 +536,7 @@ async function main(): Promise<void> {
     const sampled = samplePositions(allPositions, opts.maxPositions, rng);
 
     const engines: { name: string; heuristic: boolean }[] = [];
-    if (opts.testExact)
-      engines.push({ name: "Exact", heuristic: false });
+    if (opts.testExact) engines.push({ name: "Exact", heuristic: false });
     if (opts.testHeuristic)
       engines.push({ name: "Heuristic", heuristic: true });
 
@@ -601,22 +597,25 @@ async function main(): Promise<void> {
           if (!result.parityOk) parityFailures++;
 
           if (!opts.json) {
-            const accStr = result.skipped > 0
-              ? `${result.completed}(${result.skipped})/${result.positionsAttempted}`
-              : `${result.completed}/${result.positionsAttempted}`;
+            const accStr =
+              result.skipped > 0
+                ? `${result.completed}(${result.skipped})/${result.positionsAttempted}`
+                : `${result.completed}/${result.positionsAttempted}`;
             const accPctStr = `${result.accuracyPct.toFixed(1)}%`;
-            const parityMark = result.parityOk
-              ? ""
-              : ` ${RED}FAIL${RESET}`;
+            const parityMark = result.parityOk ? "" : ` ${RED}FAIL${RESET}`;
             const accColor =
               result.accuracyPct >= 100
                 ? GREEN
                 : result.accuracyPct >= 80
                   ? YELLOW
                   : RED;
-            const depthStr = result.avgDepth !== null ? result.avgDepth.toFixed(1) : "-";
+            const depthStr =
+              result.avgDepth !== null ? result.avgDepth.toFixed(1) : "-";
 
-            const timeStr = result.timeMs < 1 ? `${result.timeMs.toFixed(3)}ms` : `${Math.round(result.timeMs)}ms`;
+            const timeStr =
+              result.timeMs < 1
+                ? `${result.timeMs.toFixed(3)}ms`
+                : `${Math.round(result.timeMs)}ms`;
             console.log(
               `| ${pad(result.mode, 10)} | ${pad(result.engine, 10)} | ${pad(result.board, 5)} | ${pad(String(result.threads), 3, false)} | ${pad(accStr, 7, false)} | ${accColor}${pad(accPctStr, 8, false)}${RESET} | ${pad(depthStr, 6, false)} | ${pad(result.nodes.toLocaleString(), 14, false)} | ${pad(result.mns.toFixed(2), 6, false)} | ${pad(timeStr, 8, false)} |${parityMark}`,
             );

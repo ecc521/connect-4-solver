@@ -87,9 +87,7 @@ class GenericMoveSorter {
   } entries[WIDTH];
 };
 
-#ifdef BOARD_WIDTH_MACRO
-using MoveSorter = GenericMoveSorter<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>;
-#endif
+
 
 } // namespace Connect4
 } // namespace GameSolver
