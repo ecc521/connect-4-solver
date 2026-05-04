@@ -655,7 +655,7 @@ std::unique_ptr<::GameSolver::Connect4::Cache> Solver<WIDTH, HEIGHT>::createCach
       constexpr int index_bits_64 = board_bits - available_bits_64;
       if constexpr (index_bits_64 < 64) {
           uint64_t required_buckets_64 = 1ULL << index_bits_64;
-          size_t bucket_size = 16; // Calculate approx required bytes (16 bytes per bucket + overhead)
+          size_t bucket_size = 16; // 128 bits per bucket
 
           if (required_buckets_64 > table_bytes / bucket_size) {
               // Upgrade to 128-bit slot since memory is too small for 64-bit CRT
