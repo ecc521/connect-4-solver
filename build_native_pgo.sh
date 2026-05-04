@@ -71,7 +71,7 @@ echo "════════════════════════�
 # Sizes with 0 valid positions will exit non-zero; that's fine
 for SIZE in "${SIZES[@]}"; do
     echo "  Profiling ${SIZE}..."
-    LLVM_PROFILE_FILE="${SIZE}.profraw" ./tools/benchmarks/bench_native_${SIZE}_pgo --pgo 2>/dev/null || true
+    LLVM_PROFILE_FILE="${SIZE}.profraw" ./tools/benchmarks/bench_native_${SIZE}_pgo --pgo --budget 10000 2>/dev/null || true
 done
 
 echo ""

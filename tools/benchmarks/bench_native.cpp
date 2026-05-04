@@ -460,9 +460,9 @@ int main(int argc, char* argv[]) {
   std::cout << "Throughput Benchmark: " << dim_str << " (" << valid_positions.size() << " positions)\n";
   std::cout << "===========================================";
 
-  const size_t max_solve = flag_pgo ? 10 : 50;
-  const size_t max_analyze = flag_pgo ? 10 : 100;
-  const size_t max_heuristic = flag_pgo ? 10 : 100;
+  const size_t max_solve = flag_pgo ? 50 : 50;
+  const size_t max_analyze = flag_pgo ? 100 : 100;
+  const size_t max_heuristic = flag_pgo ? 100 : 100;
 
   std::vector<BenchPos> heuristic_subset;
   for (size_t i = 0; i < max_heuristic && i < valid_positions.size(); i++) heuristic_subset.push_back(valid_positions[i]);
