@@ -227,13 +227,13 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
     if(best_score >= beta) {
       uint8_t stored_move = best_move;
       if (stored_move < WIDTH && is_reverse) stored_move = WIDTH - 1 - stored_move;
-      transTable->put((SlotType)key, best_score + GenericPosition<WIDTH, HEIGHT>::MAX_SCORE - 2 * GenericPosition<WIDTH, HEIGHT>::MIN_SCORE + 2, std::min(31, WIDTH * HEIGHT - P.nbMoves()), stored_move);
+      transTable->put((SlotType)key, best_score + GenericPosition<WIDTH, HEIGHT>::MAX_SCORE - 2 * GenericPosition<WIDTH, HEIGHT>::MIN_SCORE + 2, WIDTH * HEIGHT - P.nbMoves(), stored_move);
       return best_score;
     }
     alpha = std::max(alpha, best_score);
   }
 
-  uint8_t work = std::min(31, WIDTH * HEIGHT - P.nbMoves());
+  uint8_t work = WIDTH * HEIGHT - P.nbMoves();
   uint8_t stored_move = best_move;
   if (stored_move < WIDTH && is_reverse) stored_move = WIDTH - 1 - stored_move;
   transTable->put((SlotType)key, best_score - GenericPosition<WIDTH, HEIGHT>::MIN_SCORE + 1, work, stored_move);

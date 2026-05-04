@@ -86,6 +86,7 @@ class SolverImpl : public Solver<WIDTH, HEIGHT> {
   std::atomic<bool> isSearching{false};
   std::atomic<bool> stopSearch{false};
   std::atomic<double> endTime{0.0};
+  std::unique_ptr<::GameSolver::Connect4::ThreadPool> pool;
   const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr;
 
  private:
@@ -97,14 +98,14 @@ class SolverImpl : public Solver<WIDTH, HEIGHT> {
  public:
 
   SolverImpl(size_t table_bytes) 
-    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, position_t>>(table_bytes)), nodeCount{0}, pool(std::make_unique<::GameSolver::Connect4::ThreadPool>()), book(nullptr) {
+    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, position_t>>(table_bytes)), nodeCount{0}, pool(std::make_unique<::GameSolver::Connect4::ThreadPool>()) {
     for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
       history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
     }
   }
 
   SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, position_t>> cache)
-    : transTable(cache), nodeCount{0}, pool(std::make_unique<::GameSolver::Connect4::ThreadPool>()), book(nullptr) {
+    : transTable(cache), nodeCount{0}, pool(std::make_unique<::GameSolver::Connect4::ThreadPool>()) {
     for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
       history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
     }
@@ -155,8 +156,6 @@ class SolverImpl : public Solver<WIDTH, HEIGHT> {
            (abort_flag && abort_flag->load(std::memory_order_relaxed));
   }
 
- private:
-  std::unique_ptr<::GameSolver::Connect4::ThreadPool> pool;
 };
 
 } // namespace Connect4
