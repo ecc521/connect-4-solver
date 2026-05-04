@@ -28,11 +28,12 @@ fi
 
 echo ""
 echo "Phase 1/2: Generating PGO profile data using native bindings..."
+export SKIP_NATIVE_MARCH=true
 bash build_native_pgo.sh
 
 echo ""
 echo "Phase 2/2: Building WASM with PGO profile data..."
-export PGO_FLAGS="-fprofile-use=default.profdata"
+export PGO_FLAGS="-fprofile-instr-use=default.profdata"
 bash build.sh
 
 echo ""

@@ -21,7 +21,9 @@ fi
 SIZES=()
 for f in test-data/positions_*.txt; do
     size=$(basename "$f" | sed 's/positions_//' | sed 's/.txt//')
-    SIZES+=("$size")
+    if [[ "$size" =~ ^[0-9]+x[0-9]+$ ]]; then
+        SIZES+=("$size")
+    fi
 done
 if [ ${#SIZES[@]} -eq 0 ]; then
     SIZES=("7x6" "8x8" "9x7" "10x10")
@@ -49,9 +51,13 @@ for SIZE in "${SIZES[@]}"; do
     WIDTH=$(echo $SIZE | cut -d'x' -f1)
     HEIGHT=$(echo $SIZE | cut -d'x' -f2)
     echo "  Compiling ${SIZE}..."
-    $CXX --std=c++20 -W -Wall -O3 -flto $GEN_FLAGS -DNDEBUG -DUSE_PTHREADS -Inative -march=native \
+    MARCH_FLAG="-march=native"
+    if [ "$SKIP_NATIVE_MARCH" = "true" ]; then
+        MARCH_FLAG=""
+    fi
+    $CXX --std=c++20 -W -Wall -O3 $GEN_FLAGS -DNDEBUG -DUSE_PTHREADS -Inative $MARCH_FLAG \
         -DBOARD_WIDTH_MACRO=${WIDTH} -DBOARD_HEIGHT_MACRO=${HEIGHT} \
-        tools/benchmarks/bench_native.cpp native/Solver.cpp \
+        tools/benchmarks/bench_native.cpp \
         -o tools/benchmarks/bench_native_${SIZE}_pgo &
 done
 wait

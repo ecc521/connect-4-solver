@@ -24,11 +24,13 @@ class ThreadPool {
   ThreadPool() : stop(false), current_threads(0) {}
 
   ~ThreadPool() {
+#ifndef __EMSCRIPTEN__
     stop = true;
     condition.notify_all();
     for (std::thread &worker : workers) {
       if (worker.joinable()) worker.join();
     }
+#endif
   }
 
   void ensureCapacity(int n) {
