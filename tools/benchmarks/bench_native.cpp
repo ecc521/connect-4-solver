@@ -502,36 +502,31 @@ int main(int argc, char* argv[]) {
   if (!solve_hard.empty()) {
     if (do_exact_solve) {
       DummyBook<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO> dummy;
-      if (flag_pgo) {
-        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, true, budget_ms, timeout_ms);
-        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, budget_ms, timeout_ms, &dummy);
-      } else {
-        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, true, budget_ms, timeout_ms);
-        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 18, true, budget_ms, timeout_ms);
-        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, budget_ms, timeout_ms, &dummy);
-        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 18, false, budget_ms, timeout_ms);
-      }
+      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, true, budget_ms, timeout_ms);
+      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, true, budget_ms, timeout_ms);
+      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, budget_ms, timeout_ms, &dummy);
+      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, false, budget_ms, timeout_ms, &dummy);
     }
   }
 
   if (do_exact_analyze) {
     if (exact_subset.size() >= 2) {
       run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 1, budget_ms, timeout_ms);
-      if (!flag_pgo) run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 18, budget_ms, timeout_ms);
+      run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 4, budget_ms, timeout_ms);
     }
   }
 
   if (do_heuristic_solve) {
     if (!heuristic_subset.empty()) {
       run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 1, budget_ms, timeout_ms);
-      if (!flag_pgo) run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 18, budget_ms, timeout_ms);
+      run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 4, budget_ms, timeout_ms);
     }
   }
 
   if (do_heuristic_analyze) {
     if (!heuristic_subset.empty()) {
       run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 1, budget_ms, timeout_ms);
-      if (!flag_pgo) run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 18, budget_ms, timeout_ms);
+      run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 4, budget_ms, timeout_ms);
     }
   }
 
