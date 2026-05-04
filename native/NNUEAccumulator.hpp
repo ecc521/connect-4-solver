@@ -14,7 +14,7 @@ namespace Connect4 {
 template <int W, int H>
 class NNUEAccumulator {
 public:
-    int32_t hidden[2][256];
+    alignas(64) int32_t hidden[2][256];
     NNUEAccumulator() {}
     inline void reset() {}
     inline void init(const GenericPosition<W, H>& /* P */) {}
@@ -27,7 +27,7 @@ public:
 template <>
 class NNUEAccumulator<8, 8> {
 public:
-    int32_t hidden[2][256];
+    alignas(64) int32_t hidden[2][256];
 
     NNUEAccumulator() { reset(); }
 
@@ -97,7 +97,7 @@ public:
 template <>
 class NNUEAccumulator<7, 6> {
 public:
-    int32_t hidden[2][256];
+    alignas(64) int32_t hidden[2][256];
 
     NNUEAccumulator() { reset(); }
 
