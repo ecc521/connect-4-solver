@@ -452,6 +452,7 @@ template <int WIDTH, int HEIGHT, typename SlotType>
   // If stopSearch was set externally (stop() or timeout), flag the result as aborted.
   // Don't flag as aborted when it was set by normal Lazy SMP completion (done flag).
   final_result.aborted = isAborted() && !done.load(std::memory_order_relaxed);
+
   return final_result;
 }
 
@@ -654,11 +655,9 @@ std::unique_ptr<::GameSolver::Connect4::Cache> Solver<WIDTH, HEIGHT>::createCach
       constexpr int index_bits_64 = board_bits - available_bits_64;
       if constexpr (index_bits_64 < 64) {
           uint64_t required_buckets_64 = 1ULL << index_bits_64;
-          // Calculate approx required bytes (16 bytes per bucket + overhead)
-          size_t bucket_size = 16;
-          size_t required_bytes_64 = required_buckets_64 * bucket_size;
+          size_t bucket_size = 16; // Calculate approx required bytes (16 bytes per bucket + overhead)
 
-          if (table_bytes < required_bytes_64) {
+          if (required_buckets_64 > table_bytes / bucket_size) {
               // Upgrade to 128-bit slot since memory is too small for 64-bit CRT
               return std::make_unique<TypedCache<WIDTH, HEIGHT, WASM_U128_T>>(table_bytes);
           }
