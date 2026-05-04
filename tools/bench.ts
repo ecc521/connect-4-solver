@@ -83,6 +83,7 @@ interface BenchResult {
   avgDepth: number | null;
   parityOk: boolean;
   positionsAttempted: number;
+  skipped: number;
 }
 
 // ─── Seeded RNG ─────────────────────────────────────────────────
@@ -281,6 +282,7 @@ async function runBenchmark(
 
   let correct = 0;
   let completed = 0; // positions that finished without abort/timeout
+  let skipped = 0;
   let totalAttempted = 0;
   let totalDepth = 0;
   const startNodes: number = solver.getNodeCount();
@@ -308,6 +310,7 @@ async function runBenchmark(
         // Skip these for parity counting to avoid false failures.
         const posElapsed = Date.now() - posStart;
         if (!isHeuristic && opts.timeout > 0 && posElapsed >= opts.timeout * 0.9) {
+          skipped++;
           continue; // likely partial result
         }
 
@@ -325,6 +328,7 @@ async function runBenchmark(
         // Same timeout proximity check for solve
         const posElapsed = Date.now() - posStart;
         if (!isHeuristic && opts.timeout > 0 && posElapsed >= opts.timeout * 0.9) {
+          skipped++;
           continue;
         }
 
@@ -386,6 +390,7 @@ async function runBenchmark(
     avgDepth: isHeuristic && completed > 0 ? totalDepth / completed : null,
     parityOk,
     positionsAttempted: totalAttempted,
+    skipped,
   };
 }
 
@@ -544,8 +549,8 @@ async function main(): Promise<void> {
       if (opts.runAnalyze) modes.push("analyze");
 
       for (const mode of modes) {
-        // Track baseline (first thread count) position count per mode
-        // so subsequent thread counts use identical position sets
+        // Track baseline position count so subsequent thread counts
+        // use the identical set of positions (budget only applies to baseline)
         let baselinePositionCount = 0;
 
         for (const tCount of opts.threads) {
@@ -569,7 +574,7 @@ async function main(): Promise<void> {
           await solver.init();
 
           // First thread count: apply budget to determine position set
-          // Subsequent thread counts: use the exact same positions (no budget)
+          // Subsequent thread counts: use the same positions (no budget)
           const isBaseline = baselinePositionCount === 0;
           const positionsForRun = isBaseline
             ? sampled
@@ -595,7 +600,9 @@ async function main(): Promise<void> {
           if (!result.parityOk) parityFailures++;
 
           if (!opts.json) {
-            const accStr = `${result.completed}/${result.total}`;
+            const accStr = result.skipped > 0
+              ? `${result.completed}(${result.skipped})/${result.total + result.skipped}`
+              : `${result.completed}/${result.total}`;
             const accPctStr = `${result.accuracyPct.toFixed(1)}%`;
             const parityMark = result.parityOk
               ? ""
