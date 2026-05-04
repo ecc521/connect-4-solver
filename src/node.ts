@@ -15,7 +15,7 @@ export interface NativeModuleType {
     heuristic: boolean,
   ): void;
   _createCache(w: number, h: number, size: number, heuristic: boolean): unknown;
-  _destroyCache(cache: unknown): void;
+  _destroyCache(w: number, h: number, cache: unknown, is_heuristic: boolean): void;
   _analyzeExact(
     w: number,
     h: number,
@@ -153,7 +153,7 @@ export class NativeCache {
   }
   destroy(): void {
     const native = getNativeModule();
-    if (native && this.ptr) native._destroyCache(this.ptr);
+    if (native && this.ptr) native._destroyCache(this.width, this.height, this.ptr, this.isHeuristic);
     this.ptr = null;
   }
 }
@@ -278,7 +278,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
                 this.height,
                 this._solverPtr,
                 positionStr,
-                1, // force single-thread for heuristic solve
+                threads,
                 maxDepth,
                 timeoutMs,
                 bookPtr === 0 ? null : bookPtr,
@@ -317,7 +317,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     if (native) {
       native._destroySolver(this.width, this.height, this._solverPtr, this.isHeuristic);
       if (!this._sharedCache) {
-        native._destroyCache(this._cachePtr);
+        native._destroyCache(this.width, this.height, this._cachePtr, this.isHeuristic);
       }
     }
     this.initialized = false;

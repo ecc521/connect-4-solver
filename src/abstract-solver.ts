@@ -275,7 +275,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         this._solverPtr,
         allocatedMemory,
         maxDepth,
-        1, // force single-thread for heuristic solve
+        threads,
         timeoutMs,
         bookPtr,
       );
