@@ -36,6 +36,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { performance } from "perf_hooks";
 
 // ─── Auto-discover board sizes from test-data/ ──────────────────
 function discoverSizes(): string[] {
@@ -286,15 +287,15 @@ async function runBenchmark(
   let totalAttempted = 0;
   let totalDepth = 0;
   const startNodes: number = solver.getNodeCount();
-  const startTime = Date.now();
+  const startTime = performance.now();
 
   for (const bp of positions) {
-    if (Date.now() - startTime > budget) break;
+    if (performance.now() - startTime > budget) break;
     totalAttempted++;
 
     try {
       let bestScore = -1000;
-      const posStart = Date.now();
+      const posStart = performance.now();
 
       if (mode === "analyze") {
         const result = await solver.analyze(bp.pos, {
@@ -308,7 +309,7 @@ async function runBenchmark(
         // For exact solver: if the per-position time exceeded ~90% of timeout,
         // the result may be partial (some columns timed out mid-search).
         // Skip these for parity counting to avoid false failures.
-        const posElapsed = Date.now() - posStart;
+        const posElapsed = performance.now() - posStart;
         if (!isHeuristic && opts.timeout > 0 && posElapsed >= opts.timeout * 0.9) {
           skipped++;
           continue; // likely partial result
@@ -326,7 +327,7 @@ async function runBenchmark(
         totalDepth += result.depthReached || 0;
 
         // Same timeout proximity check for solve
-        const posElapsed = Date.now() - posStart;
+        const posElapsed = performance.now() - posStart;
         if (!isHeuristic && opts.timeout > 0 && posElapsed >= opts.timeout * 0.9) {
           skipped++;
           continue;
@@ -367,8 +368,8 @@ async function runBenchmark(
   }
 
   const totalNodes = Number(solver.getNodeCount()) - Number(startNodes);
-  const totalMs = Date.now() - startTime;
-  const mns = totalMs > 0 ? totalNodes / 1_000_000 / (totalMs / 1000) : 0;
+  const totalMs = performance.now() - startTime;
+  const mns = (totalMs > 0 && totalNodes > 0) ? totalNodes / 1_000_000 / (totalMs / 1000) : 0;
   const accuracyPct =
     completed > 0 ? (correct / completed) * 100 : 0;
   // Parity is only enforced for exact solver — must be 100% on completed positions
@@ -615,8 +616,9 @@ async function main(): Promise<void> {
                   : RED;
             const depthStr = result.avgDepth !== null ? result.avgDepth.toFixed(1) : "-";
 
+            const timeStr = result.timeMs < 1 ? `${result.timeMs.toFixed(3)}ms` : `${Math.round(result.timeMs)}ms`;
             console.log(
-              `| ${pad(result.mode, 10)} | ${pad(result.engine, 10)} | ${pad(result.board, 5)} | ${pad(String(result.threads), 3, false)} | ${pad(accStr, 7, false)} | ${accColor}${pad(accPctStr, 8, false)}${RESET} | ${pad(depthStr, 6, false)} | ${pad(result.nodes.toLocaleString(), 14, false)} | ${pad(result.mns.toFixed(2), 6, false)} | ${pad(result.timeMs + "ms", 8, false)} |${parityMark}`,
+              `| ${pad(result.mode, 10)} | ${pad(result.engine, 10)} | ${pad(result.board, 5)} | ${pad(String(result.threads), 3, false)} | ${pad(accStr, 7, false)} | ${accColor}${pad(accPctStr, 8, false)}${RESET} | ${pad(depthStr, 6, false)} | ${pad(result.nodes.toLocaleString(), 14, false)} | ${pad(result.mns.toFixed(2), 6, false)} | ${pad(timeStr, 8, false)} |${parityMark}`,
             );
           }
 

@@ -151,6 +151,13 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
   int best_move = -1;
   int depth_reached = 0;
 
+  NNUEAccumulator<WIDTH, HEIGHT> root_acc;
+  if (acc) {
+    root_acc = *acc;
+  } else {
+    root_acc.init(P);
+  }
+
   struct RootMove {
     int col;
     int score;
@@ -196,11 +203,13 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
             }
           }
 
-          if (!book_hit) {
-            NNUEAccumulator<WIDTH, HEIGHT> local_acc;
-            local_acc.init(P2);
+        if (!book_hit) {
+            NNUEAccumulator<WIDTH, HEIGHT> local_acc = root_acc;
+            typename GenericPosition<WIDTH, HEIGHT>::position_t move = (P.getMask() + P.bottom_mask_col(col)) & P.column_mask(col);
+            unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(move);
+            local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (HEIGHT + 1));
             score = -negamax_heuristic(P2, -32000, 32000, d - 1, end_time_ms, local_acc, localCount);
-          }
+        }
         }
         
         {
@@ -268,6 +277,9 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
   int final_depth_reached = 0;
   this->stopSearch = false;
 
+  NNUEAccumulator<WIDTH, HEIGHT> root_acc;
+  root_acc.init(P);
+
   int total_valid_cols = 0;
   for (int i = 0; i < WIDTH; i++) if (P.canPlay(i)) total_valid_cols++;
   if (total_valid_cols == 0) return {scores, 0};
@@ -304,8 +316,10 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
             }
 
             if (!book_hit) {
-                NNUEAccumulator<WIDTH, HEIGHT> local_acc;
-                local_acc.init(P2);
+                NNUEAccumulator<WIDTH, HEIGHT> local_acc = root_acc;
+                typename GenericPosition<WIDTH, HEIGHT>::position_t move = (P.getMask() + P.bottom_mask_col(col)) & P.column_mask(col);
+                unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(move);
+                local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (HEIGHT + 1));
                 int score = -negamax_heuristic(P2, -32000, 32000, d - 1, end_time_ms, local_acc, localCount);
                 if (score >= 40000 || score <= -40000) break;
                 current_scores[col] = score;
@@ -357,8 +371,10 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
                 }
 
                 if (!book_hit) {
-                    NNUEAccumulator<WIDTH, HEIGHT> local_acc;
-                    local_acc.init(P2);
+                    NNUEAccumulator<WIDTH, HEIGHT> local_acc = root_acc;
+                    typename GenericPosition<WIDTH, HEIGHT>::position_t move = (P.getMask() + P.bottom_mask_col(col)) & P.column_mask(col);
+                    unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(move);
+                    local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (HEIGHT + 1));
                     int score = -negamax_heuristic(P2, -32000, 32000, d - 1, end_time_ms, local_acc, localCount);
                     if (score >= 40000 || score <= -40000) break;
                     current_scores[col] = score;
