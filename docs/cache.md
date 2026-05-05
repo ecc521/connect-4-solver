@@ -47,13 +47,12 @@ Multithreaded WASM requires `SharedArrayBuffer`, which is only available when yo
 
 The distributed multithreaded WASM binary (`analyze_threaded.js`) is pre-compiled using Emscripten with a `PTHREAD_POOL_SIZE=4` and `PTHREAD_POOL_SIZE_STRICT=0`. This safely provisions 4 workers by default to handle common concurrent workloads without dynamically blocking the JS main thread, while allowing dynamic expansion (`_STRICT=0`) if more threads are requested.
 
-### Node.js (Native) Persistent Thread Pool
+### Node.js (Native) Threads & Libuv
 
-In Node.js, the `NodeConnect4Solver` manages its own **Persistent Thread Pool** in C++.
+In Node.js, multi-threading operates on two distinct layers:
 
-- **No libuv limit:** It completely bypasses the Node.js `libuv` thread pool. You do NOT need to set `UV_THREADPOOL_SIZE`.
-- **High Water Mark:** The pool is lazy-initialized. If you only use 1 thread, 0 background threads are spawned. If you request 12 threads, the solver spawns 11 persistent workers. These workers stay alive and go to sleep when idle, waking up instantly for the next `analyze()` call.
-- **Resource Efficiency:** Threads are only spawned as needed. Once a solver has reached a certain thread count, it "remembers" that capacity for its entire lifetime to avoid the overhead of repeatedly creating and destroying threads.
+1. **The Libuv Thread (Concurrent Calls):** Every time you call an asynchronous method like `analyze()`, the Node.js bridge uses `Napi::AsyncWorker` to offload the evaluation to the Node.js **libuv thread pool**. This means each concurrent `analyze()` call consumes exactly **1 libuv thread**. If you plan to execute many evaluations concurrently across multiple solver instances, you may need to increase your `UV_THREADPOOL_SIZE` environment variable (the Node.js default is 4).
+2. **The C++ Worker Pool (Search Threads):** Once the evaluation begins, the underlying C++ engine manages its own **Persistent Thread Pool** to execute the multi-threaded search. These internal worker threads completely bypass libuv. If you request `threads: 12` for a single analysis, the engine spawns 11 persistent C++ workers. These workers stay alive and go to sleep when idle, waking up instantly for the next `analyze()` call to avoid creation overhead.
 
 ### Mobile Thread Pools (React Native)
 

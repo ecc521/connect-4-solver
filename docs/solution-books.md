@@ -9,6 +9,8 @@ These books map early-game and mid-game position sequences to their evaluations 
 You can download pre-computed, highly optimized Opening Books for various standard board sizes from the official GitHub Releases page:
 **[Download Solution Books](https://github.com/ecc521/connect-4-solver/releases/tag/solutionbooks)**
 
+> **Note:** To keep the `connect-4-solver` NPM package as lightweight as possible, opening books are **not** bundled by default. You must download them separately if you require instant empty-board evaluation.
+
 ### Usage Example
 
 To use a book, instantiate an `OpeningBook`, load the raw `.book` file buffer into it, and pass it into your solver's `analyze` method options!
