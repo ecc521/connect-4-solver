@@ -23,6 +23,7 @@ describe("ReactNativeConnect4Solver Bridge Tests", () => {
               _solverPtr: string,
               pos: string,
               _threads: number,
+              _timeoutMs: number,
               _w: number,
               _h: number,
               _weak: boolean,
@@ -30,13 +31,13 @@ describe("ReactNativeConnect4Solver Bridge Tests", () => {
             ) => {
               return new Promise((resolve) => {
                 if (pos === "121212") {
-                  resolve([0, 6, 11, -1000, -10, 0, -2, -1, 3]);
+                  resolve([0, 6, 11, -1000, -10, 0, -2, -1, 3, 0]); // aborted=0
                 } else if (pos === "1212121") {
-                  resolve([1, 6, 0, 0, 0, 0, 0, 0, 0]);
+                  resolve([1, 6, 0, 0, 0, 0, 0, 0, 0, 0]);
                 } else if (pos === "1111111") {
-                  resolve([2, 6, 0, 0, 0, 0, 0, 0, 0]);
+                  resolve([2, 6, 0, 0, 0, 0, 0, 0, 0, 0]);
                 } else {
-                  resolve([0, pos.length, 0, 0, 0, 0, 0, 0, 0]);
+                  resolve([0, pos.length, 0, 0, 0, 0, 0, 0, 0, 0]);
                 }
               });
             },
@@ -60,7 +61,7 @@ describe("ReactNativeConnect4Solver Bridge Tests", () => {
   });
 
   test("should seamlessly route async analysis down through NativeModules map", async () => {
-    const result = await solver.analyzeAsync("121212");
+    const result = await solver.analyze("121212");
 
     // Validate structural parity over to Javascript runtime mappings:
     expect(result.originalPosition).toBe("121212");
@@ -70,7 +71,7 @@ describe("ReactNativeConnect4Solver Bridge Tests", () => {
   });
 
   test("should interpret hard winning native states perfectly", async () => {
-    const result = await solver.analyzeAsync("1212121");
+    const result = await solver.analyze("1212121");
     // Status 1 triggers instant win evaluation parsing logic natively
     expect(result.evaluation?.outcome).toBe(Outcome.Win);
     expect(result.evaluation?.winner).toBe(Player.P1);
