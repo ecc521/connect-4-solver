@@ -57,29 +57,32 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
-    const mod = getNoSABModule();
-    const resArr = this.executeWasmAnalyze(mod, positionStr, opts);
-    return Promise.resolve(this.parseResArr(resArr, positionStr));
+    return this.runTask(() => {
+      const mod = getNoSABModule();
+      const resArr = this.executeWasmAnalyze(mod, positionStr, opts);
+      return this.parseResArr(resArr, positionStr, opts?.heuristic);
+    });
   }
 
   async loadBook(_data: Uint8Array): Promise<void> {
     if (!this.initialized) throw new Error("Call init() first.");
-    const mod = getNoSABModule();
-    if (this._bookPtr) {
-      mod._destroyBook(this.width, this.height, this._bookPtr as number);
-    }
-    const ptr = mod._malloc(_data.length);
-    const heapU8 = mod.HEAPU8 ?? new Uint8Array(mod.wasmMemory.buffer);
-    heapU8.set(_data, ptr);
+    return this.runTask(() => {
+      const mod = getNoSABModule();
+      if (this._bookPtr) {
+        mod._destroyBook(this.width, this.height, this._bookPtr as number);
+      }
+      const ptr = mod._malloc(_data.length);
+      const heapU8 = mod.HEAPU8 ?? new Uint8Array(mod.wasmMemory.buffer);
+      heapU8.set(_data, ptr);
 
-    this._bookPtr = mod._createBookFromBuffer(
-      this.width,
-      this.height,
-      ptr,
-      _data.length,
-    );
-    mod._free(ptr);
-    return Promise.resolve();
+      this._bookPtr = mod._createBookFromBuffer(
+        this.width,
+        this.height,
+        ptr,
+        _data.length,
+      );
+      mod._free(ptr);
+    });
   }
 
   release(): void {
@@ -103,9 +106,11 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     opts?: AnalyzeOptions & { weak?: boolean },
   ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
-    const mod = getNoSABModule();
-    const resArr = this.executeWasmSolve(mod, positionStr, opts);
-    return Promise.resolve(this.parseSolveResArr(resArr, positionStr));
+    return this.runTask(() => {
+      const mod = getNoSABModule();
+      const resArr = this.executeWasmSolve(mod, positionStr, opts);
+      return this.parseSolveResArr(resArr, positionStr, opts?.heuristic);
+    });
   }
 
   stop(): void {

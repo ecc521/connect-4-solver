@@ -36,6 +36,12 @@ interface NativeSolverType {
   ): void;
   createBookFromBuffer(w: number, h: number, base64: string): string;
   destroyBook(w: number, h: number, bookPtr: string): void;
+  stop(
+    solverPtr: string,
+    w: number,
+    h: number,
+    heuristic: boolean,
+  ): void;
   // Exact analysis — returns [status, nbMoves, col0..colN-1, aborted]
   analyze(
     solverPtr: string,
@@ -155,30 +161,33 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
 
   loadBook(data: Uint8Array): Promise<void> {
     if (!this.initialized) throw new Error("Call init() first.");
-    if (this._bookPtr && this._bookPtr !== "0") {
-      this._nativeModule.destroyBook(
+    return this.runTask(() => {
+      if (this._bookPtr && this._bookPtr !== "0") {
+        this._nativeModule.destroyBook(
+          this.width,
+          this.height,
+          this._bookPtr as string,
+        );
+      }
+      const b64 = encodeBase64(data);
+      this._bookPtr = this._nativeModule.createBookFromBuffer(
         this.width,
         this.height,
-        this._bookPtr as string,
+        b64,
       );
-    }
-    const b64 = encodeBase64(data);
-    this._bookPtr = this._nativeModule.createBookFromBuffer(
-      this.width,
-      this.height,
-      b64,
-    );
-    return Promise.resolve();
+    });
   }
 
-  private createEvaluation(score: number, nbMoves: number): Evaluation {
+  private createEvaluation(score: number, nbMoves: number, isHeuristicOverride?: boolean): Evaluation {
     const isPlayer1Turn = nbMoves % 2 === 0;
     const currentPlayer = isPlayer1Turn ? Player.P1 : Player.P2;
     const opponent = isPlayer1Turn ? Player.P2 : Player.P1;
     const movesRemaining = this.width * this.height - nbMoves;
     const halfMovesRemaining = Math.ceil(movesRemaining / 2);
 
-    if (this._isHeuristic) {
+    const isHeuristic = isHeuristicOverride ?? this._isHeuristic;
+
+    if (isHeuristic) {
       if (score >= 31000) {
         const realScore = score - 31000;
         return {
@@ -237,92 +246,108 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     const { threads, maxDepth, timeoutMs, bookPtr, weak } =
       this.sanitizeOpts(opts);
 
-    let nativeResArr: number[];
-    if (this._isHeuristic) {
-      nativeResArr = await this._nativeModule.analyzeHeuristic(
-        this._solverPtrStr,
-        positionStr,
-        maxDepth,
-        threads,
-        timeoutMs,
-        this.width,
-        this.height,
-        bookPtr as string,
-      );
-    } else {
-      nativeResArr = await this._nativeModule.analyze(
-        this._solverPtrStr,
-        positionStr,
-        threads,
-        timeoutMs,
-        this.width,
-        this.height,
-        weak,
-        bookPtr as string,
-      );
-    }
+    const isHeuristic = opts?.heuristic ?? this._isHeuristic;
 
-    const status = nativeResArr[0];
-    const nbMoves = nativeResArr[1];
+    return this.runTask(async () => {
+      let nativeResArr: number[];
+      if (isHeuristic) {
+        nativeResArr = await this._nativeModule.analyzeHeuristic(
+          this._solverPtrStr,
+          positionStr,
+          maxDepth,
+          threads,
+          timeoutMs,
+          this.width,
+          this.height,
+          bookPtr as string,
+        );
+      } else {
+        nativeResArr = await this._nativeModule.analyze(
+          this._solverPtrStr,
+          positionStr,
+          threads,
+          timeoutMs,
+          this.width,
+          this.height,
+          weak,
+          bookPtr as string,
+        );
+      }
 
-    let currentPosition = positionStr;
-    const currentPlayer = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
-    let evaluation: Evaluation | null = null;
-    const moveOptions: (Evaluation | null)[] = [];
+      const status = nativeResArr[0];
+      const nbMoves = nativeResArr[1];
 
-    if (status === 2) {
-      currentPosition = positionStr.slice(0, nbMoves);
-    } else if (status === 1) {
-      currentPosition = positionStr.slice(0, nbMoves + 1);
-      const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
-      evaluation = {
-        eval: { value: Number.POSITIVE_INFINITY },
-        outcome: Outcome.Win,
-        winner,
-        movesToEnd: 0,
-        score: Math.floor((this.width * this.height + 1 - nbMoves) / 2),
-      };
-    } else {
-      for (let i = 0; i < this.width; i++) {
-        const n = nativeResArr[2 + i];
-        if (n === -1000) {
-          moveOptions.push(null);
-        } else {
-          moveOptions.push(this.createEvaluation(n, nbMoves));
+      let currentPosition = positionStr;
+      const currentPlayer = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
+      let evaluation: Evaluation | null = null;
+      const moveOptions: (Evaluation | null)[] = [];
+
+      if (status === 2) {
+        currentPosition = positionStr.slice(0, nbMoves);
+      } else if (status === 1) {
+        currentPosition = positionStr.slice(0, nbMoves + 1);
+        const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
+        evaluation = {
+          eval: { value: Number.POSITIVE_INFINITY },
+          outcome: Outcome.Win,
+          winner,
+          movesToEnd: 0,
+          score: Math.floor((this.width * this.height + 1 - nbMoves) / 2),
+        };
+      } else {
+        for (let i = 0; i < this.width; i++) {
+          const n = nativeResArr[2 + i];
+          if (n === -1000) {
+            moveOptions.push(null);
+          } else {
+            moveOptions.push(this.createEvaluation(n, nbMoves, isHeuristic));
+          }
+        }
+
+        let bestEval: Evaluation | null = null;
+        for (const ev of moveOptions) {
+          if (!ev) continue;
+          if (!bestEval || ev.score > bestEval.score) bestEval = ev;
+        }
+        evaluation = bestEval;
+      }
+
+      const depthReached = nativeResArr[2 + this.width];
+      const aborted = nativeResArr[3 + this.width] === 1;
+
+      const nodes =
+        (nativeResArr[4 + this.width] >>> 0) +
+        (nativeResArr[5 + this.width] >>> 0) * 4294967296;
+
+      let bestMove: number | undefined;
+      if (evaluation && !aborted) {
+        const bestScore = evaluation.score;
+        for (let i = 0; i < this.width; i++) {
+          if (moveOptions[i]?.score === bestScore) {
+            bestMove = i;
+            break;
+          }
         }
       }
 
-      let bestEval: Evaluation | null = null;
-      for (const ev of moveOptions) {
-        if (!ev) continue;
-        if (!bestEval || ev.score > bestEval.score) bestEval = ev;
+      if (aborted) {
+        evaluation = null;
+        moveOptions.length = 0;
       }
-      evaluation = bestEval;
-    }
 
-    // resArr[2 + width]: depthReached for heuristic, aborted flag for exact
-    const depthReached = this._isHeuristic
-      ? nativeResArr[2 + this.width]
-      : undefined;
-    const aborted = this._isHeuristic
-      ? undefined
-      : nativeResArr[2 + this.width] === 1;
-
-    if (aborted) {
-      evaluation = null;
-      moveOptions.length = 0;
-    }
-
-    return {
-      position: currentPosition,
-      originalPosition: positionStr,
-      currentPlayer,
-      evaluation,
-      moveOptions,
-      depthReached,
-      isHeuristic: this._isHeuristic,
-      aborted,
-    };
+      return {
+        position: currentPosition,
+        originalPosition: positionStr,
+        currentPlayer,
+        evaluation,
+        moveOptions,
+        bestMove,
+        nodes,
+        depthReached,
+        isHeuristic: isHeuristic,
+        aborted,
+      };
+    });
   }
 
   async solve(
@@ -333,87 +358,98 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     const { threads, maxDepth, timeoutMs, bookPtr, weak } =
       this.sanitizeOpts(opts);
 
-    let nativeResArr: number[];
-    if (this._isHeuristic) {
-      nativeResArr = await this._nativeModule.solveHeuristic(
-        this._solverPtrStr,
-        positionStr,
-        maxDepth,
-        threads,
-        timeoutMs,
-        this.width,
-        this.height,
-        bookPtr as string,
-      );
-    } else {
-      nativeResArr = await this._nativeModule.solve(
-        this._solverPtrStr,
-        positionStr,
-        threads,
-        timeoutMs,
-        this.width,
-        this.height,
-        weak,
-        bookPtr as string,
-      );
-    }
+    const isHeuristic = opts?.heuristic ?? this._isHeuristic;
 
-    const status = nativeResArr[0];
-    const nbMoves = nativeResArr[1];
+    return this.runTask(async () => {
+      let nativeResArr: number[];
+      if (isHeuristic) {
+        nativeResArr = await this._nativeModule.solveHeuristic(
+          this._solverPtrStr,
+          positionStr,
+          maxDepth,
+          threads,
+          timeoutMs,
+          this.width,
+          this.height,
+          bookPtr as string,
+        );
+      } else {
+        nativeResArr = await this._nativeModule.solve(
+          this._solverPtrStr,
+          positionStr,
+          threads,
+          timeoutMs,
+          this.width,
+          this.height,
+          weak,
+          bookPtr as string,
+        );
+      }
 
-    let currentPosition = positionStr;
-    const currentPlayer = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
+      const status = nativeResArr[0];
+      const nbMoves = nativeResArr[1];
 
-    if (status === 2) {
-      currentPosition = positionStr.slice(0, nbMoves);
-    } else if (status === 1) {
-      currentPosition = positionStr.slice(0, nbMoves + 1);
-      const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
+      let currentPosition = positionStr;
+      const currentPlayer = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
+
+      if (status === 2) {
+        currentPosition = positionStr.slice(0, nbMoves);
+      } else if (status === 1) {
+        currentPosition = positionStr.slice(0, nbMoves + 1);
+        const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
+        return {
+          position: currentPosition,
+          originalPosition: positionStr,
+          currentPlayer,
+          evaluation: {
+            eval: { value: Number.POSITIVE_INFINITY },
+            outcome: Outcome.Win,
+            winner,
+            movesToEnd: 0,
+            score: Math.floor((this.width * this.height + 1 - nbMoves) / 2),
+          },
+          moveOptions: [],
+          isHeuristic: isHeuristic,
+        };
+      }
+
+      const score = nativeResArr[2];
+      const bestMove = nativeResArr[3] === -1 ? undefined : nativeResArr[3];
+      const depth = nativeResArr[4];
+      const nodes =
+        (nativeResArr[5] >>> 0) + (nativeResArr[6] >>> 0) * 4294967296;
+      const aborted = nativeResArr[7] === 1;
+
+      const evaluation = aborted ? null : this.createEvaluation(score, nbMoves);
+
       return {
         position: currentPosition,
         originalPosition: positionStr,
         currentPlayer,
-        evaluation: {
-          eval: { value: Number.POSITIVE_INFINITY },
-          outcome: Outcome.Win,
-          winner,
-          movesToEnd: 0,
-          score: Math.floor((this.width * this.height + 1 - nbMoves) / 2),
-        },
+        evaluation,
         moveOptions: [],
-        isHeuristic: this._isHeuristic,
+        depthReached: depth,
+        nodes,
+        bestMove,
+        aborted,
+        isHeuristic: isHeuristic,
       };
-    }
-
-    const score = nativeResArr[2];
-    const bestMove = nativeResArr[3] === -1 ? undefined : nativeResArr[3];
-    const depth = nativeResArr[4];
-    const nodes =
-      (nativeResArr[5] >>> 0) + (nativeResArr[6] >>> 0) * 4294967296;
-    const aborted = nativeResArr[7] === 1;
-
-    const evaluation = aborted ? null : this.createEvaluation(score, nbMoves);
-
-    return {
-      position: currentPosition,
-      originalPosition: positionStr,
-      currentPlayer,
-      evaluation,
-      moveOptions: [],
-      depthReached: depth,
-      nodes,
-      bestMove,
-      aborted,
-      isHeuristic: this._isHeuristic,
-    };
+    });
   }
 
   /**
-   * NOTE: Not currently supported on React Native.
-   * Use timeoutMs to guarantee a max search time.
+   * Immediately aborts any ongoing analysis or solve operations.
    */
   stop(): void {
-    // No-op
+    if (!this.initialized) return;
+    if (this._solverPtrStr !== "0") {
+      this._nativeModule.stop(
+        this._solverPtrStr,
+        this.width,
+        this.height,
+        this._isHeuristic,
+      );
+    }
   }
 
   getNodeCount(): Promise<number> {

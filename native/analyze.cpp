@@ -19,13 +19,16 @@ template <int W, int H>
 int32_t* runAnalysis(Solver<W, H>& solver, const char* positionCharArr, bool weak, int threads, void* book_ptr, double timeout_ms) {
   std::string positionString(positionCharArr);
   GenericPosition<W, H> P;
-  int32_t* result = (int32_t*)malloc((3 + W) * sizeof(int32_t));
+  int32_t* result = (int32_t*)malloc((6 + W) * sizeof(int32_t));
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
     result[0] = P.isWinningMove(lastColPlayed) ? 1 : 2;
     result[1] = P.nbMoves();
     for(int i = 0; i < W; i++) result[2 + i] = 0;
     result[2 + W] = 0;
+    result[3 + W] = 0;
+    result[4 + W] = 0;
+    result[5 + W] = 0;
   } else {
     if (book_ptr) solver.loadBook(static_cast<OpeningBookBase<W, H>*>(book_ptr));
     else solver.loadBook(nullptr);
@@ -35,7 +38,11 @@ int32_t* runAnalysis(Solver<W, H>& solver, const char* positionCharArr, bool wea
     result[0] = 0;
     result[1] = P.nbMoves();
     for(int i = 0; i < W; i++) result[2 + i] = res[i];
-    result[2 + W] = solver.isAborted() ? 1 : 0;
+    result[2 + W] = 0; // Depth reached undefined for exact
+    result[3 + W] = solver.isAborted() ? 1 : 0;
+    uint64_t nodes = solver.getNodeCount();
+    result[4 + W] = (int32_t)(nodes & 0xFFFFFFFF);
+    result[5 + W] = (int32_t)((nodes >> 32) & 0xFFFFFFFF);
   }
   return result;
 }
@@ -102,25 +109,31 @@ void* runCreateBook(const uint8_t* data, size_t size) {
 }
 
 template <int W, int H>
-int32_t* runHeuristicAnalysis(Solver<W, H>& solver, const char* positionCharArr, int max_depth, int threads, double timeout_ms) {
+int32_t* runHeuristicAnalysis(HeuristicSolver<W, H>& solver, const char* positionCharArr, int max_depth, int threads, double timeout_ms) {
   std::string positionString(positionCharArr);
   GenericPosition<W, H> P;
-  int32_t* result = (int32_t*)malloc((3 + W) * sizeof(int32_t));
+  int32_t* result = (int32_t*)malloc((6 + W) * sizeof(int32_t));
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
     result[0] = P.isWinningMove(lastColPlayed) ? 1 : 2;
     result[1] = P.nbMoves();
     for(int i = 0; i < W; i++) result[2 + i] = 0;
     result[2 + W] = 0;
+    result[3 + W] = 0;
+    result[4 + W] = 0;
+    result[5 + W] = 0;
   } else {
     result[0] = 0;
     result[1] = P.nbMoves();
     double end_time_ms = 0;
     if (timeout_ms > 0) end_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() + timeout_ms;
-    // Note: We use analyze directly since HeuristicSolver inherits from Solver
-    auto res = solver.analyze(P, false, threads, nullptr, end_time_ms);
-    for(int i = 0; i < W; i++) result[2 + i] = res[i];
-    result[2 + W] = 0; // Depth reached not perfectly returned yet
+    auto res = solver.analyze_heuristic(P, max_depth, threads, end_time_ms);
+    for(int i = 0; i < W; i++) result[2 + i] = res.first[i];
+    result[2 + W] = res.second;
+    result[3 + W] = solver.isAborted() ? 1 : 0;
+    uint64_t nodes = solver.getNodeCount();
+    result[4 + W] = (int32_t)(nodes & 0xFFFFFFFF);
+    result[5 + W] = (int32_t)((nodes >> 32) & 0xFFFFFFFF);
   }
   return result;
 }

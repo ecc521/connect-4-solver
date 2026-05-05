@@ -70,27 +70,32 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
   }
 
   async loadBook(data: Uint8Array): Promise<void> {
-    await this.sendMessage("loadBook", { data });
+    await this.runTask(() => this.sendMessage("loadBook", { data }));
   }
 
   async analyze(
     positionStr: string,
     opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis> {
-    return this.sendMessage("analyze", {
-      position: positionStr,
-      opts,
-    }) as Promise<PositionAnalysis>;
+    return this.runTask(() =>
+        this.sendMessage("analyze", {
+          position: positionStr,
+          opts,
+        }) as Promise<PositionAnalysis>,
+    );
   }
 
   async solve(
     positionStr: string,
     opts?: AnalyzeOptions & { weak?: boolean },
   ): Promise<PositionAnalysis> {
-    return this.sendMessage("solve", {
-      position: positionStr,
-      opts,
-    }) as Promise<PositionAnalysis>;
+    return this.runTask(
+      () =>
+        this.sendMessage("solve", {
+          position: positionStr,
+          opts,
+        }) as Promise<PositionAnalysis>,
+    );
   }
 
   /**

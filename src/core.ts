@@ -21,6 +21,8 @@ export interface AnalyzeOptions {
   maxDepth?: number;
   timeoutMs?: number;
   book?: { ptr: number };
+  heuristic?: boolean;
+  weak?: boolean;
 }
 
 export interface Evaluation {
@@ -182,7 +184,37 @@ export abstract class BaseConnect4Solver {
     this.height = height;
   }
 
-  protected sanitizeOpts(opts?: AnalyzeOptions & { weak?: boolean }): {
+  /**
+   * True if a search or analysis is currently in progress.
+   */
+  protected _isBusy = false;
+
+  /**
+   * Public accessor for the busy state.
+   */
+  public get isBusy(): boolean {
+    return this._isBusy;
+  }
+
+  /**
+   * Runs a task if the solver is not busy, otherwise throws an error.
+   */
+  protected async runTask<T>(task: () => Promise<T> | T): Promise<T> {
+    if (this._isBusy) {
+      throw new Error(
+        "Solver is busy: concurrent execution on the same instance is strictly prohibited.",
+      );
+    }
+    this._isBusy = true;
+    try {
+      const res = task();
+      return res instanceof Promise ? await res : res;
+    } finally {
+      this._isBusy = false;
+    }
+  }
+
+  protected sanitizeOpts(opts?: AnalyzeOptions): {
     threads: number;
     maxDepth: number;
     timeoutMs: number;
@@ -243,7 +275,7 @@ export abstract class BaseConnect4Solver {
   ): Promise<PositionAnalysis>;
   abstract solve(
     positionStr: string,
-    opts?: AnalyzeOptions & { weak?: boolean },
+    opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis>;
   abstract loadBook(data: Uint8Array): Promise<void>;
   /**

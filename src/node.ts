@@ -176,7 +176,6 @@ export interface NodeConnect4SolverOptions extends Connect4SolverOptions {
 }
 
 export class NodeConnect4Solver extends AbstractSyncSolver {
-  private _analysisQueue: Promise<void> = Promise.resolve();
   private _sharedCache?: NativeCache;
 
   constructor(opts?: NodeConnect4SolverOptions | number, heightOpt?: number) {
@@ -223,18 +222,19 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
 
   async loadBook(_data: Uint8Array): Promise<void> {
     if (!this.initialized) throw new Error("Call init() first.");
-    const native = getNativeModule();
-    if (native) {
-      if (this._bookPtr) {
-        native._destroyBook(this.width, this.height, this._bookPtr);
+    return this.runTask(() => {
+      const native = getNativeModule();
+      if (native) {
+        if (this._bookPtr) {
+          native._destroyBook(this.width, this.height, this._bookPtr);
+        }
+        this._bookPtr = native._createBookFromBuffer(
+          this.width,
+          this.height,
+          _data,
+        ) as number;
       }
-      this._bookPtr = native._createBookFromBuffer(
-        this.width,
-        this.height,
-        _data,
-      ) as number;
-    }
-    return Promise.resolve();
+    });
   }
 
   async analyze(
@@ -243,47 +243,37 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
   ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
 
-    return new Promise<PositionAnalysis>((resolve, reject) => {
-      this._analysisQueue = this._analysisQueue
-        .catch(() => {
-          /* ignore */
-        })
-        .then(async () => {
-          try {
-            const native = getNativeModule();
-            if (!native) throw new Error("Native module not loaded");
-            const { threads, maxDepth, timeoutMs, bookPtr, weak } =
-              this.sanitizeOpts(opts);
+    return this.runTask(async () => {
+      const native = getNativeModule();
+      if (!native) throw new Error("Native module not loaded");
+      const { threads, maxDepth, timeoutMs, bookPtr, weak } =
+        this.sanitizeOpts(opts);
 
-            let resArr: Int32Array | number[];
-            if (this.isHeuristic) {
-              resArr = await native._analyzeHeuristic(
-                this.width,
-                this.height,
-                this._solverPtr,
-                positionStr,
-                threads,
-                maxDepth,
-                timeoutMs,
-                bookPtr === 0 ? null : bookPtr,
-              );
-            } else {
-              resArr = await native._analyzeExact(
-                this.width,
-                this.height,
-                this._solverPtr,
-                positionStr,
-                weak,
-                threads,
-                bookPtr === 0 ? null : bookPtr,
-                timeoutMs,
-              );
-            }
-            resolve(this.parseResArr(resArr, positionStr));
-          } catch (e) {
-            reject(e instanceof Error ? e : new Error(String(e)));
-          }
-        });
+      let resArr: Int32Array | number[];
+      if (this.isHeuristic) {
+        resArr = await native._analyzeHeuristic(
+          this.width,
+          this.height,
+          this._solverPtr,
+          positionStr,
+          threads,
+          maxDepth,
+          timeoutMs,
+          bookPtr === 0 ? null : bookPtr,
+        );
+      } else {
+        resArr = await native._analyzeExact(
+          this.width,
+          this.height,
+          this._solverPtr,
+          positionStr,
+          weak,
+          threads,
+          bookPtr === 0 ? null : bookPtr,
+          timeoutMs,
+        );
+      }
+      return this.parseResArr(resArr, positionStr);
     });
   }
 
@@ -293,51 +283,40 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
   ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
 
-    return new Promise<PositionAnalysis>((resolve, reject) => {
-      this._analysisQueue = this._analysisQueue
-        .catch(() => {
-          /* ignore */
-        })
-        .then(async () => {
-          try {
-            const native = getNativeModule();
-            if (!native) throw new Error("Native module not loaded");
-            const { threads, maxDepth, timeoutMs, bookPtr } =
-              this.sanitizeOpts(opts);
-            const weak = opts?.weak ?? false;
+    return this.runTask(async () => {
+      const native = getNativeModule();
+      if (!native) throw new Error("Native module not loaded");
+      const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
+      const weak = opts?.weak ?? false;
 
-            let resArr: Int32Array | number[];
-            if (this.isHeuristic) {
-              // Heuristic solve() does not benefit from LazySMP threading:
-              // deterministic NNUE evaluation = no search diversity between threads.
-              // analyze_heuristic() root-splitting still benefits from threads.
-              resArr = await native._solveHeuristic(
-                this.width,
-                this.height,
-                this._solverPtr,
-                positionStr,
-                threads,
-                maxDepth,
-                timeoutMs,
-                bookPtr === 0 ? null : bookPtr,
-              );
-            } else {
-              resArr = await native._solveExact(
-                this.width,
-                this.height,
-                this._solverPtr,
-                positionStr,
-                weak,
-                threads,
-                bookPtr === 0 ? null : bookPtr,
-                timeoutMs,
-              );
-            }
-            resolve(this.parseSolveResArr(resArr, positionStr));
-          } catch (e) {
-            reject(e instanceof Error ? e : new Error(String(e)));
-          }
-        });
+      let resArr: Int32Array | number[];
+      if (this.isHeuristic) {
+        // Heuristic solve() does not benefit from LazySMP threading:
+        // deterministic NNUE evaluation = no search diversity between threads.
+        // analyze_heuristic() root-splitting still benefits from threads.
+        resArr = await native._solveHeuristic(
+          this.width,
+          this.height,
+          this._solverPtr,
+          positionStr,
+          threads,
+          maxDepth,
+          timeoutMs,
+          bookPtr === 0 ? null : bookPtr,
+        );
+      } else {
+        resArr = await native._solveExact(
+          this.width,
+          this.height,
+          this._solverPtr,
+          positionStr,
+          weak,
+          threads,
+          bookPtr === 0 ? null : bookPtr,
+          timeoutMs,
+        );
+      }
+      return this.parseSolveResArr(resArr, positionStr);
     });
   }
 

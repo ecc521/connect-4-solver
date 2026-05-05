@@ -20,6 +20,7 @@ class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContext
     external fun nativeDestroyCache(cachePtrStr: String)
     external fun nativeCreateSolver(width: Int, height: Int, cachePtrStr: String, isHeuristic: Boolean): String
     external fun nativeDestroySolver(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean)
+    external fun nativeStop(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean)
     external fun nativeCreateBookFromBuffer(width: Int, height: Int, base64: ByteArray): String
     external fun nativeDestroyBook(width: Int, height: Int, bookPtrStr: String)
     external fun nativeAnalyze(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, bookPtrStr: String): IntArray?
@@ -45,6 +46,11 @@ class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContext
     @ReactMethod(isBlockingSynchronousMethod = true)
     fun destroySolver(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean) {
         nativeDestroySolver(solverPtrStr, width, height, isHeuristic)
+    }
+
+    @ReactMethod(isBlockingSynchronousMethod = true)
+    fun stop(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean) {
+        nativeStop(solverPtrStr, width, height, isHeuristic)
     }
 
     @ReactMethod(isBlockingSynchronousMethod = true)

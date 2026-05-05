@@ -630,7 +630,7 @@ Value DestroyBook(const CallbackInfo& info) {
 template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
 std::vector<int> runAnalysisRaw(CoreSolver& solver, const std::string& pos, bool weak, int threads, void* book_ptr, double timeout_ms) {
     CorePosition P;
-    std::vector<int> result(3 + W, 0);
+    std::vector<int> result(4 + W, 0);
     
     int moves_played = P.play(pos);
     if((size_t)moves_played < pos.size()) {
@@ -650,7 +650,8 @@ std::vector<int> runAnalysisRaw(CoreSolver& solver, const std::string& pos, bool
     const CoreBook* book = static_cast<const CoreBook*>(book_ptr);
     std::vector<int> scores = solver.analyze(P, weak, threads, book, timeout_ms);
     for(int i = 0; i < W; i++) result[2 + i] = scores[i];
-    result[2 + W] = solver.isAborted() ? 1 : 0;
+    result[2 + W] = 0; // depthReached
+    result[3 + W] = solver.isAborted() ? 1 : 0;
     return result;
 }
 
@@ -690,7 +691,7 @@ std::vector<int> runSolveHeuristicRaw(CoreSolver& solver, const std::string& pos
     if (book_ptr) solver.loadBook(static_cast<BookType*>(book_ptr));
     else solver.loadBook(nullptr);
     CorePosition P;
-    std::vector<int> result(7, 0);
+    std::vector<int> result(8, 0);
     if(P.play(pos) != pos.size()) {
         int lastColPlayed = pos[P.nbMoves()] - '1';
         result[0] = P.isWinningMove(lastColPlayed) ? 1 : 2;
@@ -705,6 +706,7 @@ std::vector<int> runSolveHeuristicRaw(CoreSolver& solver, const std::string& pos
         result[4] = res.depth;
         result[5] = (int)(res.nodes & 0xFFFFFFFF);
         result[6] = (int)(res.nodes >> 32);
+        result[7] = res.aborted ? 1 : 0;
     }
     return result;
 }
@@ -1008,7 +1010,7 @@ std::vector<int> runHeuristicAnalysisRaw(CoreSolver& solver, const std::string& 
     if (book_ptr) solver.loadBook(static_cast<BookType*>(book_ptr));
     else solver.loadBook(nullptr);
     CorePosition P;
-    std::vector<int> result(3 + W, 0);
+    std::vector<int> result(4 + W, 0);
     
     if(P.play(pos) != pos.size()) {
         int lastColPlayed = pos[P.nbMoves()] - '1';
@@ -1022,6 +1024,7 @@ std::vector<int> runHeuristicAnalysisRaw(CoreSolver& solver, const std::string& 
         std::vector<int> scores = res.first;
         for(int i = 0; i < W; i++) result[2 + i] = scores[i];
         result[2 + W] = res.second;
+        result[3 + W] = solver.isAborted() ? 1 : 0;
     }
     return result;
 }

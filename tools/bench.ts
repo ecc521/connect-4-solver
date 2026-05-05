@@ -37,6 +37,10 @@
 import * as fs from "fs";
 import * as path from "path";
 import { performance } from "perf_hooks";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ─── Auto-discover board sizes from test-data/ ──────────────────
 function discoverSizes(): string[] {
@@ -284,7 +288,7 @@ async function runBenchmark(
   let totalAttempted = 0;
   let totalDepth = 0;
   let hardFailures = 0;
-  const startNodes: number = solver.getNodeCount();
+  const startNodes: number = await solver.getNodeCount();
   const startTime = performance.now();
 
   for (const bp of positions) {
@@ -385,7 +389,7 @@ async function runBenchmark(
     }
   }
 
-  const totalNodes = Number(solver.getNodeCount()) - Number(startNodes);
+  const totalNodes = Number(await solver.getNodeCount()) - Number(startNodes);
   const totalMs = performance.now() - startTime;
   const mns =
     totalMs > 0 && totalNodes > 0
