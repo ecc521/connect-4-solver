@@ -217,6 +217,8 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
     this.sendMessage("unload").catch(() => {
       /* ignore */
     });
+    this.worker.terminate();
+    this.initialized = false;
   }
 
   async getNodeCount(): Promise<number> {
