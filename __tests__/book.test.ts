@@ -204,7 +204,7 @@ describe("Polymorphic Dense Book Packing", () => {
       const result = await solver.solve("12"); 
       expect(result.evaluation?.score).toBe(-1);
 
-      solver.unload();
+      solver.release();
     }
   });
 });
