@@ -3,8 +3,10 @@ import {
   Connect4SolverOptions,
   AnalyzeOptions,
   BaseConnect4Solver,
+  SolverAbortedError,
   Player,
 } from "./core.js";
+
 
 export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
   private worker: Worker;
@@ -29,6 +31,10 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
   >();
   private initPromise: Promise<void>;
 
+  /** The cache size actually allocated in the worker after init(). May be less than
+   *  the requested cacheSizeMb if the WASM allocator could not satisfy the original request. */
+  public allocatedCacheSizeMb: number;
+
   constructor(
     workerProvider: () => Worker,
     initType: string,
@@ -50,6 +56,7 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
       if (opts.heuristic !== undefined) heuristic = opts.heuristic;
     }
 
+    this.allocatedCacheSizeMb = cacheSizeMb; // updated after init resolves
     this.initPayload = {
       width: this.width,
       height: this.height,
@@ -76,9 +83,13 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
         success: boolean;
         result: unknown;
         error: string;
+        allocatedCacheSizeMb?: number;
       }>,
     ): void => {
-      const { id, success, result, error } = e.data;
+      const { id, success, result, error, allocatedCacheSizeMb } = e.data;
+      if (allocatedCacheSizeMb !== undefined) {
+        this.allocatedCacheSizeMb = allocatedCacheSizeMb;
+      }
       const p = this.pendingRequests.get(id);
       if (p) {
         this.pendingRequests.delete(id);
@@ -101,8 +112,13 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
   }
 
   async loadBook(data: Uint8Array): Promise<void> {
+    if (this._isBusy || this._queue.length > 0) {
+      throw new Error(
+        "Cannot load a book while a search is active or queued. Call stop() and await it first.",
+      );
+    }
     this.loadedBookData = data;
-    await this.runTask(() => this.sendMessage("loadBook", { data }));
+    await this.sendMessage("loadBook", { data });
   }
 
   async analyze(
@@ -134,40 +150,38 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
   }
 
   /**
-   * Forcibly terminates the worker thread and re-creates it.
-   * This is the only way to stop a blocking WASM search in a Web Worker.
-   *
-   * Pending analyze/solve requests will resolve with { aborted: true }.
+   * Sends the abort signal to the WASM worker.
+   * For WASM, the worker thread is blocked during search, so we must terminate
+   * and restart it. Pending worker-level promises (inside sendMessage) are
+   * resolved with an aborted result so the outer runTask() task returns cleanly,
+   * which in turn settles _taskSettledPromise (letting stop() resolve).
    */
-  stop(): void {
-    // 1. Check if there is actually a search to stop
-    let activeSearchRequest = null;
+  protected _sendAbortSignal(): void {
+    // Soft stop: if nothing is actually searching, just send a stop message
+    let hasActiveSearch = false;
     for (const req of this.pendingRequests.values()) {
       if (req.type === "analyze" || req.type === "solve") {
-        activeSearchRequest = req;
+        hasActiveSearch = true;
         break;
       }
     }
 
-    if (!activeSearchRequest) {
-      // Soft Stop: If no search is running, just send a stop message.
-      // This avoids the expensive 200ms worker reboot overhead.
-      this.sendMessage("stop").catch(() => {
-        /* ignore */
-      });
+    if (!hasActiveSearch) {
+      this.sendMessage("stop").catch(() => { /* ignore */ });
       return;
     }
 
-    // Hard Stop: Terminate the blocked worker
+    // Hard stop: terminate the blocked worker
     this.worker.terminate();
 
-    // Resolve pending analyze/solve requests with an aborted result object
+    // Resolve the pending worker-level search request with an aborted result.
+    // This causes the sendMessage() Promise (inside runTask's task) to resolve,
+    // which lets _executeTask() finish and settle _taskSettledPromise.
     for (const req of this.pendingRequests.values()) {
       if (req.type === "analyze" || req.type === "solve") {
         const nbMoves = req.position ? req.position.length : 0;
         const currentPlayer = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
-
-        const abortedResult: PositionAnalysis = {
+        req.resolve({
           position: req.position ?? "",
           originalPosition: req.position ?? "",
           currentPlayer,
@@ -175,32 +189,28 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
           moveOptions: [],
           isHeuristic: this.initPayload.heuristic,
           aborted: true,
-        };
-        req.resolve(abortedResult);
+        } satisfies PositionAnalysis);
       } else {
-        req.reject(new Error("Worker terminated due to stop() signal."));
+        req.reject(new SolverAbortedError());
       }
     }
     this.pendingRequests.clear();
 
-    // Restart the worker
+    // Restart the worker and re-initialize
     this.worker = this.workerProvider();
     this.setupWorkerListener();
 
-    // Re-initialize
     const newInitPromise = this.sendMessage(
       this.initType,
       this.initPayload,
     ) as Promise<void>;
 
-    // If book was loaded, re-load it
+    // Re-load book if one was previously loaded
     if (this.loadedBookData) {
       const bookData = this.loadedBookData;
       this.initPromise = newInitPromise
         .then(() => this.sendMessage("loadBook", { data: bookData }))
-        .then(() => {
-          /* void */
-        });
+        .then(() => { /* void */ });
     } else {
       this.initPromise = newInitPromise;
     }

@@ -17,6 +17,9 @@ export const INT32_SIZE = 4;
 export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   public isHeuristic: boolean;
   protected cacheSizeMb: number;
+  /** The cache size actually allocated after init(). May be less than cacheSizeMb if the
+   *  WASM allocator could not satisfy the original request. Always read this after init(). */
+  public allocatedCacheSizeMb: number;
 
   protected _solverPtr = 0;
   protected _cachePtr = 0;
@@ -32,6 +35,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     }
 
     this.cacheSizeMb = cacheSizeMb;
+    this.allocatedCacheSizeMb = cacheSizeMb; // updated in init() after actual allocation
     this.isHeuristic = heuristic;
   }
 
@@ -350,6 +354,5 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     opts?: AnalyzeOptions & { weak?: boolean },
   ): Promise<PositionAnalysis>;
   abstract getNodeCount(): Promise<number>;
-  abstract stop(): void;
   abstract release(): void;
 }

@@ -46,15 +46,10 @@ export function setupWorkerHandler(): void {
     try {
       if (type === "init-threaded") {
         const { width, height, cacheSizeMb, heuristic } = payload;
-        const opts: Connect4SolverOptions = {
-          width,
-          height,
-          cacheSizeMb,
-          heuristic,
-        };
+        const opts: Connect4SolverOptions = { width, height, cacheSizeMb, heuristic };
         solver = new SyncWasmConnect4Solver(opts);
         await solver.init();
-        self.postMessage({ id, success: true });
+        self.postMessage({ id, success: true, allocatedCacheSizeMb: solver.allocatedCacheSizeMb });
       } else if (type === "loadBook") {
         if (!solver) throw new Error("Solver not initialized");
         if (payload.data) await solver.loadBook(payload.data);
@@ -78,7 +73,7 @@ export function setupWorkerHandler(): void {
         solver.isHeuristic = originalHeuristic;
         self.postMessage({ id, success: true, result });
       } else if (type === "stop") {
-        if (solver) solver.stop();
+        if (solver) await solver.stop();
         self.postMessage({ id, success: true });
       } else if (type === "unload") {
         if (solver) solver.release();
@@ -102,15 +97,10 @@ export function setupNoSABWorkerHandler(): void {
     try {
       if (type === "init-nosab") {
         const { width, height, cacheSizeMb, heuristic } = payload;
-        const opts: Connect4SolverOptions = {
-          width,
-          height,
-          cacheSizeMb,
-          heuristic,
-        };
+        const opts: Connect4SolverOptions = { width, height, cacheSizeMb, heuristic };
         solver = new SyncWasmNoSABConnect4Solver(opts);
         await solver.init();
-        self.postMessage({ id, success: true });
+        self.postMessage({ id, success: true, allocatedCacheSizeMb: solver.allocatedCacheSizeMb });
       } else if (type === "loadBook") {
         if (!solver) throw new Error("Solver not initialized");
         if (payload.data) {
@@ -136,7 +126,7 @@ export function setupNoSABWorkerHandler(): void {
         solver.isHeuristic = originalHeuristic;
         self.postMessage({ id, success: true, result });
       } else if (type === "stop") {
-        if (solver) solver.stop();
+        if (solver) await solver.stop();
         self.postMessage({ id, success: true });
       } else if (type === "unload") {
         if (solver) solver.release();

@@ -44,18 +44,20 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     await getThreadedModuleInitPromise();
     const mod = getThreadedModule();
     if (!mod) throw new Error("Threaded module not initialized");
-    this._cachePtr = mod._createCache(
-      this.width,
-      this.height,
-      this.cacheSizeMb * 1024 * 1024,
-      this.isHeuristic,
-    );
-    this._solverPtr = mod._createSolver(
-      this.width,
-      this.height,
-      this._cachePtr,
-      this.isHeuristic,
-    );
+
+    // OOM retry: _createCache returns 0 if allocation fails. Halve the request until it succeeds.
+    let sizeMb = this.cacheSizeMb;
+    let ptr = 0;
+    while (sizeMb >= 64) {
+      ptr = mod._createCache(this.width, this.height, sizeMb * 1024 * 1024, this.isHeuristic);
+      if (ptr !== 0) break;
+      sizeMb = Math.floor(sizeMb / 2);
+    }
+    if (ptr === 0) throw new Error(`Failed to allocate WASM cache (tried down to 64 MB)`);
+    this._cachePtr = ptr;
+    this.allocatedCacheSizeMb = sizeMb;
+
+    this._solverPtr = mod._createSolver(this.width, this.height, this._cachePtr, this.isHeuristic);
     this.initialized = true;
     return Promise.resolve();
   }
@@ -84,40 +86,36 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     });
   }
 
-  stop(): void {
-    // NOTE: this is effectively a no-op while analyze()/solve() is running.
-    // The worker's JS event loop is blocked by the synchronous WASM call, so the
-    // "stop" message sent by AbstractAsyncWebWorkerSolver.stop() sits in the queue
-    // and cannot be dispatched until the WASM function returns.
-    //
-    // Emscripten pthreads share memory, but _stopSolver still cannot be called from
-    // the blocked JS thread while the search is in flight.
-    //
-    // Use timeoutMs instead — it is set before the search starts and is polled
-    // by the C++ negamax loop internally, requiring no JS interop.
+  protected _sendAbortSignal(): void {
+    // NOTE: effectively a no-op while analyze()/solve() is running because
+    // pthreads share memory but the JS thread is blocked. Use timeoutMs instead.
     if (!this.initialized) return;
     const mod = getThreadedModule();
     mod._stopSolver(this.width, this.height, this._solverPtr, this.isHeuristic);
   }
 
-  async loadBook(_data: Uint8Array): Promise<void> {
+  loadBook(_data: Uint8Array): Promise<void> {
     if (!this.initialized) throw new Error("Call init() first.");
-    return this.runTask(() => {
-      const mod = this.isHeuristic ? getThreadedModule() : getThreadedModule();
-      if (this._bookPtr) {
-        mod._destroyBook(this.width, this.height, this._bookPtr as number);
-      }
-      const ptr = mod._malloc(_data.length);
-      const heapU8 = mod.HEAPU8 ?? new Uint8Array(mod.wasmMemory.buffer);
-      heapU8.set(_data, ptr);
-      this._bookPtr = mod._createBookFromBuffer(
-        this.width,
-        this.height,
-        ptr,
-        _data.length,
+    if (this._isBusy || this._queue.length > 0) {
+      throw new Error(
+        "Cannot load a book while a search is active or queued. Call stop() and await it first.",
       );
-      mod._free(ptr);
-    });
+    }
+    const mod = getThreadedModule();
+    if (this._bookPtr) {
+      mod._destroyBook(this.width, this.height, this._bookPtr as number);
+    }
+    const ptr = mod._malloc(_data.length);
+    const heapU8 = mod.HEAPU8 ?? new Uint8Array(mod.wasmMemory.buffer);
+    heapU8.set(_data, ptr);
+    this._bookPtr = mod._createBookFromBuffer(
+      this.width,
+      this.height,
+      ptr,
+      _data.length,
+    );
+    mod._free(ptr);
+    return Promise.resolve();
   }
 
   release(): void {
