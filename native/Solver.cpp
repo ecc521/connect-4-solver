@@ -390,9 +390,11 @@ template <int WIDTH, int HEIGHT, typename SlotType>
     endTime.store(0.0, std::memory_order_relaxed);
   }
 
+  const OpeningBookBase<WIDTH, HEIGHT>* active_book = book ? book : this->book;
+
   if (threads <= 1) {
-    if (book) return solve_single<true>(P, weak, book, book->getDepth());
-    else return solve_single<false>(P, weak, book, 0);
+    if (active_book) return solve_single<true>(P, weak, active_book, active_book->getDepth());
+    else return solve_single<false>(P, weak, nullptr, 0);
   }
 
   // --- True Lazy SMP ---
@@ -419,8 +421,8 @@ template <int WIDTH, int HEIGHT, typename SlotType>
       
       solverTlNodeCount = 0;
       ::GameSolver::Connect4::SolverResult r;
-      if (book) r = solve_single<true>(P, weak, book, book->getDepth(), &done, local_history);
-      else r = solve_single<false>(P, weak, book, 0, &done, local_history);
+      if (active_book) r = solve_single<true>(P, weak, active_book, active_book->getDepth(), &done, local_history);
+      else r = solve_single<false>(P, weak, nullptr, 0, &done, local_history);
       nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
       solverTlNodeCount = 0;
       
@@ -519,8 +521,9 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, SlotType>::analyze(const GenericPosit
 
       if (col_valid[col]) {
         ::GameSolver::Connect4::SolverResult result;
-        if (book) result = solve_single<true>(col_positions[col], weak, book, book->getDepth(), &col_abort[col]);
-        else result = solve_single<false>(col_positions[col], weak, book, 0, &col_abort[col]);
+        const OpeningBookBase<WIDTH, HEIGHT>* active_book = book ? book : this->book;
+        if (active_book) result = solve_single<true>(col_positions[col], weak, active_book, active_book->getDepth(), &col_abort[col]);
+        else result = solve_single<false>(col_positions[col], weak, nullptr, 0, &col_abort[col]);
         scores[col] = -result.score;
 
         col_done[col].store(true, std::memory_order_release);   // mark as complete
