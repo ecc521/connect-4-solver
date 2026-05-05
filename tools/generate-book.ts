@@ -1,8 +1,34 @@
-import { NodeConnect4Solver, NativeCache, getNativeModule } from "../src/node.js";
-import { OpeningBook } from "../src/index.js";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
+import { fileURLToPath } from "url";
+
+// Set UV_THREADPOOL_SIZE as early as possible from CLI args
+const tIdx = process.argv.indexOf("--threads");
+const requestedThreads =
+  tIdx !== -1 && tIdx < process.argv.length - 1
+    ? process.argv[tIdx + 1]
+    : os.cpus().length.toString();
+
+if (
+  parseInt(process.env.UV_THREADPOOL_SIZE || "0") < parseInt(requestedThreads)
+) {
+  process.env.UV_THREADPOOL_SIZE = requestedThreads;
+  // Re-spawn itself with the new environment
+  const { spawnSync } = await import("child_process");
+  const result = spawnSync(
+    process.argv[0],
+    [...process.execArgv, ...process.argv.slice(1)],
+    {
+      env: process.env,
+      stdio: "inherit",
+    },
+  );
+  process.exit(result.status ?? 0);
+}
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Automatically drop CPU priority to lowest (nice 19)
 try {
@@ -65,6 +91,10 @@ async function run() {
   );
   console.log("=========================================================");
 
+  const { NodeConnect4Solver, NativeCache, getNativeModule } =
+    await import("../src/node.js");
+  const { OpeningBook } = await import("../src/index.js");
+
   const native = getNativeModule();
   if (!native) {
     console.error(
@@ -72,8 +102,6 @@ async function run() {
     );
     process.exit(1);
   }
-
-  const minScore = -Math.floor((width * height) / 2) + 3;
 
   let bootstrapBook: OpeningBook | null = null;
   if (bootstrap) {
@@ -135,7 +163,6 @@ async function run() {
   };
 
   process.on("SIGINT", saveAndExit);
-  process.env.UV_THREADPOOL_SIZE = threads.toString();
 
   const sharedCache = new NativeCache(width, height, cacheSizeMb, false);
   const solvers: NodeConnect4Solver[] = [];
@@ -168,7 +195,7 @@ async function run() {
     const solver = solvers[workerId];
     while (true) {
       const pos = positions.pop();
-      if (!pos) break;
+      if (pos === undefined) break;
 
       let analysis;
       try {
@@ -188,18 +215,16 @@ async function run() {
 
       processed++;
 
-        // Aggregate nodes from ALL solvers for true total performance
-        const currentTotalNodes = solvers.reduce(
-          (acc, s) => acc + BigInt(s.getNodeCount()),
-          0n,
-        );
-        const elapsed = (Date.now() - start) / 1000;
-        const nps = (Number(currentTotalNodes) / elapsed / 1000000).toFixed(1);
-        const pct = ((processed / totalPositions) * 100).toFixed(1);
+      // Aggregate nodes from ALL solvers for true total performance
+      const counts = await Promise.all(solvers.map((s) => s.getNodeCount()));
+      const currentTotalNodes = counts.reduce((acc, c) => acc + BigInt(c), 0n);
+      const elapsed = (Date.now() - start) / 1000;
+      const nps = (Number(currentTotalNodes) / elapsed / 1000000).toFixed(1);
+      const pct = ((processed / totalPositions) * 100).toFixed(1);
 
-        process.stdout.write(
-          `\r[${processed}/${totalPositions}] (${pct}%) | ${nps} MN/s | Total Nodes: ${currentTotalNodes.toLocaleString()} | Current: ${pos}      `,
-        );
+      process.stdout.write(
+        `\r[${processed}/${totalPositions}] (${pct}%) | ${nps} MN/s | Total Nodes: ${currentTotalNodes.toLocaleString()} | Current: ${pos}      `,
+      );
     }
   };
 

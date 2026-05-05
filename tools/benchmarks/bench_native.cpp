@@ -432,6 +432,7 @@ int main(int argc, char* argv[]) {
     else if (arg == "--solve") flag_solve = true;
     else if (arg == "--analyze") flag_analyze = true;
     else if (arg == "--pgo") flag_pgo = true;
+    else if (arg.find("--file=") == 0) continue;
     else if (arg == "--budget" && i + 1 < argc) budget_ms = std::stoi(argv[++i]);
     else if (arg == "--timeout" && i + 1 < argc) timeout_ms = std::stoi(argv[++i]);
     else {
@@ -448,7 +449,12 @@ int main(int argc, char* argv[]) {
   if (flag_pgo) run_all = true;
 
   std::string dim_str = std::to_string(BOARD_WIDTH_MACRO) + "x" + std::to_string(BOARD_HEIGHT_MACRO);
-  auto pos_all = load_positions("test-data/positions_" + dim_str + ".txt");
+  std::string pos_file = "test-data/positions_" + dim_str + ".txt";
+  for (int i = 1; i < argc; i++) {
+    std::string arg = argv[i];
+    if (arg.find("--file=") == 0) pos_file = arg.substr(7);
+  }
+  auto pos_all = load_positions(pos_file);
   if (pos_all.empty()) return 1;
 
   std::vector<BenchPos> valid_positions;
@@ -468,8 +474,7 @@ int main(int argc, char* argv[]) {
   for (size_t i = 0; i < max_heuristic && i < valid_positions.size(); i++) heuristic_subset.push_back(valid_positions[i]);
 
   std::vector<BenchPos> exact_subset;
-  constexpr int total_cells = BOARD_WIDTH_MACRO * BOARD_HEIGHT_MACRO;
-  int min_length_analyze = total_cells - 29;
+  int min_length_analyze = 0;
   for (const auto &bp : valid_positions) {
     if ((int)bp.pos.length() >= min_length_analyze) {
       exact_subset.push_back(bp);
@@ -477,27 +482,8 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  std::vector<BenchPos> solve_hard;
-  if (total_cells <= 42) {
-    std::vector<BenchPos> sorted_pos = valid_positions;
-    std::sort(sorted_pos.begin(), sorted_pos.end(), [](const BenchPos &a, const BenchPos &b) {
-      return a.pos.length() < b.pos.length();
-    });
-    for (const auto &bp : sorted_pos) {
-      if ((int)bp.pos.length() >= 9) {
-        solve_hard.push_back(bp);
-        if (solve_hard.size() >= max_solve) break;
-      }
-    }
-  } else {
-    int min_length_solve = total_cells - 30;
-    for (const auto &bp : valid_positions) {
-      if ((int)bp.pos.length() >= min_length_solve) {
-        solve_hard.push_back(bp);
-        if (solve_hard.size() >= max_solve) break;
-      }
-    }
-  }
+  std::vector<BenchPos> solve_hard = valid_positions;
+  if (solve_hard.size() > max_solve) solve_hard.resize(max_solve);
 
   if (!solve_hard.empty()) {
     if (do_exact_solve) {

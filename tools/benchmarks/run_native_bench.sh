@@ -45,7 +45,7 @@ for SIZE in "${SIZES[@]}"; do
     echo "Compiling core engine for ${SIZE}..."
     clang++ -std=c++20 -O3 -flto -DNDEBUG -DUSE_PTHREADS -Inative -march=native \
         -DBOARD_WIDTH_MACRO=${WIDTH} -DBOARD_HEIGHT_MACRO=${HEIGHT} \
-        tools/benchmarks/bench_native.cpp native/Solver.cpp \
+        tools/benchmarks/bench_native.cpp \
         -o ${BIN}
 
     if [ $? -eq 0 ]; then
