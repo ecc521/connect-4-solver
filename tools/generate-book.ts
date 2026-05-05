@@ -188,9 +188,11 @@ async function run() {
 
       processed++;
 
-      // Log progress occasionally
-      if (processed % 10 === 0 || processed === totalPositions) {
-        const currentTotalNodes = BigInt(solver.getNodeCount());
+        // Aggregate nodes from ALL solvers for true total performance
+        const currentTotalNodes = solvers.reduce(
+          (acc, s) => acc + BigInt(s.getNodeCount()),
+          0n,
+        );
         const elapsed = (Date.now() - start) / 1000;
         const nps = (Number(currentTotalNodes) / elapsed / 1000000).toFixed(1);
         const pct = ((processed / totalPositions) * 100).toFixed(1);
