@@ -1,4 +1,4 @@
-import { NodeConnect4Solver } from "../src/node";
+import { NodeConnect4Solver } from "../src/node.js";
 
 describe("Small Cache Allocation Test", () => {
   it("does not crash or throw on 0 MB cache size", async () => {

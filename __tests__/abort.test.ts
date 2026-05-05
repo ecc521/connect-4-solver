@@ -1,4 +1,4 @@
-import { NodeConnect4Solver } from "../src/node";
+import { NodeConnect4Solver } from "../src/node.js";
 
 describe("Solver Abort/Timeout", () => {
   let solver: NodeConnect4Solver;

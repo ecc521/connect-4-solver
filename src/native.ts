@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
 import {
   BaseConnect4Solver,
   Player,
@@ -7,7 +9,7 @@ import {
   PositionAnalysis,
   calculateWDL,
   Connect4SolverOptions,
-} from "./core";
+} from "./core.js";
 
 interface NativeSolverType {
   createCache(w: number, h: number, sizeBytes: number, heuristic: boolean): string;
@@ -284,13 +286,13 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     }
 
     const score = nativeResArr[2];
-    const bestMove = this._isHeuristic ? nativeResArr[3] : undefined;
-    const depth = this._isHeuristic ? nativeResArr[4] : undefined;
+    const bestMove = nativeResArr[3] === -1 ? undefined : nativeResArr[3];
+    const depth = nativeResArr[4];
     
     // Construct 64-bit integer from two 32-bit halves (low, high)
-    const nodes = this._isHeuristic ? (nativeResArr[5] >>> 0) + ((nativeResArr[6] >>> 0) * 4294967296) : undefined;
+    const nodes = (nativeResArr[5] >>> 0) + ((nativeResArr[6] >>> 0) * 4294967296);
     
-    const aborted = this._isHeuristic ? nativeResArr[7] === 1 : nativeResArr[3] === 1;
+    const aborted = nativeResArr[7] === 1;
 
     let evaluation: Evaluation;
 
@@ -315,6 +317,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           winner: null,
           movesToEnd: null,
           score: 0,
+          bestMove,
+          nodes,
         };
       } else if (score > 0) {
         evaluation = {
@@ -326,6 +330,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           winner: owner,
           movesToEnd: halfMovesRemaining - score + 1,
           score,
+          bestMove,
+          nodes,
         };
       } else {
         evaluation = {
@@ -337,6 +343,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           winner: opp,
           movesToEnd: halfMovesRemaining + score + 1,
           score,
+          bestMove,
+          nodes,
         };
       }
     }
@@ -368,6 +376,10 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
 
   getNodeCount(): number {
     return 0; // Not bound efficiently across bridge yet
+  }
+
+  release(): void {
+    this.unload();
   }
 
   unload(): void {

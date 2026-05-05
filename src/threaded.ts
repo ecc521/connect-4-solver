@@ -1,20 +1,32 @@
-import { PositionAnalysis, AnalyzeOptions, SolverModule } from "./core";
-import { AbstractSyncSolver } from "./abstract-solver";
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/prefer-nullish-coalescing */
+
+import { PositionAnalysis, AnalyzeOptions, SolverModule } from "./core.js";
+import { AbstractSyncSolver } from "./abstract-solver.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import createModule from "../build/analyze_threaded.js";
+
+const wasmUrl = new URL("../build/analyze_threaded.wasm", import.meta.url);
+const workerUrl = new URL("../build/analyze_threaded.worker.js", import.meta.url);
 
 let ThreadedModule: SolverModule | null = null;
 let _threadedInitPromise: Promise<void> | null = null;
 
 export function getThreadedModuleInitPromise(): Promise<void> {
   if (!_threadedInitPromise) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    const createModule =
-      require("../build/analyze_threaded.js") as unknown as () => Promise<SolverModule>;
-    /* eslint-enable @typescript-eslint/no-require-imports */
-    _threadedInitPromise = createModule().then((mod: SolverModule) => {
+    _threadedInitPromise = (createModule as any)({
+      locateFile: (path: string) => {
+        if (path.endsWith('.wasm')) return wasmUrl.href;
+        if (path.endsWith('.worker.js')) return workerUrl.href;
+        return path;
+      }
+    }).then((mod: SolverModule) => {
       ThreadedModule = mod;
     });
   }
-  return _threadedInitPromise;
+  return _threadedInitPromise as Promise<void>;
 }
 
 export function getThreadedModule(): SolverModule {

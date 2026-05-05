@@ -1,5 +1,14 @@
-import { PositionAnalysis, AnalyzeOptions } from "./core";
-import { AbstractSyncSolver } from "./abstract-solver";
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
+import { PositionAnalysis, AnalyzeOptions } from "./core.js";
+import { AbstractSyncSolver } from "./abstract-solver.js";
+import { createRequire } from "module";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export interface NativeModuleType {
   _createSolver(
@@ -122,12 +131,7 @@ export function getNativeModule(): NativeModuleType | null {
     nativeModuleAttempted = true;
     try {
       if (typeof process !== "undefined" && process?.versions?.node) {
-        const req = (
-          typeof module !== "undefined" && module.require
-            ? module.require.bind(module)
-            : require
-        ) as (id: string) => unknown;
-        const path = req("path") as { join: (...args: string[]) => string };
+        const path = require("path") as { join: (...args: string[]) => string };
         const nodePath = path.join(
           __dirname,
           "..",
@@ -135,7 +139,7 @@ export function getNativeModule(): NativeModuleType | null {
           "Release",
           "connect4.node",
         );
-        NativeModule = req(nodePath) as NativeModuleType;
+        NativeModule = require(nodePath) as NativeModuleType;
       }
     } catch {
       // Fail silently
@@ -168,7 +172,7 @@ export class NativeCache {
   }
 }
 
-import { Connect4SolverOptions } from "./core";
+import { Connect4SolverOptions } from "./core.js";
 export interface NodeConnect4SolverOptions extends Connect4SolverOptions {
   sharedCache?: NativeCache;
 }

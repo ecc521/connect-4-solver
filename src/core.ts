@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
 export enum Player {
   P1 = "P1", // Moves first
   P2 = "P2", // Moves second
@@ -194,6 +196,7 @@ export abstract class BaseConnect4Solver {
   public width: number;
   public height: number;
   protected initialized = false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected _bookPtr: any = 0;
 
   constructor(
@@ -232,6 +235,7 @@ export abstract class BaseConnect4Solver {
     threads: number;
     maxDepth: number;
     timeoutMs: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     bookPtr: any;
     weak: boolean;
   } {

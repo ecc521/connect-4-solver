@@ -58,7 +58,7 @@ export default tseslint.config(
       "node_modules/",
       "coverage/",
       "eslint.config.mjs",
-      "jest.config.js",
+      "jest.config.cjs",
       "venv/",
       "example/",
       "android/",
@@ -69,6 +69,7 @@ export default tseslint.config(
       "*.js",
       "test-ptrs.ts",
       "c4_benchmark2/",
+      "scratch/",
     ],
   },
 );

@@ -194,8 +194,7 @@ jintArray runNativeSolve(JNIEnv *env, CoreSolver& solver, const char* positionSt
     int lastColPlayed = positionString[P.nbMoves()] - '1';
     result.push_back(P.isWinningMove(lastColPlayed) ? 1 : 2);
     result.push_back(P.nbMoves());
-    result.push_back(0);
-    result.push_back(0);
+    for(int i = 2; i < 8; i++) result.push_back(0);
   } else {
     if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
     else solver.loadBook(nullptr);
@@ -203,6 +202,10 @@ jintArray runNativeSolve(JNIEnv *env, CoreSolver& solver, const char* positionSt
     result.push_back(0);
     result.push_back(P.nbMoves());
     result.push_back(res.score);
+    result.push_back(res.bestMove);
+    result.push_back(res.depth);
+    result.push_back((int)(res.nodes & 0xFFFFFFFF));
+    result.push_back((int)(res.nodes >> 32));
     result.push_back(res.aborted ? 1 : 0);
   }
   jintArray jResult = env->NewIntArray(result.size());

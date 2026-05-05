@@ -1,6 +1,6 @@
 /* eslint-disable */
-import { OpeningBook } from "./index";
-import { getNativeModule } from "./node";
+import { OpeningBook } from "./index.js";
+import { getNativeModule } from "./node.js";
 
 describe("Opening Book Key Resizing", () => {
   const native = getNativeModule() as any;

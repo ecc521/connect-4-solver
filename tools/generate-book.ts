@@ -1,5 +1,5 @@
-import { NodeConnect4Solver, NativeCache, getNativeModule } from "../src/node";
-import { OpeningBook } from "../src/index";
+import { NodeConnect4Solver, NativeCache, getNativeModule } from "../src/node.js";
+import { OpeningBook } from "../src/index.js";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
@@ -183,7 +183,7 @@ async function run() {
       }
 
       if (analysis.evaluation) {
-        builder.addPosition(pos, analysis.evaluation.score - minScore + 1);
+        builder.addPosition(pos, analysis.evaluation.score);
       }
 
       processed++;
@@ -200,7 +200,6 @@ async function run() {
         process.stdout.write(
           `\r[${processed}/${totalPositions}] (${pct}%) | ${nps} MN/s | Total Nodes: ${currentTotalNodes.toLocaleString()} | Current: ${pos}      `,
         );
-      }
     }
   };
 

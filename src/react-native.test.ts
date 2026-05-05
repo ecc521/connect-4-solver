@@ -1,11 +1,15 @@
-import { Outcome, Player } from "./core";
-import { ReactNativeConnect4Solver } from "./native";
+/* eslint-disable */
 
-// Mock React Native universally before tests run
-jest.mock(
-  "react-native",
-  () => {
-    return {
+import { Outcome, Player } from "./core.js";
+import { jest } from '@jest/globals';
+import { ReactNativeConnect4Solver } from "./native.js";
+
+describe("ReactNativeConnect4Solver Bridge Tests", () => {
+  let solver: ReactNativeConnect4Solver;
+  let rnMock: any;
+
+  beforeAll(async () => {
+    rnMock = {
       NativeModules: {
         Connect4Solver: {
           createCache: jest.fn(() => "mockCachePtr"),
@@ -14,8 +18,6 @@ jest.mock(
           destroyBook: jest.fn(),
           destroySolver: jest.fn(),
           destroyCache: jest.fn(),
-          // Return a mock output raw JNI/Obj-C IntArray matching what WASM usually returns
-          // [status, nbmoves, scores...]
           analyze: jest.fn(
             (
               _solverPtr: string,
@@ -28,14 +30,10 @@ jest.mock(
             ) => {
               return new Promise((resolve) => {
                 if (pos === "121212") {
-                  // If it's a 7x6 board, output 2 (status) + 7 = 9 length array
-                  // Let's pretend it evaluated column 1 as a Win (+11)
                   resolve([0, 6, 11, -1000, -10, 0, -2, -1, 3]);
                 } else if (pos === "1212121") {
-                  // Instantly won (status = 1) on the 7th move. C++ parser will halt at 6 parsed moves.
                   resolve([1, 6, 0, 0, 0, 0, 0, 0, 0]);
                 } else if (pos === "1111111") {
-                  // Invalid play (column overfill)
                   resolve([2, 6, 0, 0, 0, 0, 0, 0, 0]);
                 } else {
                   resolve([0, pos.length, 0, 0, 0, 0, 0, 0, 0]);
@@ -49,14 +47,14 @@ jest.mock(
         select: jest.fn((opts: { default: string }) => opts.default),
       },
     };
-  },
-  { virtual: true },
-);
 
-describe("ReactNativeConnect4Solver Bridge Tests", () => {
-  let solver: ReactNativeConnect4Solver;
+    (global as any).require = (moduleName: string) => {
+      if (moduleName === "react-native") {
+        return rnMock;
+      }
+      throw new Error(`Cannot find module '${moduleName}'`);
+    };
 
-  beforeAll(async () => {
     solver = new ReactNativeConnect4Solver(7, 6);
     await solver.init(); // Mock init is instant
   });

@@ -1755,6 +1755,32 @@ Value GetBookFormat(const CallbackInfo& info) {
     return String::New(info.Env(), format);
 }
 
+Value DumpBook(const CallbackInfo& info) {
+    Env env = info.Env();
+    int w = info[0].As<Number>().Int32Value();
+    int h = info[1].As<Number>().Int32Value();
+    void* Ptr = UnwrapPointer<void>(info[2]);
+    
+    Object result = Object::New(env);
+    
+    #define DUMP_ACTION(NS, W, H, b) \
+        { \
+            auto entries = b->dump(); \
+            Array keys = Array::New(env, entries.size()); \
+            Array values = Array::New(env, entries.size()); \
+            for (size_t i = 0; i < entries.size(); i++) { \
+                keys.Set(i, BigInt::New(env, (uint64_t)entries[i].first)); \
+                values.Set(i, Number::New(env, (int)entries[i].second)); \
+            } \
+            result.Set("keys", keys); \
+            result.Set("values", values); \
+        }
+    
+    DISPATCH_BOOK(w, h, Ptr, DUMP_ACTION);
+    
+    return result;
+}
+
 Value GetBookScore(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
@@ -2413,6 +2439,7 @@ Object Init(Env env, Object exports) {
     exports.Set(String::New(env, "_stopSolver"), Function::New(env, StopSolver));
     exports.Set(String::New(env, "_getNodeCount"), Function::New(env, GetNodeCount));
     exports.Set(String::New(env, "_generatePositions"), Function::New(env, GeneratePositions));
+    exports.Set(String::New(env, "_dumpBook"), Function::New(env, DumpBook));
     
     BookBuilder::Init(env, exports);
     return exports;

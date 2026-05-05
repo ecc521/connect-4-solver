@@ -1,5 +1,5 @@
-import { NodeConnect4Solver } from "./node";
-import { Outcome, PositionAnalysis } from "./index";
+import { NodeConnect4Solver } from "./node.js";
+import { Outcome, PositionAnalysis } from "./index.js";
 
 describe("HeuristicNodeConnect4Solver", () => {
   let solver: NodeConnect4Solver;

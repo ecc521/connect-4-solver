@@ -1,6 +1,6 @@
-import { SolverModule } from "./core";
-import { getNativeModule } from "./node";
-import { getNoSABModule, getNoSABModuleInitPromise } from "./sync";
+import { SolverModule } from "./core.js";
+import { getNativeModule } from "./node.js";
+import { getNoSABModule, getNoSABModuleInitPromise } from "./sync.js";
 
 export class OpeningBook {
   protected _ptr = 0;

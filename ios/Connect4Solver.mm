@@ -196,13 +196,12 @@ template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
 NSArray* runNativeSolve(CoreSolver& solver, NSString* positionStr, int threads, void* book_ptr, double timeout_ms) {
   std::string positionString([positionStr UTF8String]);
   CorePosition P;
-  NSMutableArray *result = [NSMutableArray arrayWithCapacity:4];
+  NSMutableArray *result = [NSMutableArray arrayWithCapacity:8];
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
     [result addObject:@(P.isWinningMove(lastColPlayed) ? 1 : 2)];
     [result addObject:@(P.nbMoves())];
-    [result addObject:@(0)];
-    [result addObject:@(0)];
+    for(int i = 2; i < 8; i++) [result addObject:@(0)];
   } else {
     if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
     else solver.loadBook(nullptr);
@@ -210,6 +209,10 @@ NSArray* runNativeSolve(CoreSolver& solver, NSString* positionStr, int threads, 
     [result addObject:@(0)];
     [result addObject:@(P.nbMoves())];
     [result addObject:@(res.score)];
+    [result addObject:@(res.bestMove)];
+    [result addObject:@(res.depth)];
+    [result addObject:@((int)(res.nodes & 0xFFFFFFFF))];
+    [result addObject:@((int)(res.nodes >> 32))];
     [result addObject:@(res.aborted ? 1 : 0)];
   }
   return result;

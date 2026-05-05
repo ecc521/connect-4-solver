@@ -1,4 +1,4 @@
-import { NodeConnect4Solver } from "../src/node";
+import { NodeConnect4Solver } from "../src/node.js";
 
 describe("Heuristic vs Perfect Connectivity Benchmark", () => {
   it("heuristically evaluates complex positions without books", async () => {

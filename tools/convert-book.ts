@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { getNativeModule } from "../src/node";
+import { getNativeModule } from "../src/node.js";
 
 async function main() {
   const args = process.argv.slice(2);

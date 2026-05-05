@@ -1,5 +1,5 @@
-import { NodeConnect4Solver } from "./node";
-import { Player, Outcome } from "./index";
+import { NodeConnect4Solver } from "./node.js";
+import { Player, Outcome } from "./index.js";
 
 const BOARD_WIDTH = 7;
 

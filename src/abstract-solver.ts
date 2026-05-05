@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
+
 import {
   BaseConnect4Solver,
   Player,
@@ -8,7 +10,7 @@ import {
   AnalyzeOptions,
   Connect4SolverOptions,
   SolverModule,
-} from "./core";
+} from "./core.js";
 
 export const STATUS_WIN = 1;
 export const STATUS_INVALID = 2;

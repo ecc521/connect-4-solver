@@ -1,7 +1,9 @@
-import { Connect4SolverOptions, AnalyzeOptions } from "./core";
-import { AbstractSyncSolver } from "./abstract-solver";
-import { SyncWasmConnect4Solver } from "./threaded";
-import { SyncWasmNoSABConnect4Solver } from "./sync";
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return */
+
+import { Connect4SolverOptions, AnalyzeOptions } from "./core.js";
+import { AbstractSyncSolver } from "./abstract-solver.js";
+import { SyncWasmConnect4Solver } from "./threaded.js";
+import { SyncWasmNoSABConnect4Solver } from "./sync.js";
 
 interface WorkerMessage {
   id: number;

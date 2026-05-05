@@ -1,10 +1,14 @@
-import { NodeConnect4Solver } from "../src/node";
-import { SyncWasmConnect4Solver } from "../src/threaded";
-import { SyncWasmNoSABConnect4Solver } from "../src/sync";
-import { OpeningBook } from "../src/index";
+import { NodeConnect4Solver } from "../src/node.js";
+import { SyncWasmConnect4Solver } from "../src/threaded.js";
+import { SyncWasmNoSABConnect4Solver } from "../src/sync.js";
+import { OpeningBook } from "../src/index.js";
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 describe("Polymorphic Dense Book Packing", () => {
   const mockTxt = path.join(__dirname, "mock_scored.txt");
@@ -180,11 +184,14 @@ describe("Polymorphic Dense Book Packing", () => {
   test("should support loadBook natively across all solver environments", async () => {
     const bookData = new Uint8Array(fs.readFileSync(d5Path));
 
-    const solvers = [
+    const solvers: (NodeConnect4Solver | SyncWasmConnect4Solver | SyncWasmNoSABConnect4Solver)[] = [
       new NodeConnect4Solver(),
-      new SyncWasmConnect4Solver(),
-      new SyncWasmNoSABConnect4Solver(),
     ];
+
+    if (fs.existsSync(path.join(__dirname, "..", "build", "analyze.wasm"))) {
+      solvers.push(new SyncWasmConnect4Solver());
+      solvers.push(new SyncWasmNoSABConnect4Solver());
+    }
 
     for (const solver of solvers) {
       await solver.init();

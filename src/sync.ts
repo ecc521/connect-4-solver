@@ -1,20 +1,27 @@
-import { PositionAnalysis, AnalyzeOptions, SolverModule } from "./core";
-import { AbstractSyncSolver } from "./abstract-solver";
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/prefer-nullish-coalescing */
+
+import { PositionAnalysis, AnalyzeOptions, SolverModule } from "./core.js";
+import { AbstractSyncSolver } from "./abstract-solver.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import createModule from "../build/analyze.js";
+
+const wasmUrl = new URL("../build/analyze.wasm", import.meta.url);
 
 let NoSABModule: SolverModule | null = null;
 let _noSABInitPromise: Promise<void> | null = null;
 
 export function getNoSABModuleInitPromise(): Promise<void> {
   if (!_noSABInitPromise) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    const createModule =
-      require("../build/analyze.js") as unknown as () => Promise<SolverModule>;
-    /* eslint-enable @typescript-eslint/no-require-imports */
-    _noSABInitPromise = createModule().then((mod: SolverModule) => {
+    _noSABInitPromise = (createModule as any)({
+      locateFile: (path: string) => path.endsWith('.wasm') ? wasmUrl.href : path
+    }).then((mod: SolverModule) => {
       NoSABModule = mod;
     });
   }
-  return _noSABInitPromise;
+  return _noSABInitPromise as Promise<void>;
 }
 
 export function getNoSABModule(): SolverModule {

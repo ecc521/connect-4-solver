@@ -1,4 +1,4 @@
-import { PositionAnalysis, Connect4SolverOptions, AnalyzeOptions, BaseConnect4Solver } from "./core";
+import { PositionAnalysis, Connect4SolverOptions, AnalyzeOptions, BaseConnect4Solver } from "./core.js";
 
 export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
   private worker: Worker;
