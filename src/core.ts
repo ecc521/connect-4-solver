@@ -9,6 +9,17 @@ export enum Outcome {
   Draw = "Draw",
 }
 
+/**
+ * Thrown when a queued task is cancelled because stop() was called before it could execute.
+ * Consumers should catch this and return null / discard the result — it is not an error condition.
+ */
+export class SolverAbortedError extends Error {
+  constructor() {
+    super("Solver task was cancelled by stop()");
+    this.name = "SolverAbortedError";
+  }
+}
+
 export interface Connect4SolverOptions {
   width?: number;
   height?: number;
@@ -152,6 +163,8 @@ export interface SolverModule {
 export abstract class BaseConnect4Solver {
   public width: number;
   public height: number;
+  /** The cache size actually allocated after init(). May be less than requested if memory is tight. */
+  public allocatedCacheSizeMb: number = 0;
   protected initialized = false;
   protected _bookPtr: number | string | object = 0;
 
@@ -196,22 +209,50 @@ export abstract class BaseConnect4Solver {
     return this._isBusy;
   }
 
+  // ─── Internal search queue ───────────────────────────────────────────────
+
+  protected _queue: { task: () => Promise<unknown>; resolve: (val: unknown) => void; reject: (err: unknown) => void; }[] = [];
+
+  /** Resolves when the currently active runTask() call finishes (or null if idle). */
+  private _taskSettledPromise: Promise<void> | null = null;
+
   /**
-   * Runs a task if the solver is not busy, otherwise throws an error.
+   * Wraps a search task with busy-tracking. Queues if busy rather than throwing.
+   * Only search operations (analyze, solve) should go through runTask.
+   * Book loading must NOT use runTask — call stop() before loadBook().
    */
   protected async runTask<T>(task: () => Promise<T> | T): Promise<T> {
     if (this._isBusy) {
-      throw new Error(
-        "Solver is busy: concurrent execution on the same instance is strictly prohibited.",
-      );
+      return new Promise<T>((resolve, reject) => {
+        this._queue.push({
+          task: task as () => Promise<unknown>,
+          resolve: resolve as (v: unknown) => void,
+          reject,
+        });
+      });
     }
+    return this._executeTask(task);
+  }
+
+  private async _executeTask<T>(task: () => Promise<T> | T): Promise<T> {
     this._isBusy = true;
+    let settle!: () => void;
+    this._taskSettledPromise = new Promise<void>((r) => { settle = r; });
     try {
       const res = task();
       return res instanceof Promise ? await res : res;
     } finally {
       this._isBusy = false;
+      settle();
+      this._taskSettledPromise = null;
+      this._processNextQueued();
     }
+  }
+
+  private _processNextQueued(): void {
+    const next = this._queue.shift();
+    if (!next) return;
+    this._executeTask(next.task).then(next.resolve, next.reject);
   }
 
   protected sanitizeOpts(opts?: AnalyzeOptions): {
@@ -278,12 +319,33 @@ export abstract class BaseConnect4Solver {
     opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis>;
   abstract loadBook(data: Uint8Array): Promise<void>;
+
   /**
-   * Signals the solver to abort the current search.
-   * NOTE: This forcefully stops the solver. For Web Workers, it will terminate and restart the worker thread. Pending promises will resolve with { aborted: true }.
-   * Use timeoutMs to guarantee a maximum search time on those platforms.
+   * Sends the platform-specific abort signal to the engine.
+   * Override in subclasses (do not call stop() — that is handled by the base class).
    */
-  abstract stop(): void;
+  protected _sendAbortSignal(): void { /* no-op default */ }
+
+  /**
+   * Signals the solver to stop the current search and all queued search tasks.
+   *
+   * - Sends the abort signal to the engine immediately (fire-and-forget on the C++ side).
+   * - Rejects all queued search tasks with SolverAbortedError.
+   * - Returns a Promise that resolves when the currently active task settles
+   *   (either completes normally or aborts). After resolution, the solver is idle
+   *   and safe to call analyze() on.
+   *
+   * NOTE: loadBook() must not be called while the solver is busy.
+   * Call stop() and await the result before loading a book during active analysis.
+   */
+  async stop(): Promise<void> {
+    this._sendAbortSignal();
+    const flushed = this._queue.splice(0);
+    const err = new SolverAbortedError();
+    for (const item of flushed) item.reject(err);
+    return this._taskSettledPromise ?? Promise.resolve();
+  }
+
   abstract release(): void;
   abstract getNodeCount(): Promise<number>;
 }

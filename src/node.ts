@@ -201,13 +201,24 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
 
     if (this._sharedCache) {
       this._cachePtr = this._sharedCache.ptr as number;
+      this.allocatedCacheSizeMb = this.cacheSizeMb; // Assume it matches if shared
     } else {
-      this._cachePtr = native._createCache(
-        this.width,
-        this.height,
-        this.cacheSizeMb * 1024 * 1024,
-        this.isHeuristic,
-      ) as number;
+      // OOM retry: native._createCache returns 0 if allocation fails. Halve the request until it succeeds.
+      let sizeMb = this.cacheSizeMb;
+      let ptr = 0;
+      while (sizeMb >= 64) {
+        ptr = native._createCache(
+          this.width,
+          this.height,
+          sizeMb * 1024 * 1024,
+          this.isHeuristic,
+        ) as number;
+        if (ptr !== 0) break;
+        sizeMb = Math.floor(sizeMb / 2);
+      }
+      if (ptr === 0) throw new Error(`Failed to allocate Node.js native cache (tried down to 64 MB)`);
+      this._cachePtr = ptr;
+      this.allocatedCacheSizeMb = sizeMb;
     }
 
     this._solverPtr = native._createSolver(
@@ -220,21 +231,25 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     return Promise.resolve();
   }
 
-  async loadBook(_data: Uint8Array): Promise<void> {
+  loadBook(_data: Uint8Array): Promise<void> {
     if (!this.initialized) throw new Error("Call init() first.");
-    return this.runTask(() => {
-      const native = getNativeModule();
-      if (native) {
-        if (this._bookPtr) {
-          native._destroyBook(this.width, this.height, this._bookPtr);
-        }
-        this._bookPtr = native._createBookFromBuffer(
-          this.width,
-          this.height,
-          _data,
-        ) as number;
+    if (this._isBusy || this._queue.length > 0) {
+      throw new Error(
+        "Cannot load a book while a search is active or queued. Call stop() and await it first.",
+      );
+    }
+    const native = getNativeModule();
+    if (native) {
+      if (this._bookPtr) {
+        native._destroyBook(this.width, this.height, this._bookPtr);
       }
-    });
+      this._bookPtr = native._createBookFromBuffer(
+        this.width,
+        this.height,
+        _data,
+      ) as number;
+    }
+    return Promise.resolve();
   }
 
   async analyze(
@@ -320,7 +335,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     });
   }
 
-  stop(): void {
+  protected _sendAbortSignal(): void {
     if (!this.initialized) return;
     const native = getNativeModule();
     if (native) {

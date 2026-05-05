@@ -31,10 +31,6 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
   >();
   private initPromise: Promise<void>;
 
-  /** The cache size actually allocated in the worker after init(). May be less than
-   *  the requested cacheSizeMb if the WASM allocator could not satisfy the original request. */
-  public allocatedCacheSizeMb: number;
-
   constructor(
     workerProvider: () => Worker,
     initType: string,

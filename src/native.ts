@@ -138,12 +138,24 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
 
   init(): Promise<void> {
     if (this.initialized) return Promise.resolve();
-    this._cachePtrStr = this._nativeModule.createCache(
-      this.width,
-      this.height,
-      this._cacheSizeMb * 1024 * 1024,
-      this._isHeuristic,
-    );
+
+    // OOM retry: native.createCache returns "0" if allocation fails. Halve the request until it succeeds.
+    let sizeMb = this._cacheSizeMb;
+    let ptrStr = "0";
+    while (sizeMb >= 64) {
+      ptrStr = this._nativeModule.createCache(
+        this.width,
+        this.height,
+        sizeMb * 1024 * 1024,
+        this._isHeuristic,
+      );
+      if (ptrStr !== "0") break;
+      sizeMb = Math.floor(sizeMb / 2);
+    }
+    if (ptrStr === "0") throw new Error(`Failed to allocate native cache (tried down to 64 MB)`);
+    this._cachePtrStr = ptrStr;
+    this.allocatedCacheSizeMb = sizeMb;
+
     this._solverPtrStr = this._nativeModule.createSolver(
       this.width,
       this.height,
@@ -156,21 +168,26 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
 
   loadBook(data: Uint8Array): Promise<void> {
     if (!this.initialized) throw new Error("Call init() first.");
-    return this.runTask(() => {
-      if (this._bookPtr && this._bookPtr !== "0") {
-        this._nativeModule.destroyBook(
-          this.width,
-          this.height,
-          this._bookPtr as string,
-        );
-      }
-      const b64 = encodeBase64(data);
-      this._bookPtr = this._nativeModule.createBookFromBuffer(
+    if (this._isBusy || this._queue.length > 0) {
+      throw new Error(
+        "Cannot load a book while a search is active or queued. Call stop() and await it first.",
+      );
+    }
+    // Book loading bypasses runTask() — it has its own guard above
+    if (this._bookPtr && this._bookPtr !== "0") {
+      this._nativeModule.destroyBook(
         this.width,
         this.height,
-        b64,
+        this._bookPtr as string,
       );
-    });
+    }
+    const b64 = encodeBase64(data);
+    this._bookPtr = this._nativeModule.createBookFromBuffer(
+      this.width,
+      this.height,
+      b64,
+    );
+    return Promise.resolve();
   }
 
   private createEvaluation(
@@ -437,9 +454,9 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
   }
 
   /**
-   * Immediately aborts any ongoing analysis or solve operations.
+   * Sends the abort signal to the native engine via JNI.
    */
-  stop(): void {
+  protected _sendAbortSignal(): void {
     if (!this.initialized) return;
     if (this._solverPtrStr !== "0") {
       this._nativeModule.stop(
