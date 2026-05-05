@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { Outcome, Player } from "./core.js";
-import { jest } from '@jest/globals';
+import { jest } from "@jest/globals";
 import { ReactNativeConnect4Solver } from "./native.js";
 
 describe("ReactNativeConnect4Solver Bridge Tests", () => {
@@ -81,6 +81,8 @@ describe("ReactNativeConnect4Solver Bridge Tests", () => {
     await solver.loadBook(new Uint8Array([1, 2, 3]));
     // Should call createBookFromBuffer natively
     const rn = require("react-native");
-    expect(rn.NativeModules.Connect4Solver.createBookFromBuffer).toHaveBeenCalled();
+    expect(
+      rn.NativeModules.Connect4Solver.createBookFromBuffer,
+    ).toHaveBeenCalled();
   });
 });

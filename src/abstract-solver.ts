@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
-
 import {
   BaseConnect4Solver,
   Player,
@@ -111,7 +109,9 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     let evaluation: Evaluation | null = null;
     const moveOptions: (Evaluation | null)[] = [];
 
-    const unplayableScore = this.isHeuristic ? -1000000 : UNPLAYABLE_COLUMN_SCORE;
+    const unplayableScore = this.isHeuristic
+      ? -1000000
+      : UNPLAYABLE_COLUMN_SCORE;
 
     if (status === STATUS_INVALID) {
       currentPosition = positionStr.slice(0, nbMoves);
@@ -186,7 +186,10 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       const score = Math.floor((this.width * this.height - nbMoves) / 2);
       evaluation = {
         eval: {
-          value: winner === Player.P1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY,
+          value:
+            winner === Player.P1
+              ? Number.POSITIVE_INFINITY
+              : Number.NEGATIVE_INFINITY,
         },
         outcome: winner === currentPlayer ? Outcome.Win : Outcome.Loss,
         winner,
@@ -228,13 +231,25 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     let outputPointer: number;
     if (this.isHeuristic)
       outputPointer = mod._solveHeuristic(
-        this.width, this.height, this._solverPtr, allocatedMemory,
-        maxDepth, threads, timeoutMs, bookPtr,
+        this.width,
+        this.height,
+        this._solverPtr,
+        allocatedMemory,
+        maxDepth,
+        threads,
+        timeoutMs,
+        bookPtr as number,
       );
     else
       outputPointer = mod._solveExact(
-        this.width, this.height, this._solverPtr, allocatedMemory,
-        (weak ? 1 : 0) as unknown as boolean, threads, bookPtr, timeoutMs,
+        this.width,
+        this.height,
+        this._solverPtr,
+        allocatedMemory,
+        weak,
+        threads,
+        bookPtr as number,
+        timeoutMs,
       );
 
     const dataLength = 8;
@@ -252,19 +267,31 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     positionStr: string,
     opts?: AnalyzeOptions,
   ): Int32Array {
-    const { threads, maxDepth, timeoutMs, bookPtr, weak } = this.sanitizeOpts(opts);
+    const { threads, maxDepth, timeoutMs, bookPtr, weak } =
+      this.sanitizeOpts(opts);
 
     const allocatedMemory = mod.stringToNewUTF8(positionStr);
     let outputPointer: number;
     if (this.isHeuristic)
       outputPointer = mod._analyzeHeuristic(
-        this.width, this.height, this._solverPtr, allocatedMemory,
-        threads, maxDepth, timeoutMs,
+        this.width,
+        this.height,
+        this._solverPtr,
+        allocatedMemory,
+        threads,
+        maxDepth,
+        timeoutMs,
       );
     else
       outputPointer = mod._analyzeExact(
-        this.width, this.height, this._solverPtr, allocatedMemory,
-        (weak ? 1 : 0) as unknown as boolean, threads, bookPtr, timeoutMs,
+        this.width,
+        this.height,
+        this._solverPtr,
+        allocatedMemory,
+        weak,
+        threads,
+        bookPtr as number,
+        timeoutMs,
       );
 
     const dataLength = 3 + this.width;
@@ -278,8 +305,14 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   }
 
   abstract init(): Promise<void>;
-  abstract analyze(positionStr: string, opts?: AnalyzeOptions): Promise<PositionAnalysis>;
-  abstract solve(positionStr: string, opts?: AnalyzeOptions & { weak?: boolean }): Promise<PositionAnalysis>;
+  abstract analyze(
+    positionStr: string,
+    opts?: AnalyzeOptions,
+  ): Promise<PositionAnalysis>;
+  abstract solve(
+    positionStr: string,
+    opts?: AnalyzeOptions & { weak?: boolean },
+  ): Promise<PositionAnalysis>;
   abstract getNodeCount(): Promise<number>;
   abstract stop(): void;
   abstract release(): void;

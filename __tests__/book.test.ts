@@ -184,9 +184,11 @@ describe("Polymorphic Dense Book Packing", () => {
   test("should support loadBook natively across all solver environments", async () => {
     const bookData = new Uint8Array(fs.readFileSync(d5Path));
 
-    const solvers: (NodeConnect4Solver | SyncWasmConnect4Solver | SyncWasmNoSABConnect4Solver)[] = [
-      new NodeConnect4Solver(),
-    ];
+    const solvers: (
+      | NodeConnect4Solver
+      | SyncWasmConnect4Solver
+      | SyncWasmNoSABConnect4Solver
+    )[] = [new NodeConnect4Solver()];
 
     if (fs.existsSync(path.join(__dirname, "..", "build", "analyze.wasm"))) {
       solvers.push(new SyncWasmConnect4Solver());
@@ -201,7 +203,7 @@ describe("Polymorphic Dense Book Packing", () => {
 
       // Evaluate a depth 2 position (12). The mock book has it scored as -1 (intentionally incorrect to verify cache hit).
       // We do not pass { book } here, the solver must use the internally managed pointer.
-      const result = await solver.solve("12"); 
+      const result = await solver.solve("12");
       expect(result.evaluation?.score).toBe(-1);
 
       solver.release();

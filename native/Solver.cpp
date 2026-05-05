@@ -373,6 +373,9 @@ flush:
  */
 template <int WIDTH, int HEIGHT, typename SlotType>
 ::GameSolver::Connect4::SolverResult SolverImpl<WIDTH, HEIGHT, SlotType>::solve(const GenericPosition<WIDTH, HEIGHT> &P, bool weak, int threads, const OpeningBookBase<WIDTH, HEIGHT>* book, double timeout_ms) {
+#ifndef USE_PTHREADS
+  threads = 1;
+#endif
   if (isSearching.exchange(true, std::memory_order_acquire)) {
     throw std::runtime_error("Solver is busy: concurrent execution on the same instance is strictly prohibited.");
   }
@@ -460,6 +463,9 @@ template <int WIDTH, int HEIGHT, typename SlotType>
 
 template <int WIDTH, int HEIGHT, typename SlotType>
 std::vector<int> SolverImpl<WIDTH, HEIGHT, SlotType>::analyze(const GenericPosition<WIDTH, HEIGHT> &P, bool weak, int threads, const OpeningBookBase<WIDTH, HEIGHT>* book, double timeout_ms) {
+#ifndef USE_PTHREADS
+  threads = 1;
+#endif
   if (isSearching.exchange(true, std::memory_order_acquire)) {
     throw std::runtime_error("Solver is busy: concurrent execution on the same instance is strictly prohibited.");
   }

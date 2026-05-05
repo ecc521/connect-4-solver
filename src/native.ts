@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 import {
   BaseConnect4Solver,
   Player,
@@ -17,24 +15,76 @@ import {
  * reflects the intended final signature; the native module needs to be updated to match.
  */
 interface NativeSolverType {
-  createCache(w: number, h: number, sizeBytes: number, heuristic: boolean): string;
+  createCache(
+    w: number,
+    h: number,
+    sizeBytes: number,
+    heuristic: boolean,
+  ): string;
   destroyCache(cachePtr: string): void;
-  createSolver(w: number, h: number, cachePtr: string, heuristic: boolean): string;
-  destroySolver(solverPtr: string, w: number, h: number, heuristic: boolean): void;
+  createSolver(
+    w: number,
+    h: number,
+    cachePtr: string,
+    heuristic: boolean,
+  ): string;
+  destroySolver(
+    solverPtr: string,
+    w: number,
+    h: number,
+    heuristic: boolean,
+  ): void;
   createBookFromBuffer(w: number, h: number, base64: string): string;
   destroyBook(w: number, h: number, bookPtr: string): void;
   // Exact analysis — returns [status, nbMoves, col0..colN-1, aborted]
-  analyze(solverPtr: string, pos: string, threads: number, timeoutMs: number, w: number, h: number, weak: boolean, bookPtr: string): Promise<number[]>;
+  analyze(
+    solverPtr: string,
+    pos: string,
+    threads: number,
+    timeoutMs: number,
+    w: number,
+    h: number,
+    weak: boolean,
+    bookPtr: string,
+  ): Promise<number[]>;
   // Heuristic analysis — returns [status, nbMoves, col0..colN-1, depthReached]
-  analyzeHeuristic(solverPtr: string, pos: string, maxDepth: number, threads: number, timeoutMs: number, w: number, h: number, bookPtr: string): Promise<number[]>;
+  analyzeHeuristic(
+    solverPtr: string,
+    pos: string,
+    maxDepth: number,
+    threads: number,
+    timeoutMs: number,
+    w: number,
+    h: number,
+    bookPtr: string,
+  ): Promise<number[]>;
   // Exact solve — returns [status, nbMoves, score, bestMove, depthReached, nodes_low, nodes_high, aborted]
-  solve(solverPtr: string, pos: string, threads: number, timeoutMs: number, w: number, h: number, weak: boolean, bookPtr: string): Promise<number[]>;
+  solve(
+    solverPtr: string,
+    pos: string,
+    threads: number,
+    timeoutMs: number,
+    w: number,
+    h: number,
+    weak: boolean,
+    bookPtr: string,
+  ): Promise<number[]>;
   // Heuristic solve
-  solveHeuristic(solverPtr: string, pos: string, maxDepth: number, threads: number, timeoutMs: number, w: number, h: number, bookPtr: string): Promise<number[]>;
+  solveHeuristic(
+    solverPtr: string,
+    pos: string,
+    maxDepth: number,
+    threads: number,
+    timeoutMs: number,
+    w: number,
+    h: number,
+    bookPtr: string,
+  ): Promise<number[]>;
 }
 
 function encodeBase64(data: Uint8Array): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   let result = "";
   for (let i = 0; i < data.length; i += 3) {
     const b1 = data[i];
@@ -56,14 +106,19 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
   private _solverPtrStr = "0";
   private _nativeModule: NativeSolverType;
 
-  constructor(widthOrOpts?: number | Connect4SolverOptions, heightOpt?: number) {
+  constructor(
+    widthOrOpts?: number | Connect4SolverOptions,
+    heightOpt?: number,
+  ) {
     super(widthOrOpts, heightOpt);
     this._isHeuristic = false;
     this._cacheSizeMb = 32;
 
     if (widthOrOpts && typeof widthOrOpts === "object") {
-      if (widthOrOpts.heuristic !== undefined) this._isHeuristic = widthOrOpts.heuristic;
-      if (widthOrOpts.cacheSizeMb !== undefined) this._cacheSizeMb = widthOrOpts.cacheSizeMb;
+      if (widthOrOpts.heuristic !== undefined)
+        this._isHeuristic = widthOrOpts.heuristic;
+      if (widthOrOpts.cacheSizeMb !== undefined)
+        this._cacheSizeMb = widthOrOpts.cacheSizeMb;
     }
 
     try {
@@ -82,8 +137,18 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
 
   init(): Promise<void> {
     if (this.initialized) return Promise.resolve();
-    this._cachePtrStr = this._nativeModule.createCache(this.width, this.height, this._cacheSizeMb * 1024 * 1024, this._isHeuristic);
-    this._solverPtrStr = this._nativeModule.createSolver(this.width, this.height, this._cachePtrStr, this._isHeuristic);
+    this._cachePtrStr = this._nativeModule.createCache(
+      this.width,
+      this.height,
+      this._cacheSizeMb * 1024 * 1024,
+      this._isHeuristic,
+    );
+    this._solverPtrStr = this._nativeModule.createSolver(
+      this.width,
+      this.height,
+      this._cachePtrStr,
+      this._isHeuristic,
+    );
     this.initialized = true;
     return Promise.resolve();
   }
@@ -91,10 +156,18 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
   loadBook(data: Uint8Array): Promise<void> {
     if (!this.initialized) throw new Error("Call init() first.");
     if (this._bookPtr && this._bookPtr !== "0") {
-      this._nativeModule.destroyBook(this.width, this.height, this._bookPtr as string);
+      this._nativeModule.destroyBook(
+        this.width,
+        this.height,
+        this._bookPtr as string,
+      );
     }
     const b64 = encodeBase64(data);
-    this._bookPtr = this._nativeModule.createBookFromBuffer(this.width, this.height, b64);
+    this._bookPtr = this._nativeModule.createBookFromBuffer(
+      this.width,
+      this.height,
+      b64,
+    );
     return Promise.resolve();
   }
 
@@ -161,18 +234,31 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
-    const { threads, maxDepth, timeoutMs, bookPtr, weak } = this.sanitizeOpts(opts);
+    const { threads, maxDepth, timeoutMs, bookPtr, weak } =
+      this.sanitizeOpts(opts);
 
     let nativeResArr: number[];
     if (this._isHeuristic) {
       nativeResArr = await this._nativeModule.analyzeHeuristic(
-        this._solverPtrStr, positionStr, maxDepth, threads, timeoutMs,
-        this.width, this.height, bookPtr as string,
+        this._solverPtrStr,
+        positionStr,
+        maxDepth,
+        threads,
+        timeoutMs,
+        this.width,
+        this.height,
+        bookPtr as string,
       );
     } else {
       nativeResArr = await this._nativeModule.analyze(
-        this._solverPtrStr, positionStr, threads, timeoutMs,
-        this.width, this.height, weak, bookPtr as string,
+        this._solverPtrStr,
+        positionStr,
+        threads,
+        timeoutMs,
+        this.width,
+        this.height,
+        weak,
+        bookPtr as string,
       );
     }
 
@@ -215,8 +301,12 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     }
 
     // resArr[2 + width]: depthReached for heuristic, aborted flag for exact
-    const depthReached = this._isHeuristic ? nativeResArr[2 + this.width] : undefined;
-    const aborted = this._isHeuristic ? undefined : nativeResArr[2 + this.width] === 1;
+    const depthReached = this._isHeuristic
+      ? nativeResArr[2 + this.width]
+      : undefined;
+    const aborted = this._isHeuristic
+      ? undefined
+      : nativeResArr[2 + this.width] === 1;
 
     if (aborted) {
       evaluation = null;
@@ -240,18 +330,31 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     opts?: AnalyzeOptions & { weak?: boolean },
   ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
-    const { threads, maxDepth, timeoutMs, bookPtr, weak } = this.sanitizeOpts(opts);
+    const { threads, maxDepth, timeoutMs, bookPtr, weak } =
+      this.sanitizeOpts(opts);
 
     let nativeResArr: number[];
     if (this._isHeuristic) {
       nativeResArr = await this._nativeModule.solveHeuristic(
-        this._solverPtrStr, positionStr, maxDepth, threads, timeoutMs,
-        this.width, this.height, bookPtr as string,
+        this._solverPtrStr,
+        positionStr,
+        maxDepth,
+        threads,
+        timeoutMs,
+        this.width,
+        this.height,
+        bookPtr as string,
       );
     } else {
       nativeResArr = await this._nativeModule.solve(
-        this._solverPtrStr, positionStr, threads, timeoutMs,
-        this.width, this.height, weak, bookPtr as string,
+        this._solverPtrStr,
+        positionStr,
+        threads,
+        timeoutMs,
+        this.width,
+        this.height,
+        weak,
+        bookPtr as string,
       );
     }
 
@@ -285,7 +388,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     const score = nativeResArr[2];
     const bestMove = nativeResArr[3] === -1 ? undefined : nativeResArr[3];
     const depth = nativeResArr[4];
-    const nodes = (nativeResArr[5] >>> 0) + ((nativeResArr[6] >>> 0) * 4294967296);
+    const nodes =
+      (nativeResArr[5] >>> 0) + (nativeResArr[6] >>> 0) * 4294967296;
     const aborted = nativeResArr[7] === 1;
 
     const evaluation = aborted ? null : this.createEvaluation(score, nbMoves);
@@ -304,9 +408,12 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     };
   }
 
+  /**
+   * NOTE: Not currently supported on React Native.
+   * Use timeoutMs to guarantee a max search time.
+   */
   stop(): void {
-    // No-op: exact solver will timeout on its own via timeoutMs.
-    // A proper JNI _stopSolver binding is needed for immediate cancellation.
+    // No-op
   }
 
   getNodeCount(): Promise<number> {
@@ -317,7 +424,12 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
   release(): void {
     if (!this.initialized) return;
     if (this._solverPtrStr !== "0") {
-      this._nativeModule.destroySolver(this._solverPtrStr, this.width, this.height, this._isHeuristic);
+      this._nativeModule.destroySolver(
+        this._solverPtrStr,
+        this.width,
+        this.height,
+        this._isHeuristic,
+      );
       this._solverPtrStr = "0";
     }
     if (this._cachePtrStr !== "0") {
@@ -325,7 +437,11 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       this._cachePtrStr = "0";
     }
     if (this._bookPtr && this._bookPtr !== "0") {
-      this._nativeModule.destroyBook(this.width, this.height, this._bookPtr as string);
+      this._nativeModule.destroyBook(
+        this.width,
+        this.height,
+        this._bookPtr as string,
+      );
       this._bookPtr = "0";
     }
     this.initialized = false;

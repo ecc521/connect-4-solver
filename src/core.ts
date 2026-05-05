@@ -51,35 +51,88 @@ export interface PositionAnalysis {
  */
 export interface SolverModule {
   stringToNewUTF8(str: string): number;
-  _createCache: (w: number, h: number, bytes: number, is_heuristic: boolean) => number;
+  _createCache: (
+    w: number,
+    h: number,
+    bytes: number,
+    is_heuristic: boolean,
+  ) => number;
   _destroyCache: (ptr: number) => void;
-  _createSolver: (w: number, h: number, cachePtr: number, is_heuristic: boolean) => number;
-  _destroySolver: (w: number, h: number, ptr: number, is_heuristic: boolean) => void;
+  _createSolver: (
+    w: number,
+    h: number,
+    cachePtr: number,
+    is_heuristic: boolean,
+  ) => number;
+  _destroySolver: (
+    w: number,
+    h: number,
+    ptr: number,
+    is_heuristic: boolean,
+  ) => void;
   _createBook: (w: number, h: number, pathPtr: number) => number;
-  _createBookFromBuffer: (w: number, h: number, ptr: number, size: number) => number;
+  _createBookFromBuffer: (
+    w: number,
+    h: number,
+    ptr: number,
+    size: number,
+  ) => number;
   _convertBookToDense: (w: number, h: number, ptr: number) => number;
   _convertBookToEF: (w: number, h: number, ptr: number) => number;
   _getBookFormat: (w: number, h: number, ptr: number) => number;
   _getBookScore: (w: number, h: number, ptr: number, posPtr: number) => number;
   _destroyBook: (w: number, h: number, ptr: number) => void;
   _analyzeExact: (
-    w: number, h: number, solverPtr: number, posPtr: number,
-    weak: boolean, threads: number, bookPtr: number, timeout: number,
+    w: number,
+    h: number,
+    solverPtr: number,
+    posPtr: number,
+    weak: boolean,
+    threads: number,
+    bookPtr: number,
+    timeout: number,
   ) => number;
   _analyzeHeuristic: (
-    w: number, h: number, solverPtr: number, posPtr: number,
-    threads: number, max_depth: number, timeout: number,
+    w: number,
+    h: number,
+    solverPtr: number,
+    posPtr: number,
+    threads: number,
+    max_depth: number,
+    timeout: number,
   ) => number;
   _solveExact: (
-    w: number, h: number, solverPtr: number, posPtr: number,
-    weak: boolean, threads: number, bookPtr: number, timeout: number,
+    w: number,
+    h: number,
+    solverPtr: number,
+    posPtr: number,
+    weak: boolean,
+    threads: number,
+    bookPtr: number,
+    timeout: number,
   ) => number;
   _solveHeuristic: (
-    w: number, h: number, solverPtr: number, posPtr: number,
-    depth: number, threads: number, timeout: number, bookPtr: number,
+    w: number,
+    h: number,
+    solverPtr: number,
+    posPtr: number,
+    depth: number,
+    threads: number,
+    timeout: number,
+    bookPtr: number,
   ) => number;
-  _stopSolver: (w: number, h: number, solverPtr: number, is_heuristic: boolean) => void;
-  _getNodeCount: (w: number, h: number, solverPtr: number, is_heuristic: boolean) => number;
+  _stopSolver: (
+    w: number,
+    h: number,
+    solverPtr: number,
+    is_heuristic: boolean,
+  ) => void;
+  _getNodeCount: (
+    w: number,
+    h: number,
+    solverPtr: number,
+    is_heuristic: boolean,
+  ) => number;
   UTF8ToString(pointer: number): string;
   _malloc(size: number): number;
   _free(pointer: number): void;
@@ -98,10 +151,12 @@ export abstract class BaseConnect4Solver {
   public width: number;
   public height: number;
   protected initialized = false;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected _bookPtr: any = 0;
+  protected _bookPtr: number | string | object = 0;
 
-  constructor(widthOrOpts?: number | Connect4SolverOptions, heightOpt?: number) {
+  constructor(
+    widthOrOpts?: number | Connect4SolverOptions,
+    heightOpt?: number,
+  ) {
     let width = 7;
     let height = 6;
 
@@ -131,41 +186,71 @@ export abstract class BaseConnect4Solver {
     threads: number;
     maxDepth: number;
     timeoutMs: number;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    bookPtr: any;
+    bookPtr: number | string | object;
     weak: boolean;
   } {
     let threads = opts?.threads ?? 1;
-    if (typeof threads !== "number" || isNaN(threads) || threads < 1 || !isFinite(threads))
+    if (
+      typeof threads !== "number" ||
+      isNaN(threads) ||
+      threads < 1 ||
+      !isFinite(threads)
+    )
       throw new Error("Invalid 'threads' parameter.");
     threads = Math.floor(threads);
 
     const requestedMaxDepth = opts?.maxDepth ?? this.width * this.height;
-    if (typeof requestedMaxDepth !== "number" || isNaN(requestedMaxDepth) || requestedMaxDepth < 1 || !isFinite(requestedMaxDepth))
+    if (
+      typeof requestedMaxDepth !== "number" ||
+      isNaN(requestedMaxDepth) ||
+      requestedMaxDepth < 1 ||
+      !isFinite(requestedMaxDepth)
+    )
       throw new Error("Invalid 'maxDepth' parameter.");
-    const maxDepth = Math.min(Math.floor(requestedMaxDepth), this.width * this.height);
+    const maxDepth = Math.min(
+      Math.floor(requestedMaxDepth),
+      this.width * this.height,
+    );
 
     const timeoutMs = opts?.timeoutMs ?? 0;
-    if (typeof timeoutMs !== "number" || isNaN(timeoutMs) || timeoutMs < 0 || !isFinite(timeoutMs))
-      throw new Error("Invalid 'timeoutMs' parameter. Must be greater than or equal to 0.");
+    if (
+      typeof timeoutMs !== "number" ||
+      isNaN(timeoutMs) ||
+      timeoutMs < 0 ||
+      !isFinite(timeoutMs)
+    )
+      throw new Error(
+        "Invalid 'timeoutMs' parameter. Must be greater than or equal to 0.",
+      );
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const bookPtr = opts?.book?.ptr ?? this._bookPtr;
     const isInvalid =
       opts?.book &&
-      ((typeof bookPtr !== "number" && typeof bookPtr !== "string" && typeof bookPtr !== "object") ||
+      ((typeof bookPtr !== "number" &&
+        typeof bookPtr !== "string" &&
+        typeof bookPtr !== "object") ||
         (typeof bookPtr === "number" && isNaN(bookPtr)));
 
     if (isInvalid) throw new Error("Invalid 'book' parameter.");
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     return { threads, maxDepth, timeoutMs, bookPtr, weak: opts?.weak ?? false };
   }
 
   abstract init(): Promise<void>;
-  abstract analyze(positionStr: string, opts?: AnalyzeOptions): Promise<PositionAnalysis>;
-  abstract solve(positionStr: string, opts?: AnalyzeOptions & { weak?: boolean }): Promise<PositionAnalysis>;
+  abstract analyze(
+    positionStr: string,
+    opts?: AnalyzeOptions,
+  ): Promise<PositionAnalysis>;
+  abstract solve(
+    positionStr: string,
+    opts?: AnalyzeOptions & { weak?: boolean },
+  ): Promise<PositionAnalysis>;
   abstract loadBook(data: Uint8Array): Promise<void>;
+  /**
+   * Signals the solver to abort the current search.
+   * NOTE: This is only supported on Node.js. On WASM/React Native, the JS thread is blocked during search.
+   * Use timeoutMs to guarantee a maximum search time on those platforms.
+   */
   abstract stop(): void;
   abstract release(): void;
   abstract getNodeCount(): Promise<number>;

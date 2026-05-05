@@ -1,32 +1,33 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/prefer-nullish-coalescing */
-
 import { PositionAnalysis, AnalyzeOptions, SolverModule } from "./core.js";
 import { AbstractSyncSolver } from "./abstract-solver.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import createModule from "../build/analyze_threaded.js";
 
+type CreateModule = (options: {
+  locateFile: (path: string) => string;
+}) => Promise<SolverModule>;
+
 const wasmUrl = new URL("../build/analyze_threaded.wasm", import.meta.url);
-const workerUrl = new URL("../build/analyze_threaded.worker.js", import.meta.url);
+const workerUrl = new URL(
+  "../build/analyze_threaded.worker.js",
+  import.meta.url,
+);
 
 let ThreadedModule: SolverModule | null = null;
 let _threadedInitPromise: Promise<void> | null = null;
 
 export function getThreadedModuleInitPromise(): Promise<void> {
-  if (!_threadedInitPromise) {
-    _threadedInitPromise = (createModule as any)({
-      locateFile: (path: string) => {
-        if (path.endsWith('.wasm')) return wasmUrl.href;
-        if (path.endsWith('.worker.js')) return workerUrl.href;
-        return path;
-      }
-    }).then((mod: SolverModule) => {
-      ThreadedModule = mod;
-    });
-  }
-  return _threadedInitPromise as Promise<void>;
+  _threadedInitPromise ??= (createModule as unknown as CreateModule)({
+    locateFile: (path: string) => {
+      if (path.endsWith(".wasm")) return wasmUrl.href;
+      if (path.endsWith(".worker.js")) return workerUrl.href;
+      return path;
+    },
+  }).then((mod: SolverModule) => {
+    ThreadedModule = mod;
+  });
+  return _threadedInitPromise;
 }
 
 export function getThreadedModule(): SolverModule {
@@ -59,7 +60,10 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     return Promise.resolve();
   }
 
-  analyze(positionStr: string, opts?: AnalyzeOptions): Promise<PositionAnalysis> {
+  analyze(
+    positionStr: string,
+    opts?: AnalyzeOptions,
+  ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
     const mod = getThreadedModule();
     const resArr = this.executeWasmAnalyze(mod, positionStr, opts);
@@ -96,10 +100,10 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     if (!this.initialized) throw new Error("Call init() first.");
     const mod = this.isHeuristic ? getThreadedModule() : getThreadedModule();
     if (this._bookPtr) {
-      mod._destroyBook(this.width, this.height, this._bookPtr);
+      mod._destroyBook(this.width, this.height, this._bookPtr as number);
     }
     const ptr = mod._malloc(_data.length);
-    const heapU8 = mod.HEAPU8 || new Uint8Array(mod.wasmMemory.buffer);
+    const heapU8 = mod.HEAPU8 ?? new Uint8Array(mod.wasmMemory.buffer);
     heapU8.set(_data, ptr);
     this._bookPtr = mod._createBookFromBuffer(
       this.width,
@@ -130,11 +134,13 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
   getNodeCount(): Promise<number> {
     if (!this.initialized) return Promise.resolve(0);
     const mod = getThreadedModule();
-    return Promise.resolve(mod._getNodeCount(
-      this.width,
-      this.height,
-      this._solverPtr,
-      this.isHeuristic,
-    ));
+    return Promise.resolve(
+      mod._getNodeCount(
+        this.width,
+        this.height,
+        this._solverPtr,
+        this.isHeuristic,
+      ),
+    );
   }
 }

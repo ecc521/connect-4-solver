@@ -1,12 +1,12 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any, @typescript-eslint/prefer-nullish-coalescing */
-
 import { PositionAnalysis, AnalyzeOptions, SolverModule } from "./core.js";
 import { AbstractSyncSolver } from "./abstract-solver.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import createModule from "../build/analyze.js";
+
+type CreateModule = (options: {
+  locateFile: (path: string) => string;
+}) => Promise<SolverModule>;
 
 const wasmUrl = new URL("../build/analyze.wasm", import.meta.url);
 
@@ -14,14 +14,13 @@ let NoSABModule: SolverModule | null = null;
 let _noSABInitPromise: Promise<void> | null = null;
 
 export function getNoSABModuleInitPromise(): Promise<void> {
-  if (!_noSABInitPromise) {
-    _noSABInitPromise = (createModule as any)({
-      locateFile: (path: string) => path.endsWith('.wasm') ? wasmUrl.href : path
-    }).then((mod: SolverModule) => {
-      NoSABModule = mod;
-    });
-  }
-  return _noSABInitPromise as Promise<void>;
+  _noSABInitPromise ??= (createModule as unknown as CreateModule)({
+    locateFile: (path: string) =>
+      path.endsWith(".wasm") ? wasmUrl.href : path,
+  }).then((mod: SolverModule) => {
+    NoSABModule = mod;
+  });
+  return _noSABInitPromise;
 }
 
 export function getNoSABModule(): SolverModule {
@@ -34,10 +33,9 @@ export function getNoSABModule(): SolverModule {
 
 export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
   async init(): Promise<void> {
-    if (this.initialized) return Promise.resolve();
+    if (this.initialized) return;
     await getNoSABModuleInitPromise();
     const mod = getNoSABModule();
-    if (!mod) throw new Error("No-SAB module not initialized");
     this._cachePtr = mod._createCache(
       this.width,
       this.height,
@@ -54,12 +52,13 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     return Promise.resolve();
   }
 
-  analyze(positionStr: string, opts?: AnalyzeOptions): Promise<PositionAnalysis> {
+  analyze(
+    positionStr: string,
+    opts?: AnalyzeOptions,
+  ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
     const mod = getNoSABModule();
-    // Force 1 thread since it's NoSAB
-    const finalOpts = { ...opts, threads: 1 };
-    const resArr = this.executeWasmAnalyze(mod, positionStr, finalOpts);
+    const resArr = this.executeWasmAnalyze(mod, positionStr, opts);
     return Promise.resolve(this.parseResArr(resArr, positionStr));
   }
 
@@ -67,12 +66,12 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     if (!this.initialized) throw new Error("Call init() first.");
     const mod = getNoSABModule();
     if (this._bookPtr) {
-      mod._destroyBook(this.width, this.height, this._bookPtr);
+      mod._destroyBook(this.width, this.height, this._bookPtr as number);
     }
     const ptr = mod._malloc(_data.length);
-    const heapU8 = mod.HEAPU8 || new Uint8Array(mod.wasmMemory.buffer);
+    const heapU8 = mod.HEAPU8 ?? new Uint8Array(mod.wasmMemory.buffer);
     heapU8.set(_data, ptr);
-    
+
     this._bookPtr = mod._createBookFromBuffer(
       this.width,
       this.height,
@@ -105,9 +104,7 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
   ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
     const mod = getNoSABModule();
-    // Force 1 thread since it's NoSAB
-    const finalOpts = { ...opts, threads: 1 };
-    const resArr = this.executeWasmSolve(mod, positionStr, finalOpts);
+    const resArr = this.executeWasmSolve(mod, positionStr, opts);
     return Promise.resolve(this.parseSolveResArr(resArr, positionStr));
   }
 
@@ -127,11 +124,13 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
   getNodeCount(): Promise<number> {
     if (!this.initialized) return Promise.resolve(0);
     const mod = getNoSABModule();
-    return Promise.resolve(mod._getNodeCount(
-      this.width,
-      this.height,
-      this._solverPtr,
-      this.isHeuristic,
-    ));
+    return Promise.resolve(
+      mod._getNodeCount(
+        this.width,
+        this.height,
+        this._solverPtr,
+        this.isHeuristic,
+      ),
+    );
   }
 }

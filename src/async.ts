@@ -1,6 +1,9 @@
-import { PositionAnalysis, Connect4SolverOptions, AnalyzeOptions, BaseConnect4Solver } from "./core.js";
-
-
+import {
+  PositionAnalysis,
+  Connect4SolverOptions,
+  AnalyzeOptions,
+  BaseConnect4Solver,
+} from "./core.js";
 
 export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
   private worker: Worker;
@@ -90,12 +93,20 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
     }) as Promise<PositionAnalysis>;
   }
 
+  /**
+   * NOTE: This is ineffective in WASM as the worker thread is blocked.
+   * Use timeoutMs to guarantee a max search time.
+   */
   stop(): void {
-    this.sendMessage("stop").catch(() => { /* ignore */ });
+    this.sendMessage("stop").catch(() => {
+      /* ignore */
+    });
   }
 
   release(): void {
-    this.sendMessage("unload").catch(() => { /* ignore */ });
+    this.sendMessage("unload").catch(() => {
+      /* ignore */
+    });
   }
 
   async getNodeCount(): Promise<number> {

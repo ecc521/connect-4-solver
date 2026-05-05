@@ -53,7 +53,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     }
   }
 
-  const position_t key = P.key();
+  bool is_reverse = false;
+  const auto key = P.symmetric_key(is_reverse);
   auto packed = this->transTable->getPacked(key);
   if (packed.flags != 0 && packed.work >= depth) {
     int16_t score = packed.value;
@@ -118,12 +119,17 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     }
   }
 
-  this->transTable->put(key, (int16_t)(best_score), (uint8_t)depth, (uint8_t)(best_seen_col == -1 ? WIDTH : best_seen_col), flags); 
+  uint8_t stored_move = best_seen_col == -1 ? WIDTH : best_seen_col;
+  if (stored_move < WIDTH && is_reverse) stored_move = WIDTH - 1 - stored_move;
+  this->transTable->put(key, (int16_t)(best_score), (uint8_t)depth, stored_move, flags); 
   return best_score;
 }
 
 template <int WIDTH, int HEIGHT>
 SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool /*reset_tt*/, NNUEAccumulator<WIDTH, HEIGHT>* acc, int threads) {
+#ifndef USE_PTHREADS
+  threads = 1;
+#endif
   if (this->isSearching.exchange(true, std::memory_order_acquire)) {
     throw std::runtime_error("Solver is busy: concurrent execution on the same instance is strictly prohibited.");
   }
@@ -261,8 +267,12 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
       best_score = current_best_score;
       best_move = current_best_move;
       depth_reached = d;
+      bool is_reverse = false;
+      auto key = P.symmetric_key(is_reverse);
+      uint8_t stored_move = best_move;
+      if (stored_move < WIDTH && is_reverse) stored_move = WIDTH - 1 - stored_move;
       // Store best result in TT for next iteration's move ordering
-      this->transTable->put(P.key(), (int16_t)best_score, (uint8_t)d, (uint8_t)best_move, 1);
+      this->transTable->put(key, (int16_t)best_score, (uint8_t)d, stored_move, 1);
     }
 
     if (best_score >= 31000 || best_score <= -31000) break;
@@ -273,6 +283,9 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
 
 template <int WIDTH, int HEIGHT>
 std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads, double end_time_ms) {
+#ifndef USE_PTHREADS
+  threads = 1;
+#endif
   if (this->isSearching.exchange(true, std::memory_order_acquire)) {
     throw std::runtime_error("Solver is busy: concurrent execution on the same instance is strictly prohibited.");
   }

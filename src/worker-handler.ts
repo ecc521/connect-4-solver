@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return */
-
 import { Connect4SolverOptions, AnalyzeOptions } from "./core.js";
 import { AbstractSyncSolver } from "./abstract-solver.js";
 import { SyncWasmConnect4Solver } from "./threaded.js";
@@ -23,13 +21,24 @@ export function setupWorkerHandler(): void {
   let solver: AbstractSyncSolver | null = null;
   const existingHandler = self.onmessage;
 
-  self.onmessage = async (e: MessageEvent<any>): Promise<void> => {
+  self.onmessage = async (e: MessageEvent<WorkerMessage>): Promise<void> => {
     const { id, type, payload } = e.data;
-    
+
     // Pass to Emscripten pthread handler if it's not our message type
-    if (!type || !["init-threaded", "loadBook", "analyze", "solve", "stop", "unload", "getNodeCount"].includes(type)) {
+    if (
+      !type ||
+      ![
+        "init-threaded",
+        "loadBook",
+        "analyze",
+        "solve",
+        "stop",
+        "unload",
+        "getNodeCount",
+      ].includes(type)
+    ) {
       if (existingHandler) {
-        return existingHandler.call(self, e);
+        return existingHandler.call(self, e) as void;
       }
       return;
     }
@@ -37,7 +46,12 @@ export function setupWorkerHandler(): void {
     try {
       if (type === "init-threaded") {
         const { width, height, cacheSizeMb, heuristic } = payload;
-        const opts: Connect4SolverOptions = { width, height, cacheSizeMb, heuristic };
+        const opts: Connect4SolverOptions = {
+          width,
+          height,
+          cacheSizeMb,
+          heuristic,
+        };
         solver = new SyncWasmConnect4Solver(opts);
         await solver.init();
         self.postMessage({ id, success: true });

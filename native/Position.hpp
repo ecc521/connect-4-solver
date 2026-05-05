@@ -180,8 +180,8 @@ class GenericPosition {
   static constexpr int WIDTH = W;
   static constexpr int HEIGHT = H;
 
-  static constexpr int MIN_SCORE = -(W*H) / 2 + 3;
-  static constexpr int MAX_SCORE = (W * H + 1) / 2 - 3;
+  static constexpr int MIN_SCORE = -(W * H + 1) / 2;
+  static constexpr int MAX_SCORE = (W * H + 1) / 2;
 
   static constexpr std::array<int32_t, WIDTH * (HEIGHT + 1)> compute_tromp_weights() {
     std::array<int32_t, WIDTH * (HEIGHT + 1)> weights = {};

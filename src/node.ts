@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 import { PositionAnalysis, AnalyzeOptions } from "./core.js";
 import { AbstractSyncSolver } from "./abstract-solver.js";
 import { createRequire } from "module";
@@ -381,14 +379,16 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     if (!this.initialized) return Promise.resolve(0);
     const native = getNativeModule();
     if (native) {
-      return Promise.resolve(Number(
-        native._getNodeCount(
-          this.width,
-          this.height,
-          this._solverPtr,
-          this.isHeuristic,
+      return Promise.resolve(
+        Number(
+          native._getNodeCount(
+            this.width,
+            this.height,
+            this._solverPtr,
+            this.isHeuristic,
+          ),
         ),
-      ));
+      );
     }
     return Promise.resolve(0);
   }
