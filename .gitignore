@@ -34,17 +34,6 @@ native_old/
 android/.cxx/
 android/build/
 
-# Example App (React Native)
-example/node_modules/
-example/ios/Pods/
-example/ios/build/
-example/android/.gradle/
-example/android/build/
-example/android/local.properties
-example/android/app/build/
-example/android/.cxx/
-example/.metro-health-check*
-
 # Ignore generated data directory
 data/
 
