@@ -178,7 +178,7 @@ async function run() {
   }
 
   console.log(
-    `[+] Created ${threads} native solvers sharing a ${cacheSizeMb}MB cache.`,
+    `[+] Created ${threads} native solvers sharing a ${sharedCache.allocatedCacheSizeMb}MB cache${sharedCache.allocatedCacheSizeMb !== cacheSizeMb ? ` (Requested: ${cacheSizeMb}MB)` : ""}.`,
   );
   console.log(
     `[+] Crunching ${weak ? "WEAK " : ""}Alpha-Beta evaluations using ${threads} concurrent workers...`,

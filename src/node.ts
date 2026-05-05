@@ -148,6 +148,8 @@ export function getNativeModule(): NativeModuleType | null {
 
 export class NativeCache {
   public ptr: unknown;
+  public allocatedCacheSizeMb: number;
+
   constructor(
     public width: number,
     public height: number,
@@ -156,12 +158,23 @@ export class NativeCache {
   ) {
     const native = getNativeModule();
     if (!native) throw new Error("Native module not loaded");
-    this.ptr = native._createCache(
-      width,
-      height,
-      cacheSizeMb * 1024 * 1024,
-      isHeuristic,
-    );
+
+    // OOM retry: native._createCache returns 0 if allocation fails. Halve the request until it succeeds.
+    let sizeMb = cacheSizeMb;
+    let ptr = 0;
+    while (sizeMb >= 64) {
+      ptr = native._createCache(
+        width,
+        height,
+        sizeMb * 1024 * 1024,
+        isHeuristic,
+      ) as number;
+      if (ptr !== 0) break;
+      sizeMb = Math.floor(sizeMb / 2);
+    }
+    if (ptr === 0) throw new Error(`Failed to allocate native cache (tried down to 64 MB)`);
+    this.ptr = ptr;
+    this.allocatedCacheSizeMb = sizeMb;
   }
   destroy(): void {
     const native = getNativeModule();

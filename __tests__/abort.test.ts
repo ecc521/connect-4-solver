@@ -30,7 +30,7 @@ describe("Solver Abort/Timeout", () => {
 
     // Stop immediately
     setTimeout(() => {
-      solver.stop();
+      void solver.stop();
     }, 10);
 
     const result = await solvePromise;
