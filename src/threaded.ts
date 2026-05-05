@@ -70,6 +70,25 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     mod._stopSolver(this.width, this.height, this._solverPtr, this.isHeuristic);
   }
 
+  async loadBook(_data: Uint8Array): Promise<void> {
+    if (!this.initialized) throw new Error("Call init() first.");
+    const mod = this.isHeuristic ? getThreadedModule() : getThreadedModule();
+    if (this._bookPtr) {
+      mod._destroyBook(this.width, this.height, this._bookPtr);
+    }
+    const ptr = mod._malloc(_data.length);
+    const heapU8 = mod.HEAPU8 || new Uint8Array(mod.wasmMemory.buffer);
+    heapU8.set(_data, ptr);
+    this._bookPtr = mod._createBookFromBuffer(
+      this.width,
+      this.height,
+      ptr,
+      _data.length,
+    );
+    mod._free(ptr);
+    return Promise.resolve();
+  }
+
   release(): void {
     if (!this.initialized) return;
     const mod = getThreadedModule();

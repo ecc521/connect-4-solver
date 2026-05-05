@@ -20,8 +20,12 @@ class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContext
     external fun nativeDestroyCache(cachePtrStr: String)
     external fun nativeCreateSolver(width: Int, height: Int, cachePtrStr: String, isHeuristic: Boolean): String
     external fun nativeDestroySolver(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean)
-    external fun nativeAnalyze(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int): IntArray?
-    external fun nativeAnalyzeHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int): IntArray?
+    external fun nativeCreateBookFromBuffer(width: Int, height: Int, base64: ByteArray): String
+    external fun nativeDestroyBook(width: Int, height: Int, bookPtrStr: String)
+    external fun nativeAnalyze(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, bookPtrStr: String): IntArray?
+    external fun nativeAnalyzeHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String): IntArray?
+    external fun nativeSolve(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, bookPtrStr: String): IntArray?
+    external fun nativeSolveHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String): IntArray?
 
     @ReactMethod(isBlockingSynchronousMethod = true)
     fun createCache(width: Int, height: Int, sizeBytes: Double, isHeuristic: Boolean): String {
@@ -43,11 +47,22 @@ class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContext
         nativeDestroySolver(solverPtrStr, width, height, isHeuristic)
     }
 
+    @ReactMethod(isBlockingSynchronousMethod = true)
+    fun createBookFromBuffer(width: Int, height: Int, base64Str: String): String {
+        val decodedBytes = android.util.Base64.decode(base64Str, android.util.Base64.DEFAULT)
+        return nativeCreateBookFromBuffer(width, height, decodedBytes)
+    }
+
+    @ReactMethod(isBlockingSynchronousMethod = true)
+    fun destroyBook(width: Int, height: Int, bookPtrStr: String) {
+        nativeDestroyBook(width, height, bookPtrStr)
+    }
+
     @ReactMethod
-    fun analyze(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, weak: Boolean, promise: Promise) {
+    fun analyze(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, weak: Boolean, bookPtrStr: String, promise: Promise) {
         executor.execute {
             try {
-                val result = nativeAnalyze(solverPtrStr, position, threads, width, height)
+                val result = nativeAnalyze(solverPtrStr, position, threads, width, height, bookPtrStr)
                 if (result != null) {
                     val writableArray = Arguments.createArray()
                     for (i in result) {
@@ -64,10 +79,50 @@ class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContext
     }
 
     @ReactMethod
-    fun analyzeHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, promise: Promise) {
+    fun analyzeHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String, promise: Promise) {
         executor.execute {
             try {
-                val result = nativeAnalyzeHeuristic(solverPtrStr, position, maxDepth, threads, timeoutMs, width, height)
+                val result = nativeAnalyzeHeuristic(solverPtrStr, position, maxDepth, threads, timeoutMs, width, height, bookPtrStr)
+                if (result != null) {
+                    val writableArray = Arguments.createArray()
+                    for (i in result) {
+                        writableArray.pushInt(i)
+                    }
+                    promise.resolve(writableArray)
+                } else {
+                    promise.reject("UNSUPPORTED_SIZE", "Unsupported board size")
+                }
+            } catch (e: Exception) {
+                promise.reject("ERROR", e.message)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun solve(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, weak: Boolean, bookPtrStr: String, promise: Promise) {
+        executor.execute {
+            try {
+                val result = nativeSolve(solverPtrStr, position, threads, width, height, bookPtrStr)
+                if (result != null) {
+                    val writableArray = Arguments.createArray()
+                    for (i in result) {
+                        writableArray.pushInt(i)
+                    }
+                    promise.resolve(writableArray)
+                } else {
+                    promise.reject("UNSUPPORTED_SIZE", "Unsupported board size")
+                }
+            } catch (e: Exception) {
+                promise.reject("ERROR", e.message)
+            }
+        }
+    }
+
+    @ReactMethod
+    fun solveHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String, promise: Promise) {
+        executor.execute {
+            try {
+                val result = nativeSolveHeuristic(solverPtrStr, position, maxDepth, threads, timeoutMs, width, height, bookPtrStr)
                 if (result != null) {
                     val writableArray = Arguments.createArray()
                     for (i in result) {

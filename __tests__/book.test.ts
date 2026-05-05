@@ -1,4 +1,6 @@
 import { NodeConnect4Solver } from "../src/node";
+import { SyncWasmConnect4Solver } from "../src/threaded";
+import { SyncWasmNoSABConnect4Solver } from "../src/sync";
 import { OpeningBook } from "../src/index";
 import * as fs from "fs";
 import * as path from "path";
@@ -173,5 +175,29 @@ describe("Polymorphic Dense Book Packing", () => {
     expect(result2.evaluation?.score).toBeGreaterThanOrEqual(31000);
 
     book.destroy();
+  });
+
+  test("should support loadBook natively across all solver environments", async () => {
+    const bookData = new Uint8Array(fs.readFileSync(d5Path));
+
+    const solvers = [
+      new NodeConnect4Solver(),
+      new SyncWasmConnect4Solver(),
+      new SyncWasmNoSABConnect4Solver(),
+    ];
+
+    for (const solver of solvers) {
+      await solver.init();
+
+      // Load book directly into the native solver's state
+      await solver.loadBook(bookData);
+
+      // Evaluate a depth 2 position (12). The mock book has it scored as -1 (intentionally incorrect to verify cache hit).
+      // We do not pass { book } here, the solver must use the internally managed pointer.
+      const result = await solver.solve("12"); 
+      expect(result.evaluation?.score).toBe(-1);
+
+      solver.unload();
+    }
   });
 });

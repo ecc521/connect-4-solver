@@ -1,6 +1,6 @@
 {
   "name": "connect-4-solver",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "High-performance solver for a variety of board sizes using NNUE + alpha-beta pruning. Bindings for WASM, Node.js, and React Native.",
   "main": "dist/index.js",
   "exports": {

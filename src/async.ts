@@ -1,6 +1,6 @@
-import { PositionAnalysis, Connect4SolverOptions, AnalyzeOptions } from "./core";
+import { PositionAnalysis, Connect4SolverOptions, AnalyzeOptions, BaseConnect4Solver } from "./core";
 
-export abstract class AbstractAsyncWebWorkerSolver {
+export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
   private worker: Worker;
   private messageId = 0;
   private pendingRequests = new Map<
@@ -8,7 +8,7 @@ export abstract class AbstractAsyncWebWorkerSolver {
     { resolve: (val: unknown) => void; reject: (err: unknown) => void }
   >();
   private initPromise: Promise<void>;
-  private initialized = false;
+
 
   constructor(
     worker: Worker,
@@ -16,6 +16,7 @@ export abstract class AbstractAsyncWebWorkerSolver {
     opts?: Connect4SolverOptions | number,
     heightOpt?: number,
   ) {
+    super(opts, heightOpt);
     this.worker = worker;
     this.worker.onmessage = (
       e: MessageEvent<{
@@ -34,24 +35,17 @@ export abstract class AbstractAsyncWebWorkerSolver {
       }
     };
 
-    let width = 7;
-    let height = 6;
     let cacheSizeMb = 128;
     let heuristic = false;
 
-    if (typeof opts === "number") {
-      width = opts;
-      if (heightOpt !== undefined) height = heightOpt;
-    } else if (opts && typeof opts === "object") {
-      if (opts.width !== undefined) width = opts.width;
-      if (opts.height !== undefined) height = opts.height;
+    if (opts && typeof opts === "object") {
       if (opts.cacheSizeMb !== undefined) cacheSizeMb = opts.cacheSizeMb;
       if (opts.heuristic !== undefined) heuristic = opts.heuristic;
     }
 
     this.initPromise = this.sendMessage(initType, {
-      width,
-      height,
+      width: this.width,
+      height: this.height,
       cacheSizeMb,
       heuristic,
     }) as Promise<void>;
@@ -85,6 +79,13 @@ export abstract class AbstractAsyncWebWorkerSolver {
     }) as Promise<PositionAnalysis>;
   }
 
+  async analyzeAsync(
+    positionStr: string,
+    opts?: AnalyzeOptions,
+  ): Promise<PositionAnalysis> {
+    return this.analyze(positionStr, opts);
+  }
+
   async solve(
     positionStr: string,
     opts?: AnalyzeOptions & { weak?: boolean },
@@ -93,6 +94,13 @@ export abstract class AbstractAsyncWebWorkerSolver {
       position: positionStr,
       opts,
     }) as Promise<PositionAnalysis>;
+  }
+
+  async solveAsync(
+    positionStr: string,
+    opts?: AnalyzeOptions & { weak?: boolean },
+  ): Promise<PositionAnalysis> {
+    return this.solve(positionStr, opts);
   }
 
   stop(): void {

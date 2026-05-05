@@ -13,29 +13,35 @@ interface WorkerMessage {
     heuristic: boolean;
     position: string;
     opts: AnalyzeOptions;
+    data?: Uint8Array;
   };
 }
 
 export function setupWorkerHandler(): void {
   let solver: AbstractSyncSolver | null = null;
+  const existingHandler = self.onmessage;
 
-  self.onmessage = async (e: MessageEvent<WorkerMessage>): Promise<void> => {
+  self.onmessage = async (e: MessageEvent<any>): Promise<void> => {
     const { id, type, payload } = e.data;
+    
+    // Pass to Emscripten pthread handler if it's not our message type
+    if (!type || !["init-threaded", "loadBook", "analyze", "solve", "stop", "unload"].includes(type)) {
+      if (existingHandler) {
+        return existingHandler.call(self, e);
+      }
+      return;
+    }
+
     try {
       if (type === "init-threaded") {
         const { width, height, cacheSizeMb, heuristic } = payload;
-        const opts: Connect4SolverOptions = {
-          width,
-          height,
-          cacheSizeMb,
-          heuristic,
-        };
+        const opts: Connect4SolverOptions = { width, height, cacheSizeMb, heuristic };
         solver = new SyncWasmConnect4Solver(opts);
         await solver.init();
         self.postMessage({ id, success: true });
       } else if (type === "loadBook") {
         if (!solver) throw new Error("Solver not initialized");
-        // solver.loadBook doesn't exist natively on Connect4Solver yet, but leaving payload logic
+        if (payload.data) await solver.loadBook(payload.data);
         self.postMessage({ id, success: true });
       } else if (type === "analyze") {
         if (!solver) throw new Error("Solver not initialized");
@@ -78,6 +84,9 @@ export function setupNoSABWorkerHandler(): void {
         self.postMessage({ id, success: true });
       } else if (type === "loadBook") {
         if (!solver) throw new Error("Solver not initialized");
+        if (payload.data) {
+          await solver.loadBook(payload.data);
+        }
         self.postMessage({ id, success: true });
       } else if (type === "analyze") {
         if (!solver) throw new Error("Solver not initialized");

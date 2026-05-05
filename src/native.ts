@@ -6,29 +6,84 @@ import {
   AnalyzeOptions,
   PositionAnalysis,
   calculateWDL,
+  Connect4SolverOptions,
 } from "./core";
 
 interface NativeSolverType {
-  analyze(
-    pos: string,
-    threads: number,
-    w: number,
-    h: number,
-    weak: boolean,
-  ): Promise<number[]>;
-  releaseSolver(w: number, h: number): Promise<boolean>;
+  createCache(w: number, h: number, sizeBytes: number, heuristic: boolean): string;
+  destroyCache(cachePtr: string): void;
+  createSolver(w: number, h: number, cachePtr: string, heuristic: boolean): string;
+  destroySolver(solverPtr: string, w: number, h: number, heuristic: boolean): void;
+  createBookFromBuffer(w: number, h: number, base64: string): string;
+  destroyBook(w: number, h: number, bookPtr: string): void;
+  analyze(solverPtr: string, pos: string, threads: number, w: number, h: number, weak: boolean, bookPtr: string): Promise<number[]>;
+  analyzeHeuristic(solverPtr: string, pos: string, maxDepth: number, threads: number, timeoutMs: number, w: number, h: number, bookPtr: string): Promise<number[]>;
+  solve(solverPtr: string, pos: string, threads: number, w: number, h: number, weak: boolean, bookPtr: string): Promise<number[]>;
+  solveHeuristic(solverPtr: string, pos: string, maxDepth: number, threads: number, timeoutMs: number, w: number, h: number, bookPtr: string): Promise<number[]>;
+}
+
+function encodeBase64(data: Uint8Array): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  let result = "";
+  for (let i = 0; i < data.length; i += 3) {
+    const b1 = data[i];
+    const b2 = i + 1 < data.length ? data[i + 1] : 0;
+    const b3 = i + 2 < data.length ? data[i + 2] : 0;
+    const triplet = (b1 << 16) | (b2 << 8) | b3;
+    result += chars[(triplet >> 18) & 0x3f];
+    result += chars[(triplet >> 12) & 0x3f];
+    result += i + 1 < data.length ? chars[(triplet >> 6) & 0x3f] : "=";
+    result += i + 2 < data.length ? chars[triplet & 0x3f] : "=";
+  }
+  return result;
 }
 
 export class ReactNativeConnect4Solver extends BaseConnect4Solver {
+  private _isHeuristic: boolean;
+  private _cacheSizeMb: number;
+  private _cachePtrStr = "0";
+  private _solverPtrStr = "0";
+  private _nativeModule: NativeSolverType;
+
+  constructor(widthOrOpts?: number | Connect4SolverOptions, heightOpt?: number) {
+    super(widthOrOpts, heightOpt);
+    this._isHeuristic = false;
+    this._cacheSizeMb = 32;
+
+    if (widthOrOpts && typeof widthOrOpts === "object") {
+      if (widthOrOpts.heuristic !== undefined) this._isHeuristic = widthOrOpts.heuristic;
+      if (widthOrOpts.cacheSizeMb !== undefined) this._cacheSizeMb = widthOrOpts.cacheSizeMb;
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const rn = require("react-native") as {
+        NativeModules: { Connect4Solver?: NativeSolverType };
+      };
+      if (!rn.NativeModules.Connect4Solver) throw new Error();
+      this._nativeModule = rn.NativeModules.Connect4Solver;
+    } catch {
+      throw new Error(
+        "NativeModules.Connect4Solver is completely missing from the bridge block. Ensure the native libraries were properly bundled.",
+      );
+    }
+  }
+
   init(): Promise<void> {
-    this.initialized = true; // Native layer doesn't require WASM initialization promises
+    if (this.initialized) return Promise.resolve();
+    this._cachePtrStr = this._nativeModule.createCache(this.width, this.height, this._cacheSizeMb * 1024 * 1024, this._isHeuristic);
+    this._solverPtrStr = this._nativeModule.createSolver(this.width, this.height, this._cachePtrStr, this._isHeuristic);
+    this.initialized = true;
     return Promise.resolve();
   }
 
-  loadBook(_data: Uint8Array): Promise<void> {
-    console.warn(
-      "loadBook is natively bypassed for React Native deployments. The C++ multithreading heuristic is robust enough to not require a book payload.",
-    );
+  loadBook(data: Uint8Array): Promise<void> {
+    if (!this.initialized) throw new Error("Call init() first.");
+    if (this._bookPtr && this._bookPtr !== "0") {
+      this._nativeModule.destroyBook(this.width, this.height, this._bookPtr as string);
+    }
+    const b64 = encodeBase64(data);
+    this._bookPtr = this._nativeModule.createBookFromBuffer(this.width, this.height, b64);
     return Promise.resolve();
   }
 
@@ -36,31 +91,15 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     positionStr: string,
     opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis> {
-    let Connect4SolverNative: NativeSolverType;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const rn = require("react-native") as {
-        NativeModules: { Connect4Solver?: NativeSolverType };
-      };
-      if (!rn.NativeModules.Connect4Solver) throw new Error();
-      Connect4SolverNative = rn.NativeModules.Connect4Solver;
-    } catch {
-      throw new Error(
-        "NativeModules.Connect4Solver is completely missing from the bridge block. Ensure the native libraries were properly bundled.",
-      );
+    if (!this.initialized) throw new Error("Call init() first.");
+    const { threads, maxDepth, timeoutMs, bookPtr, weak } = this.sanitizeOpts(opts);
+
+    let nativeResArr: number[];
+    if (this._isHeuristic) {
+      nativeResArr = await this._nativeModule.analyzeHeuristic(this._solverPtrStr, positionStr, maxDepth, threads, timeoutMs, this.width, this.height, bookPtr as string);
+    } else {
+      nativeResArr = await this._nativeModule.analyze(this._solverPtrStr, positionStr, threads, this.width, this.height, weak, bookPtr as string);
     }
-
-    // Sanitize and strict-clamp the arguments before crossing the JNI bridge
-    const { threads } = this.sanitizeOpts(opts);
-
-    // Call the Objective-C++ / JNI Layer passing the raw arguments strongly
-    const nativeResArr = await Connect4SolverNative.analyze(
-      positionStr,
-      threads,
-      this.width,
-      this.height,
-      false, // weak=false
-    );
 
     const status = nativeResArr[0];
     const nbMoves = nativeResArr[1];
@@ -98,36 +137,43 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           const movesRemaining = this.width * this.height - nbMoves;
           const halfMovesRemaining = Math.ceil(movesRemaining / 2);
 
-          if (n === 0) {
+          if (this._isHeuristic) {
             moveOptions.push({
-              eval: { value: 0, wdl: calculateWDL(0, true, Outcome.Draw) },
-              outcome: Outcome.Draw,
-              winner: null,
-              movesToEnd: null,
-              score: 0,
-            });
-          } else if (n > 0) {
-            moveOptions.push({
-              eval: {
-                value: Number.POSITIVE_INFINITY,
-                wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
-              },
-              outcome: Outcome.Win,
-              winner: owner,
-              movesToEnd: halfMovesRemaining - n + 1,
+              eval: { value: n, wdl: calculateWDL(n, false) },
               score: n,
             });
           } else {
-            moveOptions.push({
-              eval: {
-                value: Number.NEGATIVE_INFINITY,
-                wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss),
-              },
-              outcome: Outcome.Loss,
-              winner: opp,
-              movesToEnd: halfMovesRemaining + n + 1,
-              score: n,
-            });
+            if (n === 0) {
+              moveOptions.push({
+                eval: { value: 0, wdl: calculateWDL(0, true, Outcome.Draw) },
+                outcome: Outcome.Draw,
+                winner: null,
+                movesToEnd: null,
+                score: 0,
+              });
+            } else if (n > 0) {
+              moveOptions.push({
+                eval: {
+                  value: Number.POSITIVE_INFINITY,
+                  wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
+                },
+                outcome: Outcome.Win,
+                winner: owner,
+                movesToEnd: halfMovesRemaining - n + 1,
+                score: n,
+              });
+            } else {
+              moveOptions.push({
+                eval: {
+                  value: Number.NEGATIVE_INFINITY,
+                  wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss),
+                },
+                outcome: Outcome.Loss,
+                winner: opp,
+                movesToEnd: halfMovesRemaining + n + 1,
+                score: n,
+              });
+            }
           }
         }
       }
@@ -140,31 +186,35 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           continue;
         }
 
-        if (ev.outcome === Outcome.Win) {
-          if (
-            bestEval.outcome !== Outcome.Win ||
-            (ev.movesToEnd !== null &&
+        if (this._isHeuristic) {
+          if (ev.score > bestEval.score) bestEval = ev;
+        } else {
+          if (ev.outcome === Outcome.Win) {
+            if (
+              bestEval.outcome !== Outcome.Win ||
+              (ev.movesToEnd !== null &&
+                ev.movesToEnd !== undefined &&
+                bestEval.movesToEnd !== null &&
+                bestEval.movesToEnd !== undefined &&
+                ev.movesToEnd < bestEval.movesToEnd)
+            ) {
+              bestEval = ev;
+            }
+          } else if (ev.outcome === Outcome.Draw) {
+            if (bestEval.outcome === Outcome.Loss) {
+              bestEval = ev;
+            }
+          } else if (ev.outcome === Outcome.Loss) {
+            if (
+              bestEval.outcome === Outcome.Loss &&
+              ev.movesToEnd !== null &&
               ev.movesToEnd !== undefined &&
               bestEval.movesToEnd !== null &&
               bestEval.movesToEnd !== undefined &&
-              ev.movesToEnd < bestEval.movesToEnd)
-          ) {
-            bestEval = ev;
-          }
-        } else if (ev.outcome === Outcome.Draw) {
-          if (bestEval.outcome === Outcome.Loss) {
-            bestEval = ev;
-          }
-        } else if (ev.outcome === Outcome.Loss) {
-          if (
-            bestEval.outcome === Outcome.Loss &&
-            ev.movesToEnd !== null &&
-            ev.movesToEnd !== undefined &&
-            bestEval.movesToEnd !== null &&
-            bestEval.movesToEnd !== undefined &&
-            ev.movesToEnd > bestEval.movesToEnd
-          ) {
-            bestEval = ev;
+              ev.movesToEnd > bestEval.movesToEnd
+            ) {
+              bestEval = ev;
+            }
           }
         }
       }
@@ -177,7 +227,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       currentPlayer,
       evaluation,
       moveOptions,
-      isHeuristic: false,
+      isHeuristic: this._isHeuristic,
     };
   }
 
@@ -188,30 +238,152 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     return this.analyze(positionStr, opts);
   }
 
-  getNodeCount(): number {
-    return 0; // Native mobile doesn't expose node count yet
+  async solve(
+    positionStr: string,
+    opts?: AnalyzeOptions & { weak?: boolean },
+  ): Promise<PositionAnalysis> {
+    if (!this.initialized) throw new Error("Call init() first.");
+    const { threads, maxDepth, timeoutMs, bookPtr, weak } = this.sanitizeOpts(opts);
+
+    let nativeResArr: number[];
+    if (this._isHeuristic) {
+      nativeResArr = await this._nativeModule.solveHeuristic(this._solverPtrStr, positionStr, maxDepth, threads, timeoutMs, this.width, this.height, bookPtr as string);
+    } else {
+      nativeResArr = await this._nativeModule.solve(this._solverPtrStr, positionStr, threads, this.width, this.height, weak, bookPtr as string);
+    }
+
+    const status = nativeResArr[0];
+    const nbMoves = nativeResArr[1];
+
+    let currentPosition = positionStr;
+    const currentPlayer = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
+
+    if (status === 2) {
+      currentPosition = positionStr.slice(0, nbMoves);
+    } else if (status === 1) {
+      currentPosition = positionStr.slice(0, nbMoves + 1);
+      const winningMoveIndex = nbMoves;
+      const winner = winningMoveIndex % 2 === 0 ? Player.P1 : Player.P2;
+      return {
+        position: currentPosition,
+        originalPosition: positionStr,
+        currentPlayer,
+        evaluation: {
+          eval: {
+            value: Number.POSITIVE_INFINITY,
+            wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
+          },
+          outcome: Outcome.Win,
+          winner: winner,
+          movesToEnd: 0,
+          score: Math.floor((this.width * this.height + 1 - nbMoves) / 2),
+        },
+        moveOptions: [],
+        isHeuristic: this._isHeuristic,
+      };
+    }
+
+    const score = nativeResArr[2];
+    const bestMove = this._isHeuristic ? nativeResArr[3] : undefined;
+    const depth = this._isHeuristic ? nativeResArr[4] : undefined;
+    
+    // Construct 64-bit integer from two 32-bit halves (low, high)
+    const nodes = this._isHeuristic ? (nativeResArr[5] >>> 0) + ((nativeResArr[6] >>> 0) * 4294967296) : undefined;
+    
+    const aborted = this._isHeuristic ? nativeResArr[7] === 1 : nativeResArr[3] === 1;
+
+    let evaluation: Evaluation;
+
+    if (this._isHeuristic) {
+      evaluation = {
+        eval: { value: score, wdl: calculateWDL(score, false) },
+        score,
+        bestMove,
+        nodes,
+      };
+    } else {
+      const isPlayer1Turn = nbMoves % 2 === 0;
+      const owner = isPlayer1Turn ? Player.P1 : Player.P2;
+      const opp = isPlayer1Turn ? Player.P2 : Player.P1;
+      const movesRemaining = this.width * this.height - nbMoves;
+      const halfMovesRemaining = Math.ceil(movesRemaining / 2);
+
+      if (score === 0) {
+        evaluation = {
+          eval: { value: 0, wdl: calculateWDL(0, true, Outcome.Draw) },
+          outcome: Outcome.Draw,
+          winner: null,
+          movesToEnd: null,
+          score: 0,
+        };
+      } else if (score > 0) {
+        evaluation = {
+          eval: {
+            value: Number.POSITIVE_INFINITY,
+            wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
+          },
+          outcome: Outcome.Win,
+          winner: owner,
+          movesToEnd: halfMovesRemaining - score + 1,
+          score,
+        };
+      } else {
+        evaluation = {
+          eval: {
+            value: Number.NEGATIVE_INFINITY,
+            wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss),
+          },
+          outcome: Outcome.Loss,
+          winner: opp,
+          movesToEnd: halfMovesRemaining + score + 1,
+          score,
+        };
+      }
+    }
+
+    return {
+      position: currentPosition,
+      originalPosition: positionStr,
+      currentPlayer,
+      evaluation,
+      moveOptions: [], // solve doesn't return full move options
+      depthReached: depth,
+      nodes,
+      bestMove,
+      aborted,
+      isHeuristic: this._isHeuristic,
+    };
   }
 
-  /**
-   * Instantly releases the native Android/iOS memory caches allocated for this specific board size back to the OS.
-   * Useful when navigating away from a game screen to prevent memory stacking.
-   */
+  async solveAsync(
+    positionStr: string,
+    opts?: AnalyzeOptions & { weak?: boolean },
+  ): Promise<PositionAnalysis> {
+    return this.solve(positionStr, opts);
+  }
+
+  stop(): void {
+    console.warn("stop() is natively a no-op via JNI bindings right now. The solver will timeout on its own.");
+  }
+
+  getNodeCount(): number {
+    return 0; // Not bound efficiently across bridge yet
+  }
+
   unload(): void {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const rn = require("react-native") as {
-        NativeModules: { Connect4Solver?: NativeSolverType };
-      };
-      if (rn.NativeModules.Connect4Solver) {
-        rn.NativeModules.Connect4Solver.releaseSolver(
-          this.width,
-          this.height,
-        ).catch(() => {
-          /* ignore */
-        });
-      }
-    } catch {
-      // Ignore if not in React Native environment
+    if (!this.initialized) return;
+    if (this._solverPtrStr !== "0") {
+      this._nativeModule.destroySolver(this._solverPtrStr, this.width, this.height, this._isHeuristic);
+      this._solverPtrStr = "0";
     }
+    if (this._cachePtrStr !== "0") {
+      this._nativeModule.destroyCache(this._cachePtrStr);
+      this._cachePtrStr = "0";
+    }
+    if (this._bookPtr && this._bookPtr !== "0") {
+      this._nativeModule.destroyBook(this.width, this.height, this._bookPtr as string);
+      this._bookPtr = "0";
+    }
+    this.initialized = false;
   }
 }

@@ -8,15 +8,23 @@ jest.mock(
     return {
       NativeModules: {
         Connect4Solver: {
+          createCache: jest.fn(() => "mockCachePtr"),
+          createSolver: jest.fn(() => "mockSolverPtr"),
+          createBookFromBuffer: jest.fn(() => "mockBookPtr"),
+          destroyBook: jest.fn(),
+          destroySolver: jest.fn(),
+          destroyCache: jest.fn(),
           // Return a mock output raw JNI/Obj-C IntArray matching what WASM usually returns
           // [status, nbmoves, scores...]
           analyze: jest.fn(
             (
+              _solverPtr: string,
               pos: string,
               _threads: number,
               _w: number,
               _h: number,
               _weak: boolean,
+              _bookPtr: string,
             ) => {
               return new Promise((resolve) => {
                 if (pos === "121212") {
@@ -70,15 +78,10 @@ describe("ReactNativeConnect4Solver Bridge Tests", () => {
     expect(result.evaluation?.winner).toBe(Player.P1);
   });
 
-  test("should correctly bypass the unneeded Opening Book loading payload securely natively", async () => {
-    // Should warn, not throw
-    const consoleSpy = jest.spyOn(console, "warn").mockImplementation(() => {
-      return;
-    });
+  test("should correctly pass the Opening Book loading payload natively", async () => {
     await solver.loadBook(new Uint8Array([1, 2, 3]));
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("natively bypassed"),
-    );
-    consoleSpy.mockRestore();
+    // Should call createBookFromBuffer natively
+    const rn = require("react-native");
+    expect(rn.NativeModules.Connect4Solver.createBookFromBuffer).toHaveBeenCalled();
   });
 });

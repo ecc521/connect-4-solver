@@ -1,5 +1,5 @@
 mkdir -p build
-EXPORTS='["_free", "_malloc", "_createCache", "_destroyCache", "_createSolver", "_destroySolver", "_stopSolver", "_createBook", "_destroyBook", "_solveExact", "_solveHeuristic", "_analyzeExact", "_analyzeHeuristic", "_getNodeCount"]'
+EXPORTS='["_free", "_malloc", "_createCache", "_destroyCache", "_createSolver", "_destroySolver", "_stopSolver", "_createBookFromBuffer", "_destroyBook", "_solveExact", "_solveHeuristic", "_analyzeExact", "_analyzeHeuristic", "_getNodeCount"]'
 
 emcc -O3 -flto -std=c++20 -msimd128 -DNDEBUG -fwasm-exceptions -DCACHE_BUCKET_SIZE=2 -o build/analyze.js native/analyze.cpp -s NO_EXIT_RUNTIME=1 -s EXPORTED_FUNCTIONS="$EXPORTS" -s EXPORTED_RUNTIME_METHODS='["FS", "UTF8ToString", "stringToNewUTF8", "getValue", "wasmMemory"]' -s INITIAL_MEMORY=200MB -s ALLOW_MEMORY_GROWTH -s WASM=1 -s SINGLE_FILE=1 -s MODULARIZE=1 -s EXPORT_NAME="createModule" -s STACK_SIZE=1048576
 

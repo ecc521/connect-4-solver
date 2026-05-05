@@ -1530,7 +1530,7 @@ Value GetNodeCount(const CallbackInfo& info) {
         else if (w == 13 && h == 8) count = static_cast<C4_13x8::Solver*>(solver)->getNodeCount();
         else if (w == 9 && h == 9) count = static_cast<C4_9x9::Solver*>(solver)->getNodeCount();
     }
-    return Number::New(info.Env(), (double)(uintptr_t)count);
+    return Number::New(info.Env(), (double)count);
 }
 
 // Helper macro for book operations

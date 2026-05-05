@@ -285,7 +285,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         this.height,
         this._solverPtr,
         allocatedMemory,
-        weak,
+        (weak ? 1 : 0) as unknown as boolean,
         threads,
         bookPtr,
         timeoutMs,
@@ -327,7 +327,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         this.height,
         this._solverPtr,
         allocatedMemory,
-        weak,
+        (weak ? 1 : 0) as unknown as boolean,
         threads,
         bookPtr,
         timeoutMs,
@@ -359,5 +359,11 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis> {
     return this.analyze(positionStr, opts);
+  }
+  async solveAsync(
+    positionStr: string,
+    opts?: AnalyzeOptions & { weak?: boolean },
+  ): Promise<PositionAnalysis> {
+    return this.solve(positionStr, opts);
   }
 }

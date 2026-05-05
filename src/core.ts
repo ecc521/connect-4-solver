@@ -176,12 +176,13 @@ export interface SolverModule {
   UTF8ToString(pointer: number): string;
   _malloc(size: number): number;
   _free(pointer: number): void;
-  HEAPU8: Uint8Array;
+  wasmMemory: WebAssembly.Memory;
   onRuntimeInitialized?: () => void;
   FS: {
     writeFile(path: string, data: Uint8Array): void;
   };
   getValue(ptr: number, type: string): number;
+  HEAPU8: Uint8Array;
 }
 
 /**
@@ -193,6 +194,7 @@ export abstract class BaseConnect4Solver {
   public width: number;
   public height: number;
   protected initialized = false;
+  protected _bookPtr: any = 0;
 
   constructor(
     widthOrOpts?: number | Connect4SolverOptions,
@@ -230,7 +232,7 @@ export abstract class BaseConnect4Solver {
     threads: number;
     maxDepth: number;
     timeoutMs: number;
-    bookPtr: number;
+    bookPtr: any;
     weak: boolean;
   } {
     let threads = opts?.threads ?? 1;
@@ -267,10 +269,10 @@ export abstract class BaseConnect4Solver {
         "Invalid 'timeoutMs' parameter. Must be greater than or equal to 0.",
       );
 
-    const bookPtr = opts?.book?.ptr ?? 0;
+    const bookPtr = opts?.book?.ptr ?? this._bookPtr;
     const isInvalid =
       opts?.book &&
-      ((typeof bookPtr !== "number" && typeof bookPtr !== "object") ||
+      ((typeof bookPtr !== "number" && typeof bookPtr !== "string" && typeof bookPtr !== "object") ||
         (typeof bookPtr === "number" && isNaN(bookPtr)));
 
     if (isInvalid) {
@@ -289,6 +291,16 @@ export abstract class BaseConnect4Solver {
     positionStr: string,
     opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis>;
+  abstract solve(
+    positionStr: string,
+    opts?: AnalyzeOptions & { weak?: boolean },
+  ): PositionAnalysis | Promise<PositionAnalysis>;
+  abstract solveAsync(
+    positionStr: string,
+    opts?: AnalyzeOptions & { weak?: boolean },
+  ): Promise<PositionAnalysis>;
+  abstract loadBook(data: Uint8Array): Promise<void>;
+  abstract stop(): void;
   abstract getNodeCount(): number;
   abstract unload(): void;
 }

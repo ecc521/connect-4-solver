@@ -219,6 +219,22 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     return Promise.resolve();
   }
 
+  async loadBook(_data: Uint8Array): Promise<void> {
+    if (!this.initialized) throw new Error("Call init() first.");
+    const native = getNativeModule();
+    if (native) {
+      if (this._bookPtr) {
+        native._destroyBook(this.width, this.height, this._bookPtr);
+      }
+      this._bookPtr = native._createBookFromBuffer(
+        this.width,
+        this.height,
+        _data,
+      ) as number;
+    }
+    return Promise.resolve();
+  }
+
   async analyze(
     positionStr: string,
     opts?: AnalyzeOptions,
@@ -348,6 +364,10 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       );
       if (!this._sharedCache) {
         native._destroyCache(this._cachePtr);
+      }
+      if (this._bookPtr) {
+        native._destroyBook(this.width, this.height, this._bookPtr);
+        this._bookPtr = 0;
       }
     }
     this.initialized = false;
