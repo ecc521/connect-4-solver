@@ -17,7 +17,7 @@ On Node.js, the native C++ addon will automatically compile for maximum performa
 - **Multi-Board Support** — Boards from 4×4 to 12×12 (up to 128-bit position masks)
 - **Opening Books** — Dense and Elias-Fano compressed book formats for instant early-game lookups
 - **Multi-Runtime** — Node.js native addon, single-threaded WASM, threaded WASM (SharedArrayBuffer), and React Native (iOS/Android JSI)
-- **TypeScript First** — Full type definitions, object-oriented API, exact Win/Loss/Draw outcomes and heuristic centipawn scores
+- **TypeScript First** — Full type definitions, object-oriented API, exact Win/Loss/Draw outcomes and heuristic scores
 
 ## Quick Start
 

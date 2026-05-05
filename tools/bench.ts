@@ -337,7 +337,7 @@ async function runBenchmark(
         if (outcome === expectedOutcome) {
           correct++;
         } else {
-          // If the heuristic claims an EXACT forced mate but the outcome is wrong, it's a fatal hallucination
+          // If the heuristic claims an EXACT forced win but the outcome is wrong, it's a fatal hallucination
           if (bestScore >= 31000 || bestScore <= -31000) {
             hardFailures++;
             if (opts.verbose) {
@@ -393,7 +393,7 @@ async function runBenchmark(
       : 0;
   const accuracyPct = completed > 0 ? (correct / completed) * 100 : 0;
   // Parity is strictly enforced for exact solver (100% required)
-  // For heuristic solver, parity only fails if it hallucinates an exact forced mate
+  // For heuristic solver, parity only fails if it hallucinates an exact forced win
   const parityOk = hardFailures === 0;
 
   return {

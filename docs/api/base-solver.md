@@ -117,9 +117,9 @@ Represents the calculated strength of a move or position.
 ```typescript
 export interface Evaluation {
   eval: {
-    value: number; // Normalized score:
+    value: number; // Decimal score:
                    //   Exact wins → +Infinity, exact losses → -Infinity, draws → 0
-                   //   Heuristic → raw_score / 100.0 (centipawn-style, typically ±5)
+                   //   Heuristic → raw_score / 100.0 (typically ±5)
   };
   outcome?: "Win" | "Loss" | "Draw"; // Only present on exact solutions
   winner?: "P1" | "P2" | null;       // null on draws; only present on exact solutions
@@ -128,4 +128,4 @@ export interface Evaluation {
 }
 ```
 
-> **Heuristic `eval.value`:** The heuristic engine does not produce Win/Draw/Loss probabilities. The normalized `eval.value` (score ÷ 100) is suitable for bar-chart display. A value of `+3.5` means the position is strongly winning; `0.0` is roughly equal.
+> **Heuristic `eval.value`:** The heuristic engine does not produce Win/Draw/Loss probabilities. The decimal `eval.value` (score ÷ 100) is suitable for bar-chart display. A value of `+3.5` means the position is strongly winning; `0.0` is roughly equal.

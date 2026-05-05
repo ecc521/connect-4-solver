@@ -59,24 +59,10 @@ Because the heuristic solver uses iterative deepening, it always has a "best gue
 
 You can inspect `result.depthReached` to see exactly how deep the solver managed to look before returning.
 
-## Evaluation & Win Probability
+## Evaluation
 
-Because the heuristic solver estimates the strength of a position rather than calculating an exact win/loss, the returned `Evaluation` object includes a Stockfish-style `eval` wrapper.
+Because the heuristic solver estimates the strength of a position rather than calculating an exact win/loss, the returned `Evaluation` object includes an `eval` wrapper containing the decimal score.
 
-The engine normalizes the neural network output into a standard `eval.value` float and maps it to a **WDL (Win/Draw/Loss)** probability curve. This allows you to easily display human-readable progress bars in your UI without needing to understand the raw mathematical scores!
-
-_The following table provides a rough approximation of how `eval.value` maps to the WDL curve. Do not hardcode these thresholds—always read from the `eval.wdl` object directly in your application!_
-
-| `eval.value` | Win Probability | Draw Probability | Loss Probability | Meaning               |
-| ------------ | --------------- | ---------------- | ---------------- | --------------------- |
-| `+Infinity`  | 100%            | 0%               | 0%               | Forced Win found      |
-| `+8.0`       | 88%             | <1%              | 12%              | Crushing Advantage    |
-| `+4.0`       | 73%             | 1%               | 26%              | Strong Advantage      |
-| `0.0`        | 25%             | 50%              | 25%              | Dead Even             |
-| `-4.0`       | 26%             | 1%               | 73%              | Strong Disadvantage   |
-| `-8.0`       | 12%             | <1%              | 88%              | Crushing Disadvantage |
-| `-Infinity`  | 0%              | 0%               | 100%             | Forced Loss found     |
-
-> **Note:** The exact mapping coefficients of the sigmoid curve will be continuously refined in future releases as the NNUE weights are trained. The table above is simply an example. The `0.0` to `1.0` probability interface in `eval.wdl`, however, will remain perfectly stable!
+The engine scales the neural network output into a standard `eval.value` float (score ÷ 100). This allows you to easily display progress bars in your UI without needing to understand the raw mathematical scores!
 
 > **Books:** The heuristic solver _never_ uses Opening Books. Passing a `book` to a heuristic solver's `analyze` method will be ignored.
