@@ -6,7 +6,6 @@ import {
   Outcome,
   Evaluation,
   PositionAnalysis,
-  calculateWDL,
   AnalyzeOptions,
   Connect4SolverOptions,
   SolverModule,
@@ -38,13 +37,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     this.isHeuristic = heuristic;
   }
 
-  solve(
-    _positionStr: string,
-    _opts?: AnalyzeOptions & { weak?: boolean },
-  ): PositionAnalysis | Promise<PositionAnalysis> {
-    throw new Error("solve() is not implemented for this solver.");
-  }
-
   protected getPlayerAt(nbMoves: number): Player {
     return nbMoves % 2 === 0 ? Player.P1 : Player.P2;
   }
@@ -60,10 +52,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       if (score >= 31000) {
         const realScore = score - 31000;
         return {
-          eval: {
-            value: Number.POSITIVE_INFINITY,
-            wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
-          },
+          eval: { value: Number.POSITIVE_INFINITY },
           outcome: Outcome.Win,
           winner: currentPlayer,
           movesToEnd: halfMovesRemaining - realScore + 1,
@@ -72,24 +61,20 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       } else if (score <= -31000) {
         const realScore = score + 31000;
         return {
-          eval: {
-            value: Number.NEGATIVE_INFINITY,
-            wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss),
-          },
+          eval: { value: Number.NEGATIVE_INFINITY },
           outcome: Outcome.Loss,
           winner: opponent,
           movesToEnd: halfMovesRemaining + realScore + 1,
           score,
         };
       } else {
-        const val = score / 100.0;
-        return { eval: { value: val, wdl: calculateWDL(val, false) }, score };
+        return { eval: { value: score / 100.0 }, score };
       }
     }
 
     if (score === 0) {
       return {
-        eval: { value: 0, wdl: calculateWDL(0, true, Outcome.Draw) },
+        eval: { value: 0 },
         outcome: Outcome.Draw,
         winner: null,
         movesToEnd: null,
@@ -97,10 +82,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       };
     } else if (score > 0) {
       return {
-        eval: {
-          value: Number.POSITIVE_INFINITY,
-          wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
-        },
+        eval: { value: Number.POSITIVE_INFINITY },
         outcome: Outcome.Win,
         winner: currentPlayer,
         movesToEnd: halfMovesRemaining - score + 1,
@@ -108,10 +90,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       };
     } else {
       return {
-        eval: {
-          value: Number.NEGATIVE_INFINITY,
-          wdl: calculateWDL(Number.NEGATIVE_INFINITY, true, Outcome.Loss),
-        },
+        eval: { value: Number.NEGATIVE_INFINITY },
         outcome: Outcome.Loss,
         winner: opponent,
         movesToEnd: halfMovesRemaining + score + 1,
@@ -132,26 +111,20 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     let evaluation: Evaluation | null = null;
     const moveOptions: (Evaluation | null)[] = [];
 
-    const unplayableScore = this.isHeuristic
-      ? -1000000
-      : UNPLAYABLE_COLUMN_SCORE;
+    const unplayableScore = this.isHeuristic ? -1000000 : UNPLAYABLE_COLUMN_SCORE;
 
     if (status === STATUS_INVALID) {
       currentPosition = positionStr.slice(0, nbMoves);
     } else if (status === STATUS_WIN) {
       currentPosition = positionStr.slice(0, nbMoves + 1);
       const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
-      const movesToEnd = 0;
       const score = Math.floor((this.width * this.height - nbMoves) / 2);
       evaluation = {
-        eval: {
-          value: Number.POSITIVE_INFINITY,
-          wdl: calculateWDL(Number.POSITIVE_INFINITY, true, Outcome.Win),
-        },
+        eval: { value: Number.POSITIVE_INFINITY },
         outcome: Outcome.Win,
-        winner: winner,
-        movesToEnd: movesToEnd,
-        score: score,
+        winner,
+        movesToEnd: 0,
+        score,
       };
     } else {
       for (let i = 0; i < this.width; i++) {
@@ -211,34 +184,18 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       currentPosition = positionStr.slice(0, nbMoves + 1);
       const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
       const score = Math.floor((this.width * this.height - nbMoves) / 2);
-
       evaluation = {
         eval: {
-          value:
-            winner === Player.P1
-              ? Number.POSITIVE_INFINITY
-              : Number.NEGATIVE_INFINITY,
-          wdl: calculateWDL(
-            winner === Player.P1
-              ? Number.POSITIVE_INFINITY
-              : Number.NEGATIVE_INFINITY,
-            true,
-            winner === Player.P1 ? Outcome.Win : Outcome.Loss,
-          ),
+          value: winner === Player.P1 ? Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY,
         },
         outcome: winner === currentPlayer ? Outcome.Win : Outcome.Loss,
-        winner: winner,
+        winner,
         movesToEnd: positionStr.length - (nbMoves + 1),
         score: winner === currentPlayer ? score : -score,
       };
     } else {
       const score = resArr[2];
       evaluation = this.createEvaluation(score, nbMoves);
-    }
-
-    if (evaluation) {
-      evaluation.bestMove = bestMove;
-      evaluation.nodes = nodes;
     }
 
     if (aborted) {
@@ -270,27 +227,14 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     const allocatedMemory = mod.stringToNewUTF8(positionStr);
     let outputPointer: number;
     if (this.isHeuristic)
-      // Heuristic solve() does not benefit from LazySMP threading
       outputPointer = mod._solveHeuristic(
-        this.width,
-        this.height,
-        this._solverPtr,
-        allocatedMemory,
-        maxDepth,
-        threads,
-        timeoutMs,
-        bookPtr,
+        this.width, this.height, this._solverPtr, allocatedMemory,
+        maxDepth, threads, timeoutMs, bookPtr,
       );
     else
       outputPointer = mod._solveExact(
-        this.width,
-        this.height,
-        this._solverPtr,
-        allocatedMemory,
-        (weak ? 1 : 0) as unknown as boolean,
-        threads,
-        bookPtr,
-        timeoutMs,
+        this.width, this.height, this._solverPtr, allocatedMemory,
+        (weak ? 1 : 0) as unknown as boolean, threads, bookPtr, timeoutMs,
       );
 
     const dataLength = 8;
@@ -308,31 +252,19 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     positionStr: string,
     opts?: AnalyzeOptions,
   ): Int32Array {
-    const { threads, maxDepth, timeoutMs, bookPtr, weak } =
-      this.sanitizeOpts(opts);
+    const { threads, maxDepth, timeoutMs, bookPtr, weak } = this.sanitizeOpts(opts);
 
     const allocatedMemory = mod.stringToNewUTF8(positionStr);
     let outputPointer: number;
     if (this.isHeuristic)
       outputPointer = mod._analyzeHeuristic(
-        this.width,
-        this.height,
-        this._solverPtr,
-        allocatedMemory,
-        threads,
-        maxDepth,
-        timeoutMs,
+        this.width, this.height, this._solverPtr, allocatedMemory,
+        threads, maxDepth, timeoutMs,
       );
     else
       outputPointer = mod._analyzeExact(
-        this.width,
-        this.height,
-        this._solverPtr,
-        allocatedMemory,
-        (weak ? 1 : 0) as unknown as boolean,
-        threads,
-        bookPtr,
-        timeoutMs,
+        this.width, this.height, this._solverPtr, allocatedMemory,
+        (weak ? 1 : 0) as unknown as boolean, threads, bookPtr, timeoutMs,
       );
 
     const dataLength = 3 + this.width;
@@ -346,26 +278,9 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   }
 
   abstract init(): Promise<void>;
-  abstract analyze(
-    positionStr: string,
-    opts?: AnalyzeOptions,
-  ): PositionAnalysis | Promise<PositionAnalysis>;
-  abstract getNodeCount(): number;
+  abstract analyze(positionStr: string, opts?: AnalyzeOptions): Promise<PositionAnalysis>;
+  abstract solve(positionStr: string, opts?: AnalyzeOptions & { weak?: boolean }): Promise<PositionAnalysis>;
+  abstract getNodeCount(): Promise<number>;
   abstract stop(): void;
   abstract release(): void;
-  unload(): void {
-    this.release();
-  }
-  async analyzeAsync(
-    positionStr: string,
-    opts?: AnalyzeOptions,
-  ): Promise<PositionAnalysis> {
-    return this.analyze(positionStr, opts);
-  }
-  async solveAsync(
-    positionStr: string,
-    opts?: AnalyzeOptions & { weak?: boolean },
-  ): Promise<PositionAnalysis> {
-    return this.solve(positionStr, opts);
-  }
 }

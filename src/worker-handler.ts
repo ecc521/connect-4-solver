@@ -27,7 +27,7 @@ export function setupWorkerHandler(): void {
     const { id, type, payload } = e.data;
     
     // Pass to Emscripten pthread handler if it's not our message type
-    if (!type || !["init-threaded", "loadBook", "analyze", "solve", "stop", "unload"].includes(type)) {
+    if (!type || !["init-threaded", "loadBook", "analyze", "solve", "stop", "unload", "getNodeCount"].includes(type)) {
       if (existingHandler) {
         return existingHandler.call(self, e);
       }
@@ -59,6 +59,9 @@ export function setupWorkerHandler(): void {
       } else if (type === "unload") {
         if (solver) solver.release();
         self.postMessage({ id, success: true });
+      } else if (type === "getNodeCount") {
+        const count = solver ? await solver.getNodeCount() : 0;
+        self.postMessage({ id, success: true, result: count });
       }
     } catch (err: unknown) {
       const error = err as Error;
@@ -104,6 +107,9 @@ export function setupNoSABWorkerHandler(): void {
       } else if (type === "unload") {
         if (solver) solver.release();
         self.postMessage({ id, success: true });
+      } else if (type === "getNodeCount") {
+        const count = solver ? await solver.getNodeCount() : 0;
+        self.postMessage({ id, success: true, result: count });
       }
     } catch (err: unknown) {
       const error = err as Error;

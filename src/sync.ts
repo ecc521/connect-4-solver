@@ -54,13 +54,13 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     return Promise.resolve();
   }
 
-  analyze(positionStr: string, opts?: AnalyzeOptions): PositionAnalysis {
+  analyze(positionStr: string, opts?: AnalyzeOptions): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
     const mod = getNoSABModule();
     // Force 1 thread since it's NoSAB
     const finalOpts = { ...opts, threads: 1 };
     const resArr = this.executeWasmAnalyze(mod, positionStr, finalOpts);
-    return this.parseResArr(resArr, positionStr);
+    return Promise.resolve(this.parseResArr(resArr, positionStr));
   }
 
   async loadBook(_data: Uint8Array): Promise<void> {
@@ -112,19 +112,26 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
   }
 
   stop(): void {
+    // NOTE: this is effectively a no-op while analyze()/solve() is running.
+    // The worker's JS event loop is blocked by the synchronous WASM call, so the
+    // "stop" message sent by AbstractAsyncWebWorkerSolver.stop() sits in the queue
+    // and cannot be dispatched until the WASM function returns.
+    //
+    // Use timeoutMs instead — it is set before the search starts and is polled
+    // by the C++ negamax loop internally, requiring no JS interop.
     if (!this.initialized) return;
     const mod = getNoSABModule();
     mod._stopSolver(this.width, this.height, this._solverPtr, this.isHeuristic);
   }
 
-  getNodeCount(): number {
-    if (!this.initialized) return 0;
+  getNodeCount(): Promise<number> {
+    if (!this.initialized) return Promise.resolve(0);
     const mod = getNoSABModule();
-    return mod._getNodeCount(
+    return Promise.resolve(mod._getNodeCount(
       this.width,
       this.height,
       this._solverPtr,
       this.isHeuristic,
-    );
+    ));
   }
 }

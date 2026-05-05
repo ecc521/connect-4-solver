@@ -377,19 +377,19 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     this.initialized = false;
   }
 
-  getNodeCount(): number {
-    if (!this.initialized) return 0;
+  getNodeCount(): Promise<number> {
+    if (!this.initialized) return Promise.resolve(0);
     const native = getNativeModule();
     if (native) {
-      return Number(
+      return Promise.resolve(Number(
         native._getNodeCount(
           this.width,
           this.height,
           this._solverPtr,
           this.isHeuristic,
         ),
-      );
+      ));
     }
-    return 0;
+    return Promise.resolve(0);
   }
 }

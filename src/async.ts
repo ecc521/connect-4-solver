@@ -1,5 +1,7 @@
 import { PositionAnalysis, Connect4SolverOptions, AnalyzeOptions, BaseConnect4Solver } from "./core.js";
 
+
+
 export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
   private worker: Worker;
   private messageId = 0;
@@ -8,7 +10,6 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
     { resolve: (val: unknown) => void; reject: (err: unknown) => void }
   >();
   private initPromise: Promise<void>;
-
 
   constructor(
     worker: Worker,
@@ -79,13 +80,6 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
     }) as Promise<PositionAnalysis>;
   }
 
-  async analyzeAsync(
-    positionStr: string,
-    opts?: AnalyzeOptions,
-  ): Promise<PositionAnalysis> {
-    return this.analyze(positionStr, opts);
-  }
-
   async solve(
     positionStr: string,
     opts?: AnalyzeOptions & { weak?: boolean },
@@ -96,31 +90,16 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
     }) as Promise<PositionAnalysis>;
   }
 
-  async solveAsync(
-    positionStr: string,
-    opts?: AnalyzeOptions & { weak?: boolean },
-  ): Promise<PositionAnalysis> {
-    return this.solve(positionStr, opts);
-  }
-
   stop(): void {
-    this.sendMessage("stop").catch(() => {
-      /* ignore */
-    });
+    this.sendMessage("stop").catch(() => { /* ignore */ });
   }
 
   release(): void {
-    this.sendMessage("unload").catch(() => {
-      /* ignore */
-    });
+    this.sendMessage("unload").catch(() => { /* ignore */ });
   }
 
-  unload(): void {
-    this.release();
-  }
-
-  getNodeCount(): number {
-    return 0; // Async worker doesn't support synchronous node count
+  async getNodeCount(): Promise<number> {
+    return this.sendMessage("getNodeCount") as Promise<number>;
   }
 }
 

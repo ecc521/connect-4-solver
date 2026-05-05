@@ -59,24 +59,34 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     return Promise.resolve();
   }
 
-  analyze(positionStr: string, opts?: AnalyzeOptions): PositionAnalysis {
+  analyze(positionStr: string, opts?: AnalyzeOptions): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
     const mod = getThreadedModule();
     const resArr = this.executeWasmAnalyze(mod, positionStr, opts);
-    return this.parseResArr(resArr, positionStr);
+    return Promise.resolve(this.parseResArr(resArr, positionStr));
   }
 
   solve(
     positionStr: string,
     opts?: AnalyzeOptions & { weak?: boolean },
-  ): PositionAnalysis {
+  ): Promise<PositionAnalysis> {
     if (!this.initialized) throw new Error("Call init() first.");
     const mod = getThreadedModule();
     const resArr = this.executeWasmSolve(mod, positionStr, opts);
-    return this.parseSolveResArr(resArr, positionStr);
+    return Promise.resolve(this.parseSolveResArr(resArr, positionStr));
   }
 
   stop(): void {
+    // NOTE: this is effectively a no-op while analyze()/solve() is running.
+    // The worker's JS event loop is blocked by the synchronous WASM call, so the
+    // "stop" message sent by AbstractAsyncWebWorkerSolver.stop() sits in the queue
+    // and cannot be dispatched until the WASM function returns.
+    //
+    // Emscripten pthreads share memory, but _stopSolver still cannot be called from
+    // the blocked JS thread while the search is in flight.
+    //
+    // Use timeoutMs instead — it is set before the search starts and is polled
+    // by the C++ negamax loop internally, requiring no JS interop.
     if (!this.initialized) return;
     const mod = getThreadedModule();
     mod._stopSolver(this.width, this.height, this._solverPtr, this.isHeuristic);
@@ -117,14 +127,14 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     this.initialized = false;
   }
 
-  getNodeCount(): number {
-    if (!this.initialized) return 0;
+  getNodeCount(): Promise<number> {
+    if (!this.initialized) return Promise.resolve(0);
     const mod = getThreadedModule();
-    return mod._getNodeCount(
+    return Promise.resolve(mod._getNodeCount(
       this.width,
       this.height,
       this._solverPtr,
       this.isHeuristic,
-    );
+    ));
   }
 }
