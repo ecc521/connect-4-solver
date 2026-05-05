@@ -10,6 +10,8 @@
 #include "Position.hpp"
 
 using namespace GameSolver::Connect4;
+using C4Solver = Solver<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>;
+using C4OpeningBook = OpeningBookBase<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>;
 
 // Mutex for writing to the CSV output safely
 std::mutex out_mutex;
@@ -34,7 +36,7 @@ Position generate_random_position(int moves, std::mt19937& rng) {
 
 // Function to dump definitive Win/Loss bounds from the Transposition Table
 template <typename SlotType>
-void dump_cache(const std::shared_ptr<TranspositionTable<SlotType, uint8_t, SolverImpl<SlotType>::VALUE_BITS>>& transTable, std::ofstream& out) {
+void dump_cache(const std::shared_ptr<TranspositionTable<SlotType, uint8_t, SolverImpl<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO, SlotType>::VALUE_BITS>>& transTable, std::ofstream& out) {
     size_t size = transTable->getSize();
     int exported = 0;
 
@@ -51,11 +53,11 @@ void dump_cache(const std::shared_ptr<TranspositionTable<SlotType, uint8_t, Solv
 }
 
 void worker_thread(int id, int num_positions, int depth, std::atomic<int>& progress) {
-    auto cache = Solver::createCache(128 * 1024 * 1024); // 128MB cache per thread
-    auto solver = Solver::createWithCache(cache.get());
+    auto cache = C4Solver::createCache(128 * 1024 * 1024); // 128MB cache per thread
+    auto solver = C4Solver::createWithCache(cache.get());
     
     // Inject the depth-14 dense book to instantly return exact scores for early branches
-    auto book = GameSolver::Connect4::OpeningBookBase::load("../data/7x6_ef14.book", 7, 6);
+    auto book = C4OpeningBook::load("../data/7x6_ef14.book", 7, 6);
     
     std::mt19937 rng(std::random_device{}() + id);
 
@@ -71,7 +73,7 @@ void worker_thread(int id, int num_positions, int depth, std::atomic<int>& progr
         if (P.canWinNext()) continue;
 
         // Weak solve to quickly populate cache with exact bounds
-        int score = solver->solve(P, true, book.get());
+        int score = solver->solve(P, true, 1, book.get()).score;
 
         out << P.key() << "," << score << "\n";
 

@@ -24,6 +24,8 @@
 #include <string>
 
 using namespace GameSolver::Connect4;
+using C4Solver = Solver<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>;
+using C4OpeningBook = OpeningBookBase<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>;
 
 /**
  * Main function.
@@ -37,7 +39,7 @@ using namespace GameSolver::Connect4;
  *  will generate an error message to standard error and an empty line to standard output.
  */
 int main(int argc, char** argv) {
-  std::unique_ptr<Solver> solver;
+  std::unique_ptr<C4Solver> solver;
   bool weak = false;
   bool analyze = false;
   int cores = 1;
@@ -61,18 +63,18 @@ int main(int argc, char** argv) {
       }
     }
   }
-  auto cache = Solver::createCache(memory_bytes);
-  if (!solver) solver = Solver::createWithCache(cache.get());
-  std::unique_ptr<OpeningBookBase<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>> book = nullptr;
+  auto cache = C4Solver::createCache(memory_bytes);
+  if (!solver) solver = C4Solver::createWithCache(cache.get());
+  std::unique_ptr<C4OpeningBook> book = nullptr;
   if (!opening_book.empty()) {
-    book = OpeningBookBase<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>::load(opening_book, BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO);
+    book = C4OpeningBook::load(opening_book, BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO);
   }
 
   if (cores > 1) {
     std::mutex io_mutex;
     
     auto worker = [&]() {
-      auto local_solver = Solver::createWithCache(cache.get());
+      auto local_solver = C4Solver::createWithCache(cache.get());
 
       while (true) {
         std::string current_line;

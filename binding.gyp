@@ -37,6 +37,9 @@
         ['use_pgo=="true" and OS!="mac"', {
           "cflags_cc": [ "-flto", "-fprofile-use" ],
           "ldflags": [ "-flto", "-fprofile-use" ]
+        }],
+        ['OS=="linux"', {
+          "libraries": [ "-latomic" ]
         }]
       ]
     }

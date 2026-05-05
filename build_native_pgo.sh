@@ -13,7 +13,11 @@ set -e
 
 # We use clang++ because it has standard support for PGO on both macOS and Linux.
 CXX="clang++"
-if ! command -v clang++ &> /dev/null; then
+LLVM_PROFDATA="llvm-profdata"
+if [ "$EMSDK_PGO" = "1" ] && [ -x "/opt/emsdk/upstream/bin/clang++" ]; then
+    CXX="/opt/emsdk/upstream/bin/clang++"
+    LLVM_PROFDATA="/opt/emsdk/upstream/bin/llvm-profdata"
+elif ! command -v clang++ &> /dev/null; then
     CXX="g++"
 fi
 
@@ -38,7 +42,7 @@ echo "════════════════════════�
 echo " PGO Phase 1: Compiling Instrumented Binaries"
 echo "═══════════════════════════════════════════════"
 
-if [ "$CXX" = "clang++" ]; then
+if [[ "$CXX" == *"clang++"* ]]; then
     GEN_FLAGS="-fprofile-instr-generate -fcoverage-mapping -fprofile-update=atomic"
     USE_FLAGS="-fprofile-instr-use=default.profdata"
 else
@@ -71,7 +75,7 @@ echo "════════════════════════�
 # Sizes with 0 valid positions will exit non-zero; that's fine
 for SIZE in "${SIZES[@]}"; do
     echo "  Profiling ${SIZE}..."
-    LLVM_PROFILE_FILE="${SIZE}.profraw" ./tools/benchmarks/bench_native_${SIZE}_pgo --pgo --budget 10000 2>/dev/null || true
+    LLVM_PROFILE_FILE="${SIZE}.profraw" ./tools/benchmarks/bench_native_${SIZE}_pgo --pgo --budget 500 2>/dev/null || true
 done
 
 echo ""
@@ -79,13 +83,13 @@ echo "════════════════════════�
 echo " PGO Phase 3: Merging Profile Data"
 echo "═══════════════════════════════════════════════"
 
-if [ "$CXX" = "clang++" ]; then
+if [[ "$CXX" == *"clang++"* ]]; then
     PROFRAW_FILES=""
     for SIZE in "${SIZES[@]}"; do
         PROFRAW_FILES="${PROFRAW_FILES} ${SIZE}.profraw"
     done
     xcrun llvm-profdata merge -output=default.profdata $PROFRAW_FILES 2>/dev/null || \
-        llvm-profdata merge -output=default.profdata $PROFRAW_FILES
+        $LLVM_PROFDATA merge -output=default.profdata $PROFRAW_FILES
     echo "  Merged into default.profdata"
 fi
 

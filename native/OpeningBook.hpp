@@ -469,4 +469,5 @@ inline std::vector<uint8_t> OpeningBookBase<W, H>::serialize_elias_fano(int dept
 
 } // namespace Connect4
 } // namespace GameSolver
+
 #endif

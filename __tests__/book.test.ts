@@ -11,6 +11,12 @@ describe("Polymorphic Dense Book Packing", () => {
   const d20Path = path.join(__dirname, "..", "data", "7x6_dense20.book");
 
   beforeAll(() => {
+    // Ensure data directory exists
+    const dataDir = path.join(__dirname, "..", "data");
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+
     // Valid connect 4 positions with arbitrary scores
     const positions = [
       "1 1",

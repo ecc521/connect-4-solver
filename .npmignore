@@ -1,0 +1,18 @@
+# Exclude the entire data directory (books, datasets, models)
+data/
+
+# Exclude Android and iOS build artifacts and caches
+android/build/
+android/.cxx/
+android/.gradle/
+ios/build/
+ios/Pods/
+ios/.symlinks/
+
+# Exclude PGO artifacts if they leak
+*.profraw
+*.profdata
+
+# Exclude local scratch files
+patch*.js
+test-ptrs.*

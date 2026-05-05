@@ -106,18 +106,17 @@ npm run bench:book                       # Opening book lookup benchmark
 
 ### PGO Builds (Profile-Guided Optimization)
 
-PGO yields ~2% throughput improvement on native and ~30% on WASM by optimizing branch prediction and instruction caching.
+Native Node.js environments support PGO for maximum C++ throughput. (PGO yields mixed results, typically providing ~2% improvement on `bench:native`).
+
+> [!WARNING]
+> WebAssembly PGO has been intentionally removed from this repository. While Emscripten supports LLVM PGO, the aggressively inlined code inflates the WASM binary AST size beyond V8's optimization limits. This causes TurboFan to abort JIT compilation ("bailout"), forcing the engine to run the core solver loop in the baseline Liftoff interpreter, resulting in catastrophic performance regressions (often 30-80% slower).
 
 ```bash
 # Native PGO
 npm run build:native:pgo
 
-# WASM PGO
-npm run build:wasm:pgo
-
 # A/B comparison (builds baseline → runs bench → builds PGO → runs bench again)
 npm run bench:pgo:native
-npm run bench:pgo:wasm
 ```
 
 ## npm Scripts Reference
@@ -129,14 +128,12 @@ npm run bench:pgo:wasm
 | `npm run build:native`         | Recompile native C++ addon            |
 | `npm run build:native:pgo`     | PGO-optimized native build            |
 | `npm run build:wasm`           | Compile WASM module                   |
-| `npm run build:wasm:pgo`       | PGO-optimized WASM build              |
 | `npm test`                     | Lint + Jest unit tests                |
 | `npm run bench` / `bench:node` | Benchmark via Node.js native addon    |
 | `npm run bench:wasm`           | Benchmark via WASM                    |
 | `npm run bench:cpp`            | Benchmark raw C++ engine (no Node.js) |
 | `npm run bench:book`           | Opening book benchmark                |
 | `npm run bench:pgo:native`     | PGO A/B comparison (native)           |
-| `npm run bench:pgo:wasm`       | PGO A/B comparison (WASM)             |
 | `npm run docs:dev`             | Local VitePress dev server            |
 
 ## Board Size Support
