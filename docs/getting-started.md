@@ -67,7 +67,7 @@ async function run() {
 
   // Always free native memory when finished
   book.unload();
-  solver.unload();
+  solver.release();
 }
 
 run();
@@ -113,7 +113,7 @@ async function run() {
 
   // Always free native memory
   book.unload();
-  solver.unload();
+  solver.release();
 }
 
 run();
@@ -153,7 +153,7 @@ async function run() {
 
   // Always free native memory
   book.unload();
-  solver.unload();
+  solver.release();
 }
 
 run();
@@ -176,8 +176,8 @@ async function run() {
   });
   await solver.init();
 
-  // ⚠️ Blocks the main thread until it finishes resolving!
-  const result = solver.analyze("4424", { book });
+  // ⚠️ Blocks the main thread until analysis resolves (no WebWorker)
+  const result = await solver.analyze("4424", { book });
 
   if (result.evaluation) {
     if (result.evaluation.outcome === Outcome.Win) {
@@ -191,7 +191,7 @@ async function run() {
 
   // Always free native memory
   book.unload();
-  solver.unload();
+  solver.release();
 }
 
 run();
@@ -227,6 +227,6 @@ If you only care about the **outcome** (Win/Loss/Draw) and not finding the absol
 ## Next Steps
 
 - **[Solution Books](/solution-books)** — Required for practical exact solving on 7x6 and larger boards.
-- **[Memory & Threading](/cache)** — Cache sizing, multithreading, and `unload()` lifecycle.
+- **[Memory & Threading](/cache)** — Cache sizing, multithreading, and `release()` lifecycle.
 - **[WebWorker Solvers](/api/webworker-solvers)** — Non-blocking browser integration.
 - **[API Reference](/api/base-solver)** — Full method signatures and return types.
