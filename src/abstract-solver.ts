@@ -39,7 +39,11 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     return nbMoves % 2 === 0 ? Player.P1 : Player.P2;
   }
 
-  protected createEvaluation(score: number, nbMoves: number, isHeuristicOverride?: boolean): Evaluation {
+  protected createEvaluation(
+    score: number,
+    nbMoves: number,
+    isHeuristicOverride?: boolean,
+  ): Evaluation {
     const isPlayer1Turn = nbMoves % 2 === 0;
     const currentPlayer = isPlayer1Turn ? Player.P1 : Player.P2;
     const opponent = isPlayer1Turn ? Player.P2 : Player.P1;
@@ -116,7 +120,8 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
 
     // The heuristic engine uses -1000000 for unplayable columns.
     // However, some versions might return UNPLAYABLE_COLUMN_SCORE (-1000) as well.
-    const isUnplayable = (n: number): boolean => n === -1000000 || n === UNPLAYABLE_COLUMN_SCORE;
+    const isUnplayable = (n: number): boolean =>
+      n === -1000000 || n === UNPLAYABLE_COLUMN_SCORE;
 
     if (status === STATUS_INVALID) {
       currentPosition = positionStr.slice(0, nbMoves);
@@ -149,7 +154,9 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     const depthReached = resArr[2 + this.width];
     const aborted = resArr[3 + this.width] === 1;
 
-    const nodes = (resArr[4 + this.width] >>> 0) + (resArr[5 + this.width] >>> 0) * 4294967296;
+    const nodes =
+      (resArr[4 + this.width] >>> 0) +
+      (resArr[5 + this.width] >>> 0) * 4294967296;
 
     let bestMove: number | undefined;
     if (evaluation && !aborted) {

@@ -19,8 +19,8 @@ In those environments, the explicit base `NodeConnect4Solver` and `ReactNativeCo
 **Implements:** [`BaseConnect4Solver`](./base-solver)
 
 ```typescript
-new WebWorkerWasmConnect4Solver(worker: Worker, options: { width: number, height: number, cacheSizeMb?: number, heuristic?: boolean });
-new WebWorkerWasmNoSABConnect4Solver(worker: Worker, options: { width: number, height: number, cacheSizeMb?: number, heuristic?: boolean });
+new WebWorkerWasmConnect4Solver(workerProvider: () => Worker, options: { width: number, height: number, cacheSizeMb?: number, heuristic?: boolean });
+new WebWorkerWasmNoSABConnect4Solver(workerProvider: () => Worker, options: { width: number, height: number, cacheSizeMb?: number, heuristic?: boolean });
 ```
 
 ### Which class should I use? (SharedArrayBuffer)
@@ -62,13 +62,14 @@ On your main UI thread, instantiate the worker using your framework's native `ne
 // App.tsx
 import { WebWorkerWasmNoSABConnect4Solver } from "connect-4-solver/async";
 
-// 1. Instantiate the Worker using your NoSAB worker file
-const worker = new Worker(new URL("./c4-worker-nosab.ts", import.meta.url), {
-  type: "module",
-});
+// 1. Define the Worker Factory using your NoSAB worker file
+const workerProvider = () =>
+  new Worker(new URL("./c4-worker-nosab.ts", import.meta.url), {
+    type: "module",
+  });
 
-// 2. Wrap it with the Async Solver
-const solver = new WebWorkerWasmNoSABConnect4Solver(worker, {
+// 2. Pass the factory to the Async Solver
+const solver = new WebWorkerWasmNoSABConnect4Solver(workerProvider, {
   width: 7,
   height: 6,
 });
@@ -88,8 +89,12 @@ The worker-handler supports heuristics and threads automatically via `init()`. J
 ```typescript
 import { WebWorkerWasmConnect4Solver } from "connect-4-solver/async";
 
+// Define your factory once
+const workerProvider = () =>
+  new Worker(new URL("./c4-worker.ts", import.meta.url));
+
 // Offload the PThread WASM engine to a WebWorker
-const threadedSolver = new WebWorkerWasmConnect4Solver(worker, {
+const threadedSolver = new WebWorkerWasmConnect4Solver(workerProvider, {
   width: 7,
   height: 6,
 });
@@ -97,7 +102,7 @@ await threadedSolver.init();
 await threadedSolver.analyze("1122", { threads: 4 });
 
 // Offload the Heuristic WASM engine
-const heuristicSolver = new WebWorkerWasmConnect4Solver(worker, {
+const heuristicSolver = new WebWorkerWasmConnect4Solver(workerProvider, {
   width: 7,
   height: 6,
   heuristic: true,
@@ -106,6 +111,8 @@ await heuristicSolver.init();
 await heuristicSolver.analyze("1122");
 ```
 
-::: tip 💡 Memory Management
-When you are completely finished with an async solver, you can call `solver.unload()` to safely destroy the WASM pointers. However, because the WebWorker runs in a completely isolated memory space, simply calling `worker.terminate()` from your main thread will also instantly destroy the entire WASM module and its caches!
+::: tip 💡 Memory Management & Stopping
+When you are completely finished with an async solver, you can call `solver.unload()` to safely destroy the WASM pointers.
+
+Because synchronous WASM execution blocks the WebWorker's event loop, the standard `stop()` signal is only reliable if the solver can terminate and restart the worker. This is why the **worker factory** is mandatory: calling `solver.stop()` will terminate the active worker and immediately spawn a fresh one via your factory, ensuring the engine remains responsive for the next analysis.
 :::

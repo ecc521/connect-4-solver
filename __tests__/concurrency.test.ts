@@ -6,7 +6,7 @@ describe("Solver Concurrency Guard", () => {
     const solver = new NodeConnect4Solver();
     await solver.init();
 
-    // Start a search on a 7x6 board with a position that takes a bit of time 
+    // Start a search on a 7x6 board with a position that takes a bit of time
     // to ensure we can catch it in the middle.
     // "112233" is a simple position.
     const p1 = solver.solve("112233");

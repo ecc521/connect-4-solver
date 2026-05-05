@@ -87,13 +87,14 @@ async function run() {
   const bookBuffer = new Uint8Array(await res.arrayBuffer());
   const book = await OpeningBook.fromBuffer(bookBuffer);
 
-  // 1. Instantiate the Worker (Syntax may vary based on your bundler, e.g. Vite)
-  const worker = new Worker(new URL("./c4-worker.ts", import.meta.url), {
-    type: "module",
-  });
+  // 1. Define the Worker Factory (Syntax may vary based on your bundler, e.g. Vite)
+  const workerProvider = () =>
+    new Worker(new URL("./c4-worker.ts", import.meta.url), {
+      type: "module",
+    });
 
   // 2. Wrap it with the Async Solver matching the book's size
-  const solver = new WebWorkerWasmConnect4Solver(worker, {
+  const solver = new WebWorkerWasmConnect4Solver(workerProvider, {
     width: book.width,
     height: book.height,
   });

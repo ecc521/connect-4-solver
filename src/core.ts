@@ -280,7 +280,7 @@ export abstract class BaseConnect4Solver {
   abstract loadBook(data: Uint8Array): Promise<void>;
   /**
    * Signals the solver to abort the current search.
-   * NOTE: This is only supported on Node.js. On WASM/React Native, the JS thread is blocked during search.
+   * NOTE: This forcefully stops the solver. For Web Workers, it will terminate and restart the worker thread. Pending promises will resolve with { aborted: true }.
    * Use timeoutMs to guarantee a maximum search time on those platforms.
    */
   abstract stop(): void;

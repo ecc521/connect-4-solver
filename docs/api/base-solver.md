@@ -58,8 +58,7 @@ Unlike `analyze()`, which evaluates every possible column to create a heat-map, 
 Signals the solver to abort the current search.
 
 > [!IMPORTANT]
-> `stop()` is only supported on **Node.js native**. On WASM and React Native, the JS thread is blocked during search, so the signal cannot be received. Use `timeoutMs` to guarantee a maximum search time across all platforms.
-
+> `stop()` forcefully terminates the solver. For **Node.js native** and **React Native**, it interrupts the background thread. For **Web Workers**, it will hard-terminate and restart the worker to interrupt blocking WASM calculations. Pending promises will resolve with `{ aborted: true }`.
 
 ### `getNodeCount()`
 

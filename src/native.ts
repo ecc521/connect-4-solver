@@ -36,12 +36,7 @@ interface NativeSolverType {
   ): void;
   createBookFromBuffer(w: number, h: number, base64: string): string;
   destroyBook(w: number, h: number, bookPtr: string): void;
-  stop(
-    solverPtr: string,
-    w: number,
-    h: number,
-    heuristic: boolean,
-  ): void;
+  stop(solverPtr: string, w: number, h: number, heuristic: boolean): void;
   // Exact analysis — returns [status, nbMoves, col0..colN-1, aborted]
   analyze(
     solverPtr: string,
@@ -178,7 +173,11 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     });
   }
 
-  private createEvaluation(score: number, nbMoves: number, isHeuristicOverride?: boolean): Evaluation {
+  private createEvaluation(
+    score: number,
+    nbMoves: number,
+    isHeuristicOverride?: boolean,
+  ): Evaluation {
     const isPlayer1Turn = nbMoves % 2 === 0;
     const currentPlayer = isPlayer1Turn ? Player.P1 : Player.P2;
     const opponent = isPlayer1Turn ? Player.P2 : Player.P1;
