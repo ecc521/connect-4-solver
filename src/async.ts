@@ -1,4 +1,4 @@
-import { PositionAnalysis, Connect4SolverOptions } from "./index";
+import { PositionAnalysis, Connect4SolverOptions, AnalyzeOptions } from "./core";
 
 export abstract class AbstractAsyncWebWorkerSolver {
   private worker: Worker;
@@ -77,12 +77,7 @@ export abstract class AbstractAsyncWebWorkerSolver {
 
   async analyze(
     positionStr: string,
-    opts?: {
-      threads?: number;
-      maxDepth?: number;
-      timeoutMs?: number;
-      book?: unknown;
-    },
+    opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis> {
     return this.sendMessage("analyze", {
       position: positionStr,
@@ -92,12 +87,7 @@ export abstract class AbstractAsyncWebWorkerSolver {
 
   async solve(
     positionStr: string,
-    opts?: {
-      weak?: boolean;
-      maxDepth?: number;
-      timeoutMs?: number;
-      book?: unknown;
-    },
+    opts?: AnalyzeOptions & { weak?: boolean },
   ): Promise<PositionAnalysis> {
     return this.sendMessage("solve", {
       position: positionStr,
