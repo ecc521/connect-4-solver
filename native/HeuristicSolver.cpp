@@ -36,7 +36,7 @@ HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TransTable> cach
 template <int WIDTH, int HEIGHT>
 int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc, uint32_t& localCount) {
   if (P.canWinNext()) {
-      return 31000 + (WIDTH * HEIGHT + 1 - (P.nbMoves() + 1)) / 2;
+      return 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
   }
 
   if (depth <= 0) {
@@ -66,7 +66,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   auto moves = P.possibleNonLosingMoves();
   if (moves == 0) {
       if (P.nbMoves() == WIDTH * HEIGHT) return 0; // Board is full, it's a draw.
-      return -31000 - (WIDTH * HEIGHT + 2 - P.nbMoves()) / 2;
+      return -31000 - (WIDTH * HEIGHT - P.nbMoves()) / 2;
   }
 
   struct Move {
@@ -139,7 +139,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
   } guard{this->isSearching};
 
   if(P.canWinNext()) {
-    int score = 31000 + (WIDTH * HEIGHT + 2 - (P.nbMoves() + 1)) / 2;
+    int score = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
     for (int i = 0; i < WIDTH; i++) {
         if (P.canPlay(i) && P.isWinningMove(i)) return {score, i, (int)P.nbMoves(), getNodeCount()};
     }
@@ -200,7 +200,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
         int score = -40000;
 
         if (P.isWinningMove(col)) {
-          score = 31000 + (WIDTH * HEIGHT + 2 - (P.nbMoves() + 1)) / 2;
+          score = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
         } else {
           GenericPosition<WIDTH, HEIGHT> P2(P);
           P2.playCol(col);
