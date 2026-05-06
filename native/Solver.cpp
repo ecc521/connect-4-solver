@@ -58,7 +58,9 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
   if (shouldAbort(abort_flag)) [[unlikely]] return 0;
 
   assert(alpha < beta);
-  assert(!P.canWinNext());
+  if (P.canWinNext()) {
+    return (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
+  }
 
   if (++solverTlNodeCount >= 16384) [[unlikely]] {
     nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
