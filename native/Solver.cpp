@@ -442,8 +442,8 @@ template <int WIDTH, int HEIGHT, typename SlotType>
   // Main thread also searches (thread 0, no perturbation)
   solverTlNodeCount = 0;
   ::GameSolver::Connect4::SolverResult r;
-  if (book) r = solve_single<true>(P, weak, book, book->getDepth(), &done);
-  else r = solve_single<false>(P, weak, book, 0, &done);
+  if (active_book) r = solve_single<true>(P, weak, active_book, active_book->getDepth(), &done);
+  else r = solve_single<false>(P, weak, nullptr, 0, &done);
   nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
   solverTlNodeCount = 0;
   
@@ -455,8 +455,7 @@ template <int WIDTH, int HEIGHT, typename SlotType>
   fut.wait();
   final_result.nodes = getNodeCount();
   // If stopSearch was set externally (stop() or timeout), flag the result as aborted.
-  // Don't flag as aborted when it was set by normal Lazy SMP completion (done flag).
-  final_result.aborted = isAborted() && !done.load(std::memory_order_relaxed);
+  final_result.aborted = isAborted();
 
   return final_result;
 }

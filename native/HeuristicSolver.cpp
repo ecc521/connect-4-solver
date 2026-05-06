@@ -69,6 +69,17 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
       return -31000 - (WIDTH * HEIGHT - P.nbMoves()) / 2;
   }
 
+  // Forced move fast-path: only one legal move, skip TT write to avoid cache pollution.
+  if ((moves & (moves - 1)) == 0) {
+    if (localCount > 0) localCount--;
+    GenericPosition<WIDTH, HEIGHT> P2(P);
+    P2.play(moves);
+    NNUEAccumulator<WIDTH, HEIGHT> next_acc = acc;
+    unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(moves);
+    next_acc.addPiece(P.nbMoves() % 2, bit_idx / (HEIGHT + 1), bit_idx % (HEIGHT + 1));
+    return -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, next_acc, localCount);
+  }
+
   struct Move {
     typename GenericPosition<WIDTH, HEIGHT>::position_t move;
     int score;
@@ -84,7 +95,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
 
       GenericPosition<WIDTH, HEIGHT> child(P);
       child.play(m);
-      this->transTable->prefetch(child.key());
+      this->transTable->prefetch(child.symmetric_key());
     }
   }
   std::sort(sorted_moves, sorted_moves + n_moves, [](const Move &a, const Move &b) {
