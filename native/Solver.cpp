@@ -349,16 +349,28 @@ flush:
 
   // PHASE 2: Fallback to hot-TT scan for best move
   if (bestMove == -1) {
-    for (int i = 0; i < WIDTH; i++) {
+    typename GenericPosition<WIDTH, HEIGHT>::position_t possible = P.possibleNonLosingMoves();
+    if (possible == 0) {
+      // If there are no non-losing moves, any playable move is equally bad.
+      for (int i = 0; i < WIDTH; i++) {
         int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
         if (P.canPlay(col)) {
-            GenericPosition<WIDTH, HEIGHT> P2(P);
-            P2.playCol(col);
-            if (negamax<HasBook>(P2, -score, -score + 1, book, book_depth) == -score) {
-                bestMove = col;
-                break;
-            }
+          bestMove = col;
+          break;
         }
+      }
+    } else {
+      for (int i = 0; i < WIDTH; i++) {
+          int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
+          if (possible & GenericPosition<WIDTH, HEIGHT>::column_mask(col)) {
+              GenericPosition<WIDTH, HEIGHT> P2(P);
+              P2.playCol(col);
+              if (negamax<HasBook>(P2, -score, -score + 1, book, book_depth) == -score) {
+                  bestMove = col;
+                  break;
+              }
+          }
+      }
     }
   }
 

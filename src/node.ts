@@ -159,20 +159,20 @@ export class NativeCache {
     const native = getNativeModule();
     if (!native) throw new Error("Native module not loaded");
 
-    // OOM retry: native._createCache returns 0 if allocation fails. Halve the request until it succeeds.
     let sizeMb = cacheSizeMb;
-    let ptr = 0;
-    while (sizeMb >= 64) {
+    let ptr: unknown;
+    while (true) {
       ptr = native._createCache(
         width,
         height,
         sizeMb * 1024 * 1024,
         isHeuristic,
-      ) as number;
-      if (ptr !== 0) break;
-      sizeMb = Math.floor(sizeMb / 2);
+      );
+      if (ptr) break;
+      if (sizeMb <= 4) break;
+      sizeMb = Math.max(4, Math.floor(sizeMb / 2));
     }
-    if (ptr === 0) throw new Error(`Failed to allocate native cache (tried down to 64 MB)`);
+    if (!ptr) throw new Error(`Failed to allocate native cache`);
     this.ptr = ptr;
     this.allocatedCacheSizeMb = sizeMb;
   }
@@ -216,21 +216,21 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       this._cachePtr = this._sharedCache.ptr as number;
       this.allocatedCacheSizeMb = this.cacheSizeMb; // Assume it matches if shared
     } else {
-      // OOM retry: native._createCache returns 0 if allocation fails. Halve the request until it succeeds.
       let sizeMb = this.cacheSizeMb;
-      let ptr = 0;
-      while (sizeMb >= 64) {
+      let ptr: unknown;
+      while (true) {
         ptr = native._createCache(
           this.width,
           this.height,
           sizeMb * 1024 * 1024,
           this.isHeuristic,
-        ) as number;
-        if (ptr !== 0) break;
-        sizeMb = Math.floor(sizeMb / 2);
+        );
+        if (ptr) break;
+        if (sizeMb <= 4) break;
+        sizeMb = Math.max(4, Math.floor(sizeMb / 2));
       }
-      if (ptr === 0) throw new Error(`Failed to allocate Node.js native cache (tried down to 64 MB)`);
-      this._cachePtr = ptr;
+      if (!ptr) throw new Error(`Failed to allocate Node.js native cache`);
+      this._cachePtr = ptr as number;
       this.allocatedCacheSizeMb = sizeMb;
     }
 

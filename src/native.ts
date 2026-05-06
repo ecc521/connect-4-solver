@@ -142,7 +142,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     // OOM retry: native.createCache returns "0" if allocation fails. Halve the request until it succeeds.
     let sizeMb = this._cacheSizeMb;
     let ptrStr = "0";
-    while (sizeMb >= 64) {
+    while (true) {
       ptrStr = this._nativeModule.createCache(
         this.width,
         this.height,
@@ -150,9 +150,10 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         this._isHeuristic,
       );
       if (ptrStr !== "0") break;
-      sizeMb = Math.floor(sizeMb / 2);
+      if (sizeMb <= 4) break;
+      sizeMb = Math.max(4, Math.floor(sizeMb / 2));
     }
-    if (ptrStr === "0") throw new Error(`Failed to allocate native cache (tried down to 64 MB)`);
+    if (ptrStr === "0") throw new Error(`Failed to allocate native cache`);
     this._cachePtrStr = ptrStr;
     this.allocatedCacheSizeMb = sizeMb;
 
@@ -346,7 +347,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         }
       }
 
-      if (aborted) {
+      if (aborted && !isHeuristic) {
         evaluation = null;
         moveOptions.length = 0;
       }
@@ -436,7 +437,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         (nativeResArr[5] >>> 0) + (nativeResArr[6] >>> 0) * 4294967296;
       const aborted = nativeResArr[7] === 1;
 
-      const evaluation = aborted ? null : this.createEvaluation(score, nbMoves);
+      const evaluation = (aborted && !isHeuristic) ? null : this.createEvaluation(score, nbMoves);
 
       return {
         position: currentPosition,
