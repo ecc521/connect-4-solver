@@ -58,7 +58,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
   if (shouldAbort(abort_flag)) [[unlikely]] return 0;
 
   assert(alpha < beta);
-  if (P.canWinNext()) {
+  if (P.canWinNext()) [[unlikely]] {
     return (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
   }
 
