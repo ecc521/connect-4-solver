@@ -319,7 +319,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
         int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
         if (P.canPlay(col)) {
           if (P.isWinningMove(col)) {
-            current_scores[col] = 31000 + (WIDTH * HEIGHT + 1 - (P.nbMoves() + 1)) / 2;
+            current_scores[col] = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
           } else {
             GenericPosition<WIDTH, HEIGHT> P2(P);
             P2.playCol(col);
@@ -374,7 +374,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
     for (int i = 0; i < WIDTH; i++) {
         int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
         if (P.canPlay(col)) {
-            if(P.isWinningMove(col)) current_scores[col] = 31000 + (WIDTH * HEIGHT + 1 - (P.nbMoves() + 1)) / 2;
+            if(P.isWinningMove(col)) current_scores[col] = 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
             else {
                 GenericPosition<WIDTH, HEIGHT> P2(P);
                 P2.playCol(col);
