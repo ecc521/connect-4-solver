@@ -157,11 +157,13 @@ int main(int argc, char** argv) {
     }
     printf("OK\n");
 
-    // ── Adaptive cutover: tracked globally ───────────────────────────────────
-    // `cutover_ply` = the lowest ply at which an exact timeout has occurred.
-    // Positions with nbMoves() >= cutover_ply use the heuristic solver.
-    // Starts at INT_MAX (all positions attempted exactly first).
-    std::atomic<int> cutover_ply{INT_MAX};
+    // ── Adaptive cutover: max remaining moves for exact solving ───────────────
+    // Starts at max_ply (try exact for all positions).
+    // When a timeout occurs at remaining=N, atomically reduces to N-1.
+    // Each thread starts at remaining=0 (end of game, trivially fast) and
+    // increments, so the boundary is discovered from a safe direction.
+    // Only ever decreases — no cascade possible.
+    std::atomic<int> max_remaining_exact{max_ply};
 
     // ── Output files with resume support ─────────────────────────────────────
     // Open in append mode so an interrupted run can be resumed.
@@ -208,31 +210,37 @@ int main(int argc, char** argv) {
         auto exact_solver = ExactSolver::createWithCache(exact_cache.get());
         auto heur_solver  = HeuristicSolver<W, H>::createWithCache(heur_cache.get());
 
-        // Generate positions starting from high plies and working down.
-        // Each thread independently walks from max_ply toward 0,
-        // contributing to the globally-discovered cutover point.
-        int current_ply = max_ply - (thread_id % 8);  // slight offset per thread
+        // Each thread independently tracks how many moves remain.
+        // Start at a small offset so threads don't all probe the same depth simultaneously.
+        // remaining=0 is a terminal/near-terminal position (instant solve).
+        int current_remaining = thread_id % num_threads;
 
         while (n_total.load(std::memory_order_relaxed) < total_positions) {
-            if (current_ply < 0) current_ply = max_ply;
+            // Wrap around: after probing the full range, restart from 0.
+            if (current_remaining > max_ply) current_remaining = 0;
 
-            Pos P = make_random_position(current_ply, reinterpret_cast<std::mt19937&>(rng));
-            const int ply = P.nbMoves();
-            const int cutover = cutover_ply.load(std::memory_order_relaxed);
+            // Convert remaining moves → ply count (pieces on board)
+            const int target_ply = max_ply - current_remaining;
+            Pos P = make_random_position(target_ply, reinterpret_cast<std::mt19937&>(rng));
 
-            if (ply < cutover) {
+            const int remaining = max_ply - P.nbMoves();
+            const int max_rem   = max_remaining_exact.load(std::memory_order_relaxed);
+
+            if (remaining <= max_rem) {
                 // ── Attempt exact solve ─────────────────────────────────
                 double t0 = now_ms();
                 SolverResult res = exact_solver->solve(P, false, 1, nullptr, timeout_ms);
                 double elapsed = now_ms() - t0;
 
                 if (res.aborted || elapsed >= timeout_ms) {
-                    // Timeout occurred — update cutover
-                    int old = cutover_ply.load(std::memory_order_relaxed);
-                    while (ply < old &&
-                           !cutover_ply.compare_exchange_weak(old, ply, std::memory_order_relaxed))
+                    // Timeout: lower the cutover to remaining-1.
+                    // This is an atomic min — only decreases, never increases.
+                    int old = max_remaining_exact.load(std::memory_order_relaxed);
+                    while (remaining <= old &&
+                           !max_remaining_exact.compare_exchange_weak(
+                               old, remaining - 1, std::memory_order_relaxed))
                     {}
-                    // Fall through to heuristic for this position
+                    // Fall through: evaluate this position heuristically instead
                     goto use_heuristic;
                 }
 
@@ -257,12 +265,12 @@ int main(int argc, char** argv) {
             } else {
                 use_heuristic:
                 // ── Deep heuristic search ───────────────────────────────
-                // 2s ceiling: iterative deepening typically converges at depth 10-12
-                // for mid-game 8x8 positions in well under 500ms. This is just a safety bound.
+                // 2s ceiling — iterative deepening on mid-game positions
+                // typically converges well within 500ms.
                 SolverResult hres = heur_solver->solve(P, false, 1, nullptr, 2000.0);
                 if (hres.aborted) {
-                    --current_ply;
-                    continue;
+                    ++current_remaining;
+                    continue;  // skip, try another position
                 }
 
                 // Normalize heuristic score from NNUE range to [-1, +1]
@@ -289,15 +297,15 @@ int main(int argc, char** argv) {
             }
 
             n_total.fetch_add(1, std::memory_order_relaxed);
-            --current_ply;
+            ++current_remaining;
 
             if (n_total.load() % 10000 == 0) {
-                int co = cutover_ply.load();
-                printf("\r[%dk] exact=%dk soft=%dk  cutover_ply=%s",
+                int mr = max_remaining_exact.load();
+                printf("\r[%dk] exact=%dk soft=%dk  exact_cutover=%d remaining moves",
                     n_total.load() / 1000,
                     n_exact.load() / 1000,
                     n_soft.load() / 1000,
-                    co == INT_MAX ? "none(all exact)" : std::to_string(co).c_str());
+                    mr);
                 fflush(stdout);
             }
         }
@@ -315,11 +323,13 @@ int main(int argc, char** argv) {
     fclose(exact_file);
     fclose(soft_file);
 
-    int final_cutover = cutover_ply.load();
+    int final_cutover = max_remaining_exact.load();
     printf("\n\n=== Done ===\n");
-    printf("Exact records  : %d  -> data_exact.bin\n", n_exact.load());
-    printf("Soft records   : %d  -> data_soft.bin\n",  n_soft.load());
-    printf("Cutover ply    : %s\n",
-        final_cutover == INT_MAX ? "never triggered (all exact)" : std::to_string(final_cutover).c_str());
+    printf("Exact records       : %d  -> data_exact.bin\n", n_exact.load());
+    printf("Soft records        : %d  -> data_soft.bin\n",  n_soft.load());
+    printf("Exact cutover       : <= %d remaining moves (>= ply %d)\n",
+        final_cutover, max_ply - final_cutover);
     return 0;
 }
+
+
