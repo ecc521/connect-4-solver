@@ -91,7 +91,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         outcome: Outcome.Win,
         winner: currentPlayer,
         movesToEnd: halfMovesRemaining - score + 1,
-        score,
+        score: score >= 31000 ? score : 31000 + score,
       };
     } else {
       return {
@@ -99,7 +99,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         outcome: Outcome.Loss,
         winner: opponent,
         movesToEnd: halfMovesRemaining + score + 1,
-        score,
+        score: score <= -31000 ? score : -31000 + score,
       };
     }
   }
@@ -129,13 +129,13 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     } else if (status === STATUS_WIN) {
       currentPosition = positionStr.slice(0, nbMoves + 1);
       const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
-      const score = Math.floor((this.width * this.height - nbMoves) / 2);
+      const baseScore = Math.floor((this.width * this.height - nbMoves) / 2);
       evaluation = {
         eval: { value: Number.POSITIVE_INFINITY },
         outcome: Outcome.Win,
         winner,
         movesToEnd: 0,
-        score,
+        score: 31000 + baseScore,
       };
     } else {
       for (let i = 0; i < this.width; i++) {
@@ -212,7 +212,8 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     } else if (status === STATUS_WIN) {
       currentPosition = positionStr.slice(0, nbMoves + 1);
       const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
-      const score = Math.floor((this.width * this.height - nbMoves) / 2);
+      const baseScore = Math.floor((this.width * this.height - nbMoves) / 2);
+      const adjustedScore = 31000 + baseScore;
       evaluation = {
         eval: {
           value:
@@ -223,7 +224,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         outcome: winner === currentPlayer ? Outcome.Win : Outcome.Loss,
         winner,
         movesToEnd: positionStr.length - (nbMoves + 1),
-        score: winner === currentPlayer ? score : -score,
+        score: winner === currentPlayer ? adjustedScore : -adjustedScore,
       };
     } else {
       const score = resArr[2];
