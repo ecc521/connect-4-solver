@@ -1,115 +1,134 @@
 """
-train_nnue.py — NNUE training on exact solver scores.
+train_nnue.py — NNUE training on hybrid exact + soft-label datasets.
 
-Target: exact minimax score in [-32, +32] for 8x8.
-Loss:   MSE only. No BCE/WDL mixing.
-Scale:  Raw integer score — no division by 200, no clipping.
+Accepts two types of .bin files:
+  --exact  data_exact.bin  : 20 bytes/record: uint64 pos, uint64 opp, int16 score, int16 pad
+                             score in [-32, +32] for 8x8. Normalized by dividing by MAX_SCORE.
+  --soft   data_soft.bin   : 20 bytes/record: uint64 pos, uint64 opp, float32 score, int32 pad
+                             score already normalized to [-1.0, +1.0].
 
-Binary record format (20 bytes each):
-  uint64 pos, uint64 opp, int16 search_score, int16 exact_wdl
+Loss weighting: exact records receive 1.0x weight, soft records 0.3x weight.
+
+Architecture variants (controlled by --hidden1 and --hidden2):
+  S (default): 256 -> 32 -> 1  (~40K params)
+  M:           512 -> 64 -> 1  (~140K params)
+  L:          1024 -> 128 -> 1 (~530K params)
 """
 
 import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader, ConcatDataset, random_split
 import numpy as np
 import time
 import argparse
 
 
-class Connect4Dataset(Dataset):
-    def __init__(self, data_files, width, height):
+# ── Datasets ──────────────────────────────────────────────────────────────────
+
+class ExactDataset(Dataset):
+    """Loads data_exact.bin: raw minimax scores in [-MAX_SCORE, +MAX_SCORE]."""
+
+    def __init__(self, files, width, height):
         dtype = np.dtype([
-            ('pos',          np.uint64),
-            ('opp',          np.uint64),
-            ('search_score', np.int16),
-            ('exact_wdl',    np.int16),
+            ('pos',     np.uint64),
+            ('opp',     np.uint64),
+            ('score',   np.int32),   # raw minimax in [-32,+32]; stored as int32 (24 byte record)
+            ('padding', np.int32),
         ])
+        self.max_score = (width * height + 1) // 2  # e.g. 32 for 8x8
 
         all_data = []
-        for f in data_files:
+        for f in files:
             if not os.path.exists(f):
                 print(f"Warning: {f} not found, skipping.")
                 continue
-            print(f"Loading {f}...")
+            print(f"Loading exact data: {f}...")
             all_data.append(np.fromfile(f, dtype=dtype))
 
         if not all_data:
-            raise ValueError("No data files found.")
+            raise ValueError("No exact data files found.")
 
         data = np.concatenate(all_data)
-
-        # Filter: only keep records with exact scores in valid range
-        exact = data['exact_wdl'].astype(np.int32)
-        max_score = (width * height) // 2
-        mask = (exact >= -max_score) & (exact <= max_score)
+        # Filter out any out-of-range records
+        mask = (data['score'] >= -self.max_score) & (data['score'] <= self.max_score)
         data = data[mask]
-        print(f"Loaded {len(data)} valid records (filtered {(~mask).sum()} heuristic-scale outliers).")
+        print(f"Exact: {len(data)} records (filtered {(~mask).sum()} outliers)")
 
-        # Features: 2 * W * H binary bits (current/opponent pieces)
+        self.features = self._extract_features(data['pos'], data['opp'], width, height)
+        raw = data['score'].astype(np.float32)
+        self.labels   = torch.from_numpy(raw / self.max_score).unsqueeze(1)
+        self.weights  = torch.ones(len(data), 1, dtype=torch.float32)  # 1.0x weight
+
+    @staticmethod
+    def _extract_features(pos_arr, opp_arr, width, height):
         col_bits = height + 1
-        n = len(data)
+        n = len(pos_arr)
         features = np.zeros((n, width * height * 2), dtype=np.float32)
-        pos_arr = data['pos']
-        opp_arr = data['opp']
         for col in range(width):
             for r in range(height):
                 bit = col * col_bits + r
-                features[:, col * height + r]               = (pos_arr >> bit) & 1
-                features[:, width * height + col * height + r] = (opp_arr >> bit) & 1
-
-        self.features = torch.from_numpy(features)
-        # Normalize targets to [-1, +1]: exact_score / MAX_SCORE
-        # This is critical for fast convergence with ClippedReLU activations:
-        # both activation outputs AND targets are on the same [-1, +1] scale.
-        # The export SCALE is adjusted to map back to the C++ integer range.
-        max_score = (width * height) // 2
-        raw_labels = data['exact_wdl'].astype(np.float32)
-        self.labels = torch.from_numpy(raw_labels / max_score).unsqueeze(1)
-        print(f"Score distribution: min={data['exact_wdl'].min()}, "
-              f"max={data['exact_wdl'].max()}, "
-              f"mean={data['exact_wdl'].mean():.2f}")
-        print(f"Normalized target range: [{(raw_labels/max_score).min():.3f}, {(raw_labels/max_score).max():.3f}]")
-
-        # Compute sample weights to handle class imbalance
-        is_win = raw_labels > 0
-        is_loss = raw_labels < 0
-        is_draw = raw_labels == 0
-        n_win = is_win.sum()
-        n_loss = is_loss.sum()
-        n_draw = is_draw.sum()
-        n_total = len(raw_labels)
-        
-        # Inverse frequency weights, bounded to avoid crazy spikes for very rare draws
-        w_win = n_total / (3 * max(1, n_win))
-        w_loss = n_total / (3 * max(1, n_loss))
-        w_draw = min(10.0, n_total / (3 * max(1, n_draw))) # cap draw weight at 10x
-        
-        weights = np.zeros(n_total, dtype=np.float32)
-        weights[is_win] = w_win
-        weights[is_loss] = w_loss
-        weights[is_draw] = w_draw
-        self.weights = torch.from_numpy(weights).unsqueeze(1)
+                features[:, col * height + r]                    = (pos_arr >> bit) & 1
+                features[:, width * height + col * height + r]   = (opp_arr >> bit) & 1
+        return torch.from_numpy(features)
 
     def __len__(self): return len(self.labels)
     def __getitem__(self, idx): return self.features[idx], self.labels[idx], self.weights[idx]
 
+
+class SoftDataset(Dataset):
+    """Loads data_soft.bin: pre-normalized scores in [-1.0, +1.0]."""
+
+    def __init__(self, files, width, height, loss_weight=0.3):
+        dtype = np.dtype([
+            ('pos',     np.uint64),
+            ('opp',     np.uint64),
+            ('score',   np.float32), # pre-normalized to [-1.0, +1.0]
+            ('padding', np.int32),   # 24 byte record
+        ])
+
+        all_data = []
+        for f in files:
+            if not os.path.exists(f):
+                print(f"Warning: {f} not found, skipping.")
+                continue
+            print(f"Loading soft data: {f}...")
+            all_data.append(np.fromfile(f, dtype=dtype))
+
+        if not all_data:
+            raise ValueError("No soft data files found.")
+
+        data = np.concatenate(all_data)
+        # Filter invalid normalized scores
+        mask = (data['score'] >= -1.0) & (data['score'] <= 1.0)
+        data = data[mask]
+        print(f"Soft: {len(data)} records (filtered {(~mask).sum()} outliers)")
+
+        self.features = ExactDataset._extract_features(data['pos'], data['opp'], width, height)
+        self.labels   = torch.from_numpy(data['score'].copy()).unsqueeze(1)
+        self.weights  = torch.full((len(data), 1), loss_weight, dtype=torch.float32)
+
+    def __len__(self): return len(self.labels)
+    def __getitem__(self, idx): return self.features[idx], self.labels[idx], self.weights[idx]
+
+
+# ── Model ─────────────────────────────────────────────────────────────────────
 
 class ClippedReLU(nn.Module):
     def forward(self, x): return torch.clamp(x, 0.0, 1.0)
 
 
 class NNUE(nn.Module):
-    """256 → ClipReLU → 32 → ClipReLU → 1 (linear output)."""
-    def __init__(self, width, height):
+    """Configurable 2-layer NNUE: input -> H1 -> ClipReLU -> H2 -> ClipReLU -> 1."""
+
+    def __init__(self, width, height, hidden1=256, hidden2=32):
         super().__init__()
-        self.fc1   = nn.Linear(width * height * 2, 256)
+        self.fc1   = nn.Linear(width * height * 2, hidden1)
         self.relu1 = ClippedReLU()
-        self.fc2   = nn.Linear(256, 32)
+        self.fc2   = nn.Linear(hidden1, hidden2)
         self.relu2 = ClippedReLU()
-        self.fc3   = nn.Linear(32, 1)
+        self.fc3   = nn.Linear(hidden2, 1)
 
     def forward(self, x):
         x = self.relu1(self.fc1(x))
@@ -117,37 +136,67 @@ class NNUE(nn.Module):
         return self.fc3(x)
 
 
+# ── Training ──────────────────────────────────────────────────────────────────
+
 def train():
     parser = argparse.ArgumentParser()
     parser.add_argument("--width",      type=int, default=8)
     parser.add_argument("--height",     type=int, default=8)
-    parser.add_argument("--input",      type=str, required=True,
-                        help="Comma-separated list of .bin dataset files")
-    parser.add_argument("--output",     type=str, default="nnue_model.pt")
+    parser.add_argument("--exact",      type=str, default="",
+                        help="Comma-separated list of data_exact.bin files")
+    parser.add_argument("--soft",       type=str, default="",
+                        help="Comma-separated list of data_soft.bin files")
+    parser.add_argument("--soft-weight", type=float, default=0.3,
+                        help="Loss weight for soft-label records (default 0.3)")
+    parser.add_argument("--hidden1",    type=int, default=256,
+                        help="Hidden layer 1 size (256=S, 512=M, 1024=L)")
+    parser.add_argument("--hidden2",    type=int, default=32,
+                        help="Hidden layer 2 size (32=S, 64=M, 128=L)")
+    parser.add_argument("--output",     type=str, default="nnue_8x8.pt")
     parser.add_argument("--epochs",     type=int, default=40)
     parser.add_argument("--batch-size", type=int, default=8192)
     parser.add_argument("--lr",         type=float, default=0.002)
     args = parser.parse_args()
 
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else
+                          "mps"  if torch.backends.mps.is_available() else "cpu")
     print(f"Device: {device}")
 
-    files = [f.strip() for f in args.input.split(",")]
-    dataset = Connect4Dataset(files, args.width, args.height)
+    datasets = []
+    if args.exact:
+        exact_files = [f.strip() for f in args.exact.split(",") if f.strip()]
+        datasets.append(ExactDataset(exact_files, args.width, args.height))
+    if args.soft:
+        soft_files = [f.strip() for f in args.soft.split(",") if f.strip()]
+        datasets.append(SoftDataset(soft_files, args.width, args.height, args.soft_weight))
 
-    val_size   = max(1, int(0.1 * len(dataset)))
-    train_size = len(dataset) - val_size
-    train_ds, val_ds = random_split(dataset, [train_size, val_size])
+    if not datasets:
+        print("Error: provide at least one of --exact or --soft")
+        return
 
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,  num_workers=4, pin_memory=True)
-    val_loader   = DataLoader(val_ds,   batch_size=args.batch_size, shuffle=False, num_workers=2, pin_memory=True)
+    combined = ConcatDataset(datasets) if len(datasets) > 1 else datasets[0]
+    print(f"Total records: {len(combined)}")
 
-    model     = NNUE(args.width, args.height).to(device)
+    val_size   = max(1, int(0.05 * len(combined)))
+    train_size = len(combined) - val_size
+    train_ds, val_ds = random_split(combined, [train_size, val_size])
+
+    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,
+                              num_workers=4, pin_memory=True)
+    val_loader   = DataLoader(val_ds,   batch_size=args.batch_size, shuffle=False,
+                              num_workers=2, pin_memory=True)
+
+    n_params = args.hidden1 * args.width * args.height * 2 + args.hidden1 + \
+               args.hidden2 * args.hidden1 + args.hidden2 + args.hidden2 + 1
+    print(f"Architecture: {args.width*args.height*2} -> {args.hidden1} -> {args.hidden2} -> 1")
+    print(f"Parameters  : ~{n_params:,}")
+
+    model     = NNUE(args.width, args.height, args.hidden1, args.hidden2).to(device)
     criterion = nn.MSELoss(reduction='none')
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 
-    max_score = (args.width * args.height) // 2
+    max_score = (args.width * args.height + 1) // 2
     best_val  = float('inf')
 
     for epoch in range(args.epochs):
@@ -158,13 +207,11 @@ def train():
         for feats, targets, weights in train_loader:
             feats, targets, weights = feats.to(device), targets.to(device), weights.to(device)
             optimizer.zero_grad()
-            loss_unreduced = criterion(model(feats), targets)
-            loss = (loss_unreduced * weights).mean()
+            loss = (criterion(model(feats), targets) * weights).mean()
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
 
-        # Validation: loss + WDL accuracy
         model.eval()
         val_loss, correct, total = 0.0, 0, 0
         with torch.no_grad():
@@ -172,13 +219,11 @@ def train():
                 feats, targets, weights = feats.to(device), targets.to(device), weights.to(device)
                 out = model(feats)
                 val_loss += (criterion(out, targets) * weights).mean().item()
-                # Normalized targets: draw=0, smallest win/loss = ±1/32=0.03125
                 THRESH = 1.0 / (2 * max_score)
-                pred_win  = out > THRESH;  true_win  = targets > THRESH
-                pred_loss = out < -THRESH; true_loss = targets < -THRESH
-                pred_draw = (out.abs() <= THRESH); true_draw = (targets.abs() <= THRESH)
-                correct += ((pred_win & true_win) | (pred_loss & true_loss) | (pred_draw & true_draw)).sum().item()
-                total   += feats.size(0)
+                correct += (((out >  THRESH) & (targets >  THRESH)) |
+                            ((out < -THRESH) & (targets < -THRESH)) |
+                            ((out.abs() <= THRESH) & (targets.abs() <= THRESH))).sum().item()
+                total += feats.size(0)
 
         avg_train = train_loss / len(train_loader)
         avg_val   = val_loss   / len(val_loader)
@@ -193,7 +238,9 @@ def train():
         if avg_val < best_val:
             best_val = avg_val
             torch.save(model.state_dict(), args.output)
-            print(f"  ✓ Saved to {args.output}")
+            print(f"  ✓ Saved to {args.output}  (WDL={accuracy:.1f}%)")
+
+    print(f"\nBest val loss: {best_val:.6f}")
 
 
 if __name__ == "__main__":
