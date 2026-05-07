@@ -52,3 +52,4 @@ patch*.js
 test-ptrs.*
 venv/
 __pycache__/
+wasm-out/

@@ -36,14 +36,7 @@ describe("HeuristicNodeConnect4Solver", () => {
     const hScore = heuristicRes.evaluation?.score ?? 0;
     const eScore = exactRes.evaluation?.score ?? 0;
 
-    const parsedHScore =
-      hScore >= 31000
-        ? hScore - 31000
-        : hScore <= -31000
-          ? hScore + 31000
-          : hScore;
-
-    expect(parsedHScore).toBe(eScore);
+    expect(hScore).toBe(eScore);
     exactSolver.release();
   });
 

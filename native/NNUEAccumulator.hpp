@@ -5,6 +5,7 @@
 #include "NNUEAccumulatorOneLayer.hpp"
 #include "nnue_weights_7x6.hpp"
 #include "Position.hpp"
+#include "Constants.hpp"
 #include <cstdint>
 #include <cstring>
 #if defined(__ARM_NEON) || defined(__aarch64__)
@@ -162,8 +163,8 @@ public:
         }
 
         sum = sum / WTS::QA;
-        if (sum > 30000) sum = 30000;
-        if (sum < -30000) sum = -30000;
+        if (sum > SCORE_NNUE_MAX) sum = SCORE_NNUE_MAX;
+        if (sum < -SCORE_NNUE_MAX) sum = -SCORE_NNUE_MAX;
         return (int)sum;
     }
 };
@@ -241,9 +242,9 @@ public:
             }
         }
         sum = sum / NNUE_7x6::QA;
-        if (sum > 30000) sum = 30000;
-        if (sum < -30000) sum = -30000;
-        return sum;
+        if (sum > SCORE_NNUE_MAX) sum = SCORE_NNUE_MAX;
+        if (sum < -SCORE_NNUE_MAX) sum = -SCORE_NNUE_MAX;
+        return (int)sum;
     }
 };
 

@@ -8,6 +8,7 @@ import {
   Connect4SolverOptions,
   SolverModule,
 } from "./core.js";
+import { SCORE_FORCED_WIN_BASE } from "./constants.js";
 
 export const STATUS_WIN = 1;
 export const STATUS_INVALID = 2;
@@ -43,6 +44,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   protected createEvaluation(
     score: number,
     nbMoves: number,
+    depthReached: number,
     isHeuristicOverride?: boolean,
   ): Evaluation {
     const isPlayer1Turn = nbMoves % 2 === 0;
@@ -52,28 +54,31 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     const halfMovesRemaining = Math.ceil(movesRemaining / 2);
 
     const isHeuristic = isHeuristicOverride ?? this.isHeuristic;
+    const isProvenExact = !isHeuristic || score >= SCORE_FORCED_WIN_BASE || score <= -SCORE_FORCED_WIN_BASE || depthReached >= movesRemaining;
 
     if (isHeuristic) {
-      if (score >= 31000) {
-        const depth = score - 31000;
+      if (score >= SCORE_FORCED_WIN_BASE) {
+        const depth = score - SCORE_FORCED_WIN_BASE;
         return {
           eval: { value: Number.POSITIVE_INFINITY },
           outcome: Outcome.Win,
           winner: currentPlayer,
           movesToEnd: depth,
           score,
+          isProvenExact,
         };
-      } else if (score <= -31000) {
-        const depth = Math.abs(score + 31000);
+      } else if (score <= -SCORE_FORCED_WIN_BASE) {
+        const depth = Math.abs(score + SCORE_FORCED_WIN_BASE);
         return {
           eval: { value: Number.NEGATIVE_INFINITY },
           outcome: Outcome.Loss,
           winner: opponent,
           movesToEnd: depth,
           score,
+          isProvenExact,
         };
-      } else {
-        return { eval: { value: score / 100.0 }, score };
+      } else if (!isProvenExact) {
+        return { eval: { value: score / 100.0 }, score, isProvenExact };
       }
     }
 
@@ -84,6 +89,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         winner: null,
         movesToEnd: null,
         score,
+        isProvenExact,
       };
     } else if (score > 0) {
       return {
@@ -91,7 +97,8 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         outcome: Outcome.Win,
         winner: currentPlayer,
         movesToEnd: halfMovesRemaining - score + 1,
-        score: score >= 31000 ? score : 31000 + score,
+        score: score >= SCORE_FORCED_WIN_BASE ? score : SCORE_FORCED_WIN_BASE + score,
+        isProvenExact,
       };
     } else {
       return {
@@ -99,7 +106,8 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         outcome: Outcome.Loss,
         winner: opponent,
         movesToEnd: halfMovesRemaining + score + 1,
-        score: score <= -31000 ? score : -31000 + score,
+        score: score <= -SCORE_FORCED_WIN_BASE ? score : -SCORE_FORCED_WIN_BASE + score,
+        isProvenExact,
       };
     }
   }
@@ -117,6 +125,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     let evaluation: Evaluation | null = null;
     const moveOptions: (Evaluation | null)[] = [];
 
+    const depthReached = resArr[2 + this.width];
     const isHeuristic = isHeuristicOverride ?? this.isHeuristic;
 
     // The heuristic engine uses -1000000 for unplayable columns.
@@ -135,13 +144,14 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         outcome: Outcome.Win,
         winner,
         movesToEnd: 0,
-        score: 31000 + baseScore,
+        score: SCORE_FORCED_WIN_BASE + baseScore,
+        isProvenExact: true,
       };
     } else {
       for (let i = 0; i < this.width; i++) {
         const n = resArr[2 + i];
         if (isUnplayable(n)) moveOptions.push(null);
-        else moveOptions.push(this.createEvaluation(n, nbMoves, isHeuristic));
+        else moveOptions.push(this.createEvaluation(n, nbMoves, depthReached, isHeuristic));
       }
 
       let bestEval: Evaluation | null = null;
@@ -152,7 +162,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       evaluation = bestEval;
     }
 
-    const depthReached = resArr[2 + this.width];
     const aborted = resArr[3 + this.width] === 1;
 
     const nodes =
@@ -213,7 +222,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       currentPosition = positionStr.slice(0, nbMoves + 1);
       const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
       const baseScore = Math.floor((this.width * this.height - nbMoves) / 2);
-      const adjustedScore = 31000 + baseScore;
+      const adjustedScore = SCORE_FORCED_WIN_BASE + baseScore;
       evaluation = {
         eval: {
           value:
@@ -225,12 +234,14 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         winner,
         movesToEnd: positionStr.length - (nbMoves + 1),
         score: winner === currentPlayer ? adjustedScore : -adjustedScore,
+        isProvenExact: true,
       };
     } else {
       const score = resArr[2];
       evaluation = this.createEvaluation(
         score,
         nbMoves,
+        depthReached,
         isHeuristicOverride ?? this.isHeuristic,
       );
     }

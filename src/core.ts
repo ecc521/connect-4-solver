@@ -44,6 +44,7 @@ export interface Evaluation {
   winner?: Player | null; // null when Draw, only present on exact solutions
   movesToEnd?: number | null; // null when Draw, only present on exact solutions
   score: number; // raw score (positive = current player winning)
+  isProvenExact?: boolean; // True if the score is mathematically proven and not a heuristic prediction
 }
 
 export interface PositionAnalysis {
