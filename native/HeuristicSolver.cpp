@@ -53,10 +53,10 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   if (++localCount >= 16384) [[unlikely]] {
     this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
     localCount = 0;
-    if (this->stopSearch.load(std::memory_order_relaxed)) [[unlikely]] return 40000;
+    if (this->stopSearch.load(std::memory_order_relaxed)) [[unlikely]] return SCORE_INFINITY;
     if (checkHeuristicTimeout(end_time_ms)) {
       this->stopSearch = true;
-      return 40000;
+      return SCORE_INFINITY;
     }
   }
 
@@ -108,7 +108,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     return a.score > b.score;
   });
 
-  int best_score = -40000;
+  int best_score = -SCORE_INFINITY;
   int best_seen_col = -1;
   uint8_t flags = 3; // Upper bound
 
@@ -124,7 +124,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     acc.addPiece(player, col, row);
     int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, acc, localCount);
     acc.removePiece(player, col, row);
-    if (score >= 40000 || score <= -40000) return 40000;
+    if (score >= SCORE_INFINITY || score <= -SCORE_INFINITY) return SCORE_INFINITY;
 
     if (score > best_score) {
       best_score = score;
@@ -200,7 +200,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
   for (int i = 0; i < WIDTH; i++) {
     int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
     if (P.canPlay(col)) {
-      root_moves.push_back({col, -40000});
+      root_moves.push_back({col, -SCORE_INFINITY});
     }
   }
 
@@ -220,7 +220,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
         if (this->stopSearch.load(std::memory_order_relaxed)) break;
 
         int col = root_moves[idx].col;
-        int score = -40000;
+        int score = -SCORE_INFINITY;
 
         if (P.isWinningMove(col)) {
           score = SCORE_FORCED_WIN_BASE + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
@@ -316,7 +316,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
     std::atomic<bool>& flag;
     ~LockGuard() { flag.store(false, std::memory_order_release); }
   } guard{this->isSearching};
-  std::vector<int> scores(WIDTH, -40000);
+  std::vector<int> scores(WIDTH, -SCORE_INFINITY);
   int final_depth_reached = 0;
   this->stopSearch = false;
 
@@ -366,7 +366,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
                 unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(move);
                 local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (HEIGHT + 1));
                 int score = -negamax_heuristic(P2, -SCORE_INFINITY, SCORE_INFINITY, d - 1, end_time_ms, local_acc, localCount);
-                if (score >= 40000 || score <= -40000) break;
+                if (score >= SCORE_INFINITY || score <= -SCORE_INFINITY) break;
                 current_scores[col] = score;
             }
           }
@@ -421,7 +421,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
                     unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(move);
                     local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (HEIGHT + 1));
                     int score = -negamax_heuristic(P2, -SCORE_INFINITY, SCORE_INFINITY, d - 1, end_time_ms, local_acc, localCount);
-                    if (score >= 40000 || score <= -40000) break;
+                    if (score >= SCORE_INFINITY || score <= -SCORE_INFINITY) break;
                     current_scores[col] = score;
                 }
             }
