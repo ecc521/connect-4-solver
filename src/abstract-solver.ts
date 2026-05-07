@@ -54,7 +54,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     const halfMovesRemaining = Math.ceil(movesRemaining / 2);
 
     const isHeuristic = isHeuristicOverride ?? this.isHeuristic;
-    const isProvenExact = !isHeuristic || score >= SCORE_FORCED_WIN_BASE || score <= -SCORE_FORCED_WIN_BASE || depthReached >= movesRemaining;
 
     if (isHeuristic) {
       if (score >= SCORE_FORCED_WIN_BASE) {
@@ -65,7 +64,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
           winner: currentPlayer,
           movesToEnd: depth,
           score,
-          isProvenExact,
         };
       } else if (score <= -SCORE_FORCED_WIN_BASE) {
         const depth = Math.abs(score + SCORE_FORCED_WIN_BASE);
@@ -75,10 +73,9 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
           winner: opponent,
           movesToEnd: depth,
           score,
-          isProvenExact,
         };
-      } else if (!isProvenExact) {
-        return { eval: { value: score / 100.0 }, score, isProvenExact };
+      } else if (depthReached < movesRemaining) {
+        return { eval: { value: score / 100.0 }, score };
       }
     }
 
@@ -89,7 +86,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         winner: null,
         movesToEnd: null,
         score,
-        isProvenExact,
       };
     } else if (score > 0) {
       return {
@@ -98,7 +94,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         winner: currentPlayer,
         movesToEnd: halfMovesRemaining - score + 1,
         score: score >= SCORE_FORCED_WIN_BASE ? score : SCORE_FORCED_WIN_BASE + score,
-        isProvenExact,
       };
     } else {
       return {
@@ -107,7 +102,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         winner: opponent,
         movesToEnd: halfMovesRemaining + score + 1,
         score: score <= -SCORE_FORCED_WIN_BASE ? score : -SCORE_FORCED_WIN_BASE + score,
-        isProvenExact,
       };
     }
   }
@@ -145,7 +139,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         winner,
         movesToEnd: 0,
         score: SCORE_FORCED_WIN_BASE + baseScore,
-        isProvenExact: true,
       };
     } else {
       for (let i = 0; i < this.width; i++) {
@@ -234,7 +227,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         winner,
         movesToEnd: positionStr.length - (nbMoves + 1),
         score: winner === currentPlayer ? adjustedScore : -adjustedScore,
-        isProvenExact: true,
       };
     } else {
       const score = resArr[2];
