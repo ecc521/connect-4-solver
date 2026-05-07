@@ -10,14 +10,22 @@
  * which the exact solver has timed out. Any position at a ply >= cutover_ply
  * is routed to the heuristic solver instead.
  *
- * Binary formats:
- *   data_exact.bin  — 20 bytes/record:
- *     uint64_t pos, uint64_t opp, int16_t score, int16_t padding
- *     score is raw minimax: [-32, +32] for 8x8
+ * Binary formats (40 bytes each — positions stored as two uint64 halves for full 128-bit coverage):
  *
- *   data_soft.bin   — 20 bytes/record:
- *     uint64_t pos, uint64_t opp, float normalized_score, int32_t padding
- *     normalized_score is in [-1.0, +1.0] (heuristic score / SCORE_NNUE_MAX)
+ *   data_exact.bin:
+ *     uint64_t pos_lo, uint64_t pos_hi   — low/high 64 bits of current player bitboard
+ *     uint64_t opp_lo, uint64_t opp_hi   — low/high 64 bits of opponent bitboard
+ *     int32_t  score                      — raw minimax in [-32, +32] for 8x8
+ *     int32_t  padding
+ *
+ *   data_soft.bin:
+ *     uint64_t pos_lo, uint64_t pos_hi
+ *     uint64_t opp_lo, uint64_t opp_hi
+ *     float    score                      — normalized to [-1.0, +1.0]
+ *     int32_t  padding
+ *
+ * Resume: if output files already exist they are appended to, and their
+ * existing record counts are subtracted from the generation target.
  *
  * Usage:
  *   ./gen_training_data_8x8 [total_positions] [timeout_sec] [threads] [seed]
@@ -52,29 +60,27 @@ using HeurCache   = HeuristicCache<W, H>;
 
 // ── Binary record layouts ─────────────────────────────────────────────────────
 //
-// Both records are 24 bytes to avoid alignment/packing issues:
+// Both record types are 40 bytes:
 //
-// ExactRecord (24 bytes):
-//   uint64_t pos, uint64_t opp, int32_t score (raw minimax [-32,+32]), int32_t padding
-//
-// SoftRecord (24 bytes):
-//   uint64_t pos, uint64_t opp, float score (normalized [-1,+1]), int32_t padding
+// Positions for 8x8 use __uint128_t (72 bits needed per player), which does NOT
+// fit in a single uint64_t (col 7 rows 1-7 occupy bits 64-70). We store each
+// bitboard as a lo/hi uint64_t pair to capture the full 128-bit value.
 
 struct ExactRecord {
-    uint64_t pos;
-    uint64_t opp;
-    int32_t  score;    // raw minimax in [-32, +32] for 8x8
+    uint64_t pos_lo, pos_hi;   // full 128-bit current-player bitboard
+    uint64_t opp_lo, opp_hi;   // full 128-bit opponent bitboard
+    int32_t  score;            // raw minimax in [-32, +32] for 8x8
     int32_t  padding;
 };
-static_assert(sizeof(ExactRecord) == 24);
+static_assert(sizeof(ExactRecord) == 40);
 
 struct SoftRecord {
-    uint64_t pos;
-    uint64_t opp;
-    float    score;    // normalized to [-1.0, +1.0]
+    uint64_t pos_lo, pos_hi;
+    uint64_t opp_lo, opp_hi;
+    float    score;            // normalized to [-1.0, +1.0]
     int32_t  padding;
 };
-static_assert(sizeof(SoftRecord) == 24);
+static_assert(sizeof(SoftRecord) == 40);
 
 // ── Timing helper ─────────────────────────────────────────────────────────────
 static double now_ms() {
@@ -157,17 +163,42 @@ int main(int argc, char** argv) {
     // Starts at INT_MAX (all positions attempted exactly first).
     std::atomic<int> cutover_ply{INT_MAX};
 
-    // ── Output files ──────────────────────────────────────────────────────────
+    // ── Output files with resume support ─────────────────────────────────────
+    // Open in append mode so an interrupted run can be resumed.
+    // Count existing records to know how many more we need.
+    auto count_records = [](const char* path, size_t record_size) -> int {
+        FILE* f = fopen(path, "rb");
+        if (!f) return 0;
+        fseek(f, 0, SEEK_END);
+        long sz = ftell(f);
+        fclose(f);
+        return (sz > 0) ? (int)(sz / record_size) : 0;
+    };
+
+    int existing_exact = count_records("data_exact.bin", sizeof(ExactRecord));
+    int existing_soft  = count_records("data_soft.bin",  sizeof(SoftRecord));
+    int already_done   = existing_exact + existing_soft;
+
+    if (already_done > 0) {
+        printf("Resuming: found %d existing exact + %d soft = %d total records.\n",
+               existing_exact, existing_soft, already_done);
+        if (already_done >= total_positions) {
+            printf("Target already reached. Nothing to do.\n");
+            return 0;
+        }
+    }
+
     std::mutex exact_mutex, soft_mutex;
-    FILE* exact_file = fopen("data_exact.bin", "wb");
-    FILE* soft_file  = fopen("data_soft.bin",  "wb");
+    FILE* exact_file = fopen("data_exact.bin", "ab");
+    FILE* soft_file  = fopen("data_soft.bin",  "ab");
     if (!exact_file || !soft_file) {
         fprintf(stderr, "Could not open output files.\n");
         return 1;
     }
 
-    // ── Progress counters ─────────────────────────────────────────────────────
-    std::atomic<int> n_exact{0}, n_soft{0}, n_total{0};
+    // ── Progress counters (start from existing record counts) ─────────────────
+    std::atomic<int> n_exact{existing_exact}, n_soft{existing_soft},
+                     n_total{already_done};
 
     // ── Worker function ───────────────────────────────────────────────────────
     auto worker = [&](int thread_id) {
@@ -206,14 +237,17 @@ int main(int argc, char** argv) {
                 }
 
                 {
-                    // Write exact record
-                    ExactRecord rec;
+                    // Write exact record — store full 128-bit position as lo/hi pair
                     using pos_t = typename Pos::position_t;
                     pos_t cur = P.getCurrentPosition();
                     pos_t opp = P.getMask() ^ cur;
-                    rec.pos     = static_cast<uint64_t>(cur);
-                    rec.opp     = static_cast<uint64_t>(opp);
-                    rec.score   = static_cast<int16_t>(res.score);
+
+                    ExactRecord rec;
+                    rec.pos_lo  = static_cast<uint64_t>(cur);
+                    rec.pos_hi  = static_cast<uint64_t>(cur >> 64);
+                    rec.opp_lo  = static_cast<uint64_t>(opp);
+                    rec.opp_hi  = static_cast<uint64_t>(opp >> 64);
+                    rec.score   = res.score;
                     rec.padding = 0;
 
                     std::lock_guard<std::mutex> lk(exact_mutex);
@@ -223,7 +257,9 @@ int main(int argc, char** argv) {
             } else {
                 use_heuristic:
                 // ── Deep heuristic search ───────────────────────────────
-                SolverResult hres = heur_solver->solve(P, false, 1, nullptr, 5000.0);
+                // 2s ceiling: iterative deepening typically converges at depth 10-12
+                // for mid-game 8x8 positions in well under 500ms. This is just a safety bound.
+                SolverResult hres = heur_solver->solve(P, false, 1, nullptr, 2000.0);
                 if (hres.aborted) {
                     --current_ply;
                     continue;
@@ -234,12 +270,16 @@ int main(int argc, char** argv) {
                 float norm = std::max(-1.0f, std::min(1.0f,
                     static_cast<float>(hres.score) / NNUE_MAX));
 
-                SoftRecord rec;
+                // Write soft record — store full 128-bit position as lo/hi pair
                 using pos_t = typename Pos::position_t;
                 pos_t cur = P.getCurrentPosition();
                 pos_t opp = P.getMask() ^ cur;
-                rec.pos     = static_cast<uint64_t>(cur);
-                rec.opp     = static_cast<uint64_t>(opp);
+
+                SoftRecord rec;
+                rec.pos_lo  = static_cast<uint64_t>(cur);
+                rec.pos_hi  = static_cast<uint64_t>(cur >> 64);
+                rec.opp_lo  = static_cast<uint64_t>(opp);
+                rec.opp_hi  = static_cast<uint64_t>(opp >> 64);
                 rec.score   = norm;
                 rec.padding = 0;
 

@@ -28,13 +28,21 @@ import argparse
 # ── Datasets ──────────────────────────────────────────────────────────────────
 
 class ExactDataset(Dataset):
-    """Loads data_exact.bin: raw minimax scores in [-MAX_SCORE, +MAX_SCORE]."""
+    """Loads data_exact.bin: raw minimax scores in [-MAX_SCORE, +MAX_SCORE].
+
+    Record format (40 bytes):
+      uint64 pos_lo, uint64 pos_hi,  -- full 128-bit current-player bitboard
+      uint64 opp_lo, uint64 opp_hi,  -- full 128-bit opponent bitboard
+      int32 score, int32 padding
+    """
 
     def __init__(self, files, width, height):
         dtype = np.dtype([
-            ('pos',     np.uint64),
-            ('opp',     np.uint64),
-            ('score',   np.int32),   # raw minimax in [-32,+32]; stored as int32 (24 byte record)
+            ('pos_lo',  np.uint64),
+            ('pos_hi',  np.uint64),
+            ('opp_lo',  np.uint64),
+            ('opp_hi',  np.uint64),
+            ('score',   np.int32),   # raw minimax in [-MAX_SCORE, +MAX_SCORE]
             ('padding', np.int32),
         ])
         self.max_score = (width * height + 1) // 2  # e.g. 32 for 8x8
@@ -56,21 +64,34 @@ class ExactDataset(Dataset):
         data = data[mask]
         print(f"Exact: {len(data)} records (filtered {(~mask).sum()} outliers)")
 
-        self.features = self._extract_features(data['pos'], data['opp'], width, height)
+        self.features = self._extract_features(
+            data['pos_lo'], data['pos_hi'], data['opp_lo'], data['opp_hi'], width, height)
         raw = data['score'].astype(np.float32)
         self.labels   = torch.from_numpy(raw / self.max_score).unsqueeze(1)
         self.weights  = torch.ones(len(data), 1, dtype=torch.float32)  # 1.0x weight
 
     @staticmethod
-    def _extract_features(pos_arr, opp_arr, width, height):
+    def _extract_features(pos_lo, pos_hi, opp_lo, opp_hi, width, height):
+        """Extract binary features from split 128-bit bitboards.
+
+        For 8x8, bit index = col * (height+1) + row. Bits 0-63 are in _lo,
+        bits 64+ are in _hi.
+        """
         col_bits = height + 1
-        n = len(pos_arr)
+        n = len(pos_lo)
         features = np.zeros((n, width * height * 2), dtype=np.float32)
+
         for col in range(width):
             for r in range(height):
                 bit = col * col_bits + r
-                features[:, col * height + r]                    = (pos_arr >> bit) & 1
-                features[:, width * height + col * height + r]   = (opp_arr >> bit) & 1
+                if bit < 64:
+                    features[:, col * height + r]                  = (pos_lo >> bit) & np.uint64(1)
+                    features[:, width * height + col * height + r] = (opp_lo >> bit) & np.uint64(1)
+                else:
+                    b = np.uint64(bit - 64)
+                    features[:, col * height + r]                  = (pos_hi >> b) & np.uint64(1)
+                    features[:, width * height + col * height + r] = (opp_hi >> b) & np.uint64(1)
+
         return torch.from_numpy(features)
 
     def __len__(self): return len(self.labels)
@@ -78,14 +99,22 @@ class ExactDataset(Dataset):
 
 
 class SoftDataset(Dataset):
-    """Loads data_soft.bin: pre-normalized scores in [-1.0, +1.0]."""
+    """Loads data_soft.bin: pre-normalized scores in [-1.0, +1.0].
+
+    Record format (40 bytes):
+      uint64 pos_lo, uint64 pos_hi,
+      uint64 opp_lo, uint64 opp_hi,
+      float32 score, int32 padding
+    """
 
     def __init__(self, files, width, height, loss_weight=0.3):
         dtype = np.dtype([
-            ('pos',     np.uint64),
-            ('opp',     np.uint64),
+            ('pos_lo',  np.uint64),
+            ('pos_hi',  np.uint64),
+            ('opp_lo',  np.uint64),
+            ('opp_hi',  np.uint64),
             ('score',   np.float32), # pre-normalized to [-1.0, +1.0]
-            ('padding', np.int32),   # 24 byte record
+            ('padding', np.int32),
         ])
 
         all_data = []
@@ -105,12 +134,14 @@ class SoftDataset(Dataset):
         data = data[mask]
         print(f"Soft: {len(data)} records (filtered {(~mask).sum()} outliers)")
 
-        self.features = ExactDataset._extract_features(data['pos'], data['opp'], width, height)
+        self.features = ExactDataset._extract_features(
+            data['pos_lo'], data['pos_hi'], data['opp_lo'], data['opp_hi'], width, height)
         self.labels   = torch.from_numpy(data['score'].copy()).unsqueeze(1)
         self.weights  = torch.full((len(data), 1), loss_weight, dtype=torch.float32)
 
     def __len__(self): return len(self.labels)
     def __getitem__(self, idx): return self.features[idx], self.labels[idx], self.weights[idx]
+
 
 
 # ── Model ─────────────────────────────────────────────────────────────────────
