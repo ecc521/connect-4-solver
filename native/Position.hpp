@@ -20,6 +20,7 @@
 #define POSITION_HPP
 
 #include <string>
+#include <iostream>
 #include <cstdint>
 #include <cassert>
 #include <array>
@@ -182,6 +183,7 @@ class GenericPosition {
 
   static constexpr int MIN_SCORE = -(W * H + 1) / 2;
   static constexpr int MAX_SCORE = (W * H + 1) / 2;
+  std::string move_history; // Added for debugging
 
   static constexpr std::array<int32_t, WIDTH * (HEIGHT + 1)> compute_tromp_weights() {
     std::array<int32_t, WIDTH * (HEIGHT + 1)> weights = {};
@@ -450,6 +452,24 @@ class GenericPosition {
   position_t current_position;
   position_t mask;
   unsigned int moves;
+
+public:
+  void printBoard() const {
+      for (int r = HEIGHT - 1; r >= 0; r--) {
+          for (int c = 0; c < WIDTH; c++) {
+              position_t bit = position_t(1) << (c * (HEIGHT + 1) + r);
+              if (mask & bit) {
+                  if (current_position & bit) std::cout << "O ";
+                  else std::cout << "X ";
+              } else {
+                  std::cout << ". ";
+              }
+          }
+          std::cout << "\n";
+      }
+      std::cout << "\n";
+  }
+private:
 
   void partialKey3(position_t &key, int col) const {
     for(position_t pos = position_t(1) << (col * (HEIGHT + 1)); pos & mask; pos <<= 1) {

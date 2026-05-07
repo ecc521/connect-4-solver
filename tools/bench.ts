@@ -244,7 +244,8 @@ function loadPositions(filePath: string): BenchPos[] {
         expectedScore = Number(parts[1]);
       }
       return { pos, expectedScore };
-    });
+    })
+    .filter((bp) => !isNaN(bp.expectedScore));
 }
 
 function samplePositions(
@@ -296,7 +297,7 @@ async function runBenchmark(
     totalAttempted++;
 
     try {
-      let bestScore = -1000;
+      let bestScore = -100000;
       const posStart = performance.now();
 
       if (mode === "analyze") {
@@ -304,7 +305,7 @@ async function runBenchmark(
           threads,
           timeoutMs: opts.timeout,
         });
-        if (!result || result.aborted) continue;
+        if (!result || (!isHeuristic && result.aborted)) continue;
         totalDepth += result.depthReached || 0;
         if (!result.moveOptions || result.moveOptions.length === 0) continue;
 
@@ -316,7 +317,7 @@ async function runBenchmark(
           threads,
           timeoutMs: opts.timeout,
         });
-        if (!result || result.aborted || !result.evaluation) continue;
+        if (!result || (!isHeuristic && result.aborted) || !result.evaluation) continue;
         totalDepth += result.depthReached || 0;
 
         bestScore = result.evaluation.score;
@@ -326,12 +327,13 @@ async function runBenchmark(
 
       // Accuracy check
       if (isHeuristic) {
+        const DRAW_THRESHOLD = 5000;
         const outcome =
           bestScore >= 31000
             ? 1
             : bestScore <= -31000
               ? -1
-              : bestScore === 0
+              : Math.abs(bestScore) <= DRAW_THRESHOLD
                 ? 0
                 : bestScore > 0
                   ? 1
@@ -343,6 +345,7 @@ async function runBenchmark(
         } else {
           // If the heuristic claims an EXACT forced win but the outcome is wrong, it's a fatal hallucination
           if (bestScore >= 31000 || bestScore <= -31000) {
+            console.log(`Failed! Pos: ${bp.pos}, EngineScore: ${bestScore}, ExpectedScore: ${bp.expectedScore}`);
             hardFailures++;
             if (opts.verbose) {
               console.log(

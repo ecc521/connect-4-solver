@@ -170,7 +170,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       }
     }
 
-    if (aborted) {
+    if (aborted && !isHeuristic) {
       evaluation = null;
       moveOptions.length = 0;
     }
@@ -234,7 +234,9 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       );
     }
 
-    if (aborted) {
+    const isHeuristic = isHeuristicOverride ?? this.isHeuristic;
+
+    if (aborted && !isHeuristic) {
       evaluation = null;
     }
 

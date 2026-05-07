@@ -40,12 +40,12 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     // OOM retry: _createCache returns 0 if allocation fails. Halve the request until it succeeds.
     let sizeMb = this.cacheSizeMb;
     let ptr = 0;
-    while (sizeMb >= 64) {
+    while (sizeMb >= 4) {
       ptr = mod._createCache(this.width, this.height, sizeMb * 1024 * 1024, this.isHeuristic);
       if (ptr !== 0) break;
       sizeMb = Math.floor(sizeMb / 2);
     }
-    if (ptr === 0) throw new Error(`Failed to allocate WASM cache (tried down to 64 MB)`);
+    if (ptr === 0) throw new Error(`Failed to allocate WASM cache (tried down to 4 MB)`);
     this._cachePtr = ptr;
     this.allocatedCacheSizeMb = sizeMb;
 

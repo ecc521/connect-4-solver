@@ -20,6 +20,7 @@
 #include "SolverResult.hpp"
 #include "ThreadPool.hpp"
 #include "Solver.hpp"
+#include <new>
 namespace GameSolver {
 namespace Connect4 {
 
@@ -32,7 +33,15 @@ class HeuristicCache : public Cache {
   using TransTable = TranspositionTable<position_t, int16_t, 16, 7, 2, 5, position_t>;
   std::shared_ptr<TransTable> transTable;
   
-  HeuristicCache(size_t table_bytes) : transTable(std::make_shared<TransTable>(table_bytes)) {}
+  HeuristicCache(size_t table_bytes) {
+      auto* t = new (std::nothrow) TransTable(table_bytes);
+      if (t && t->isValid()) {
+          transTable.reset(t);
+      } else {
+          delete t;
+      }
+  }
+  bool isValid() const { return transTable != nullptr; }
   void reset() override { transTable->reset(); }
   int getSlotWidth() const override { return 128; }
 };
@@ -107,12 +116,17 @@ class HeuristicSolver : public ::GameSolver::Connect4::Solver<WIDTH, HEIGHT> {
   HeuristicSolver() : HeuristicSolver(std::make_shared<TransTable>((1ULL << HEURISTIC_TABLE_SIZE) * 16ULL)) {}
 
   static std::unique_ptr<::GameSolver::Connect4::Cache> createCache(size_t table_bytes) {
-    return std::make_unique<HeuristicCache<WIDTH, HEIGHT>>(table_bytes);
+    auto* c = new (std::nothrow) HeuristicCache<WIDTH, HEIGHT>(table_bytes);
+    if (c && c->isValid()) return std::unique_ptr<::GameSolver::Connect4::Cache>(c);
+    delete c;
+    return nullptr;
   }
 
   static std::unique_ptr<HeuristicSolver<WIDTH, HEIGHT>> createWithCache(::GameSolver::Connect4::Cache* cache) {
     if (auto c = dynamic_cast<HeuristicCache<WIDTH, HEIGHT>*>(cache)) {
-      return std::make_unique<HeuristicSolver<WIDTH, HEIGHT>>(c->transTable);
+      auto* s = new (std::nothrow) HeuristicSolver<WIDTH, HEIGHT>(c->transTable);
+      if (!s) return nullptr;
+      return std::unique_ptr<HeuristicSolver<WIDTH, HEIGHT>>(s);
     }
     return nullptr;
   }

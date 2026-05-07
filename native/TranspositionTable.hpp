@@ -22,6 +22,7 @@
 #include <cstring>
 #include <atomic>
 #include <stdexcept>
+#include <new>
 
 #if defined(__unix__) || defined(__APPLE__) || defined(__EMSCRIPTEN__)
 #include <cstdlib>
@@ -94,12 +95,17 @@ class TranspositionTable {
 
 #if defined(__unix__) || defined(__APPLE__) || defined(__EMSCRIPTEN__)
     if (posix_memalign((void**)&Data, 128, total_bytes) != 0) {
-        throw std::runtime_error("posix_memalign failed for TranspositionTable");
+        Data = nullptr;
+    } else {
+        std::memset(Data, 0, total_bytes);
     }
-    std::memset(Data, 0, total_bytes);
 #else
-    Data = new Bucket[num_buckets]();
+    Data = new (std::nothrow) Bucket[num_buckets]();
 #endif
+  }
+
+  bool isValid() const {
+    return Data != nullptr;
   }
 
   ~TranspositionTable() {

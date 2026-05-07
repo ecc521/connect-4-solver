@@ -90,13 +90,69 @@ inline double elapsed_ms(TimePoint start) {
   return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
 }
 
-// --- Exact solve benchmark (Independent Parallelism) ---
-// Each thread gets its own Solver instance, but they all share the same Cache.
+// --- Exact solve benchmark (Independent Parallelism, or Fresh-TT per position) ---
+// Each thread gets its own Solver instance. When fresh_tt=true, a new TT is
+// created per position so node counts are not inflated by warm-up from earlier positions.
 template <int W, int H>
 void run_solve(const std::vector<BenchPos> &positions, int threads, bool weak,
                int budget_ms = 2000, int timeout_ms_per = 200,
-               const OpeningBookBase<W, H>* book = nullptr) {
+               const OpeningBookBase<W, H>* book = nullptr,
+               bool fresh_tt = false) {
   size_t mem_size = get_cache_size();
+  if (fresh_tt) {
+    // Fresh-TT mode: each position gets its own solver with a cold TT.
+    // Forces single-threaded sequential execution.
+    uint64_t total_nodes = 0;
+    int correct_cnt = 0, completed_cnt = 0;
+    auto bench_start = Clock::now();
+    for (const auto &bp : positions) {
+      if (elapsed_ms(bench_start) > budget_ms) break;
+      auto fresh_cache = Solver<W, H>::createCache(mem_size);
+      auto solver = Solver<W, H>::createWithCache(fresh_cache.get());
+      auto pos_start = Clock::now();
+      GenericPosition<W, H> p;
+      p.play(bp.pos);
+      auto res = solver->solve(p, weak, 1, book, (double)timeout_ms_per);
+      if (res.score == 0 && elapsed_ms(pos_start) >= timeout_ms_per * 0.9) continue; // timed out
+      completed_cnt++;
+      total_nodes += solver->getNodeCount();
+      int expected = weak ? (bp.expected_score > 0 ? 1 : (bp.expected_score < 0 ? -1 : 0)) : bp.expected_score;
+      int actual   = weak ? (res.score > 0 ? 1 : (res.score < 0 ? -1 : 0)) : res.score;
+      if (actual == expected) correct_cnt++;
+      else {
+        g_parity_failures++;
+        std::cerr << "PARITY FAIL [fresh solve" << (weak ? " weak" : "") << "]: pos=\""
+                  << bp.pos << "\" expected=" << expected << " got=" << actual << "\n";
+      }
+    }
+    double total_ms = elapsed_ms(bench_start);
+    double mns = (total_nodes / 1000000.0) / (total_ms / 1000.0);
+    static bool fsolve_header_printed = false;
+    if (!fsolve_header_printed) {
+      std::cout << "\n| Mode         | Type      | Board | Cache  | Slot    |"
+                   " Thr | Pos  | Nodes      | MN/s  | Time     | Parity |\n";
+      std::cout << "|--------------|-----------|-------|--------|---------|-----|"
+                   "------|------------|-------|----------|--------|\n";
+      fsolve_header_printed = true;
+    }
+    std::string mode = std::string(weak ? "solve(weak)" : "solve()") + "*";
+    std::string board_str = std::to_string(W) + "x" + std::to_string(H);
+    std::cout << "| " << std::left << std::setw(12) << mode << " | "
+              << std::setw(9) << "Exact"
+              << " | " << std::setw(5) << board_str
+              << " | " << std::setw(6) << std::to_string(mem_size / (1024 * 1024)) + " MB"
+              << " | " << std::setw(7) << std::to_string(Solver<W,H>::createCache(mem_size)->getSlotWidth()) + "-bit"
+              << " | " << std::setw(3) << 1
+              << " | " << std::setw(4) << completed_cnt
+              << " | " << std::setw(10) << total_nodes
+              << " | " << std::fixed << std::setprecision(2) << std::setw(5) << mns
+              << " | " << std::setw(8) << std::to_string((int)total_ms) + " ms"
+              << " | " << correct_cnt << "/" << completed_cnt
+              << (correct_cnt == completed_cnt ? " ✓" : " FAIL") << " |\n";
+    return;
+  }
+
+  // Shared-TT mode (original)
   auto cache = Solver<W, H>::createCache(mem_size);
   
   // Create a pool of solvers sharing the same cache
@@ -422,7 +478,7 @@ void run_heuristic_solve(const std::vector<BenchPos> &positions, int threads,
 int main(int argc, char* argv[]) {
   bool flag_heuristic = false, flag_exact = false;
   bool flag_solve = false, flag_analyze = false;
-  bool flag_pgo = false;
+  bool flag_pgo = false, flag_fresh = false;
   int budget_ms = 2000;
   int timeout_ms = 200;
   for (int i = 1; i < argc; i++) {
@@ -432,6 +488,7 @@ int main(int argc, char* argv[]) {
     else if (arg == "--solve") flag_solve = true;
     else if (arg == "--analyze") flag_analyze = true;
     else if (arg == "--pgo") flag_pgo = true;
+    else if (arg == "--fresh") flag_fresh = true;
     else if (arg.find("--file=") == 0) continue;
     else if (arg == "--budget" && i + 1 < argc) budget_ms = std::stoi(argv[++i]);
     else if (arg == "--timeout" && i + 1 < argc) timeout_ms = std::stoi(argv[++i]);
@@ -488,10 +545,15 @@ int main(int argc, char* argv[]) {
   if (!solve_hard.empty()) {
     if (do_exact_solve) {
       DummyBook<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO> dummy;
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, true, budget_ms, timeout_ms);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, true, budget_ms, timeout_ms);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, budget_ms, timeout_ms, &dummy);
-      run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, false, budget_ms, timeout_ms, &dummy);
+      if (flag_fresh) {
+        // Fresh-TT mode: one cold solve per position (strong only — most useful for ordering comparison)
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, budget_ms, timeout_ms, &dummy, true);
+      } else {
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, true, budget_ms, timeout_ms);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, true, budget_ms, timeout_ms);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, budget_ms, timeout_ms, &dummy);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, false, budget_ms, timeout_ms, &dummy);
+      }
     }
   }
 

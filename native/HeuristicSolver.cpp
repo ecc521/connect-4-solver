@@ -39,7 +39,13 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
       return 31000 + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
   }
 
-  if (depth <= 0) {
+  auto moves = P.possibleNonLosingMoves();
+  if (moves == 0) {
+      if (P.nbMoves() == WIDTH * HEIGHT) return 0; // Board is full, it's a draw.
+      return -31000 - (WIDTH * HEIGHT - P.nbMoves()) / 2;
+  }
+
+  if (depth <= 0 && (moves & (moves - 1)) != 0) {
     return NNUE<WIDTH, HEIGHT>::evaluate_accumulated(acc, P);
   }
 
@@ -63,21 +69,20 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     if (packed.flags == 3 && score <= alpha) return score; // Upper bound
   }
 
-  auto moves = P.possibleNonLosingMoves();
-  if (moves == 0) {
-      if (P.nbMoves() == WIDTH * HEIGHT) return 0; // Board is full, it's a draw.
-      return -31000 - (WIDTH * HEIGHT - P.nbMoves()) / 2;
-  }
-
   // Forced move fast-path: only one legal move, skip TT write to avoid cache pollution.
   if ((moves & (moves - 1)) == 0) {
     if (localCount > 0) localCount--;
     GenericPosition<WIDTH, HEIGHT> P2(P);
     P2.play(moves);
-    NNUEAccumulator<WIDTH, HEIGHT> next_acc = acc;
     unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(moves);
-    next_acc.addPiece(P.nbMoves() % 2, bit_idx / (HEIGHT + 1), bit_idx % (HEIGHT + 1));
-    return -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, next_acc, localCount);
+    int col = bit_idx / (HEIGHT + 1);
+    int row = bit_idx % (HEIGHT + 1);
+    int player = P.nbMoves() % 2;
+    
+    acc.addPiece(player, col, row);
+    int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, acc, localCount);
+    acc.removePiece(player, col, row);
+    return score;
   }
 
   struct Move {
@@ -109,11 +114,15 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   for (int i = 0; i < n_moves; i++) {
     GenericPosition<WIDTH, HEIGHT> P2(P);
     P2.play(sorted_moves[i].move);
-    NNUEAccumulator<WIDTH, HEIGHT> next_acc = acc;
+    
     unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(sorted_moves[i].move);
-    next_acc.addPiece(P.nbMoves() % 2, bit_idx / (HEIGHT + 1), bit_idx % (HEIGHT + 1));
-
-    int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, next_acc, localCount);
+    int col = bit_idx / (HEIGHT + 1);
+    int row = bit_idx % (HEIGHT + 1);
+    int player = P.nbMoves() % 2;
+    
+    acc.addPiece(player, col, row);
+    int score = -negamax_heuristic(P2, -beta, -alpha, depth - 1, end_time_ms, acc, localCount);
+    acc.removePiece(player, col, row);
     if (score >= 40000 || score <= -40000) return 40000;
 
     if (score > best_score) {

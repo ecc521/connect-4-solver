@@ -159,11 +159,16 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 void* createCache(int w, int h, size_t bytes, bool is_heuristic) {
-    if (is_heuristic) {
-        DISPATCH_CREATE_HEURISTIC_CACHE(w, h, bytes);
-    } else {
-        DISPATCH_CREATE_EXACT_CACHE(w, h, bytes);
+    try {
+        if (is_heuristic) {
+            DISPATCH_CREATE_HEURISTIC_CACHE(w, h, bytes);
+        } else {
+            DISPATCH_CREATE_EXACT_CACHE(w, h, bytes);
+        }
+    } catch (...) {
+        return nullptr;
     }
+    return nullptr;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -175,11 +180,16 @@ void destroyCache(void* cache) {
 
 EMSCRIPTEN_KEEPALIVE
 void* createSolver(int w, int h, void* cache_ptr, bool is_heuristic) {
-    if (is_heuristic) {
-        DISPATCH_CREATE_HEURISTIC(w, h, cache_ptr);
-    } else {
-        DISPATCH_CREATE_EXACT(w, h, cache_ptr);
+    try {
+        if (is_heuristic) {
+            DISPATCH_CREATE_HEURISTIC(w, h, cache_ptr);
+        } else {
+            DISPATCH_CREATE_EXACT(w, h, cache_ptr);
+        }
+    } catch (...) {
+        return nullptr;
     }
+    return nullptr;
 }
 
 EMSCRIPTEN_KEEPALIVE

@@ -38,6 +38,7 @@
 #include <thread>
 #include <algorithm>
 #include <future>
+#include <new>
 
 using namespace GameSolver::Connect4;
 
@@ -659,8 +660,14 @@ class TypedCache : public ::GameSolver::Connect4::Cache {
   static constexpr int MOVE_BITS = WIDTH >= 16 ? 5 : (WIDTH >= 8 ? 4 : 3);
   std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, typename GenericPosition<WIDTH, HEIGHT>::position_t>> transTable;
 
-  TypedCache(size_t table_bytes)
-    : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, typename GenericPosition<WIDTH, HEIGHT>::position_t>>(table_bytes)) {
+  TypedCache(size_t table_bytes) {
+      auto* t = new (std::nothrow) TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, typename GenericPosition<WIDTH, HEIGHT>::position_t>(table_bytes);
+      if (t && t->isValid()) {
+          transTable.reset(t);
+      } else {
+          delete t;
+          return;
+      }
 
       // Calculate CRT safety
       int shift_amount = VALUE_BITS + 7 + MOVE_BITS; // ValueBits + WorkBits + MoveBits
@@ -678,6 +685,10 @@ class TypedCache : public ::GameSolver::Connect4::Cache {
       }
     }
 
+  bool isValid() const {
+    return transTable != nullptr;
+  }
+
   void reset() override {
     transTable->reset();
   }
@@ -690,7 +701,10 @@ class TypedCache : public ::GameSolver::Connect4::Cache {
 template <int WIDTH, int HEIGHT>
 std::unique_ptr<::GameSolver::Connect4::Cache> Solver<WIDTH, HEIGHT>::createCache(size_t table_bytes) {
   if (std::getenv("FORCE_128_BIT")) {
-      return std::make_unique<TypedCache<WIDTH, HEIGHT, WASM_U128_T>>(table_bytes);
+      auto* c = new (std::nothrow) TypedCache<WIDTH, HEIGHT, WASM_U128_T>(table_bytes);
+      if (c && c->isValid()) return std::unique_ptr<::GameSolver::Connect4::Cache>(c);
+      delete c;
+      return nullptr;
   }
 
   constexpr int VALUE_BITS = getRequiredValueBits<WIDTH, HEIGHT>();
@@ -706,25 +720,38 @@ std::unique_ptr<::GameSolver::Connect4::Cache> Solver<WIDTH, HEIGHT>::createCach
 
           if (required_buckets_64 > table_bytes / bucket_size) {
               // Upgrade to 128-bit slot since memory is too small for 64-bit CRT
-              return std::make_unique<TypedCache<WIDTH, HEIGHT, WASM_U128_T>>(table_bytes);
+              auto* c = new (std::nothrow) TypedCache<WIDTH, HEIGHT, WASM_U128_T>(table_bytes);
+              if (c && c->isValid()) return std::unique_ptr<::GameSolver::Connect4::Cache>(c);
+              delete c;
+              return nullptr;
           }
       } else {
           // If 64-bit slot mathematically requires > 2^64 buckets, it's impossible. Must use 128-bit.
-          return std::make_unique<TypedCache<WIDTH, HEIGHT, WASM_U128_T>>(table_bytes);
+          auto* c = new (std::nothrow) TypedCache<WIDTH, HEIGHT, WASM_U128_T>(table_bytes);
+          if (c && c->isValid()) return std::unique_ptr<::GameSolver::Connect4::Cache>(c);
+          delete c;
+          return nullptr;
       }
   }
 
-  return std::make_unique<TypedCache<WIDTH, HEIGHT, uint64_t>>(table_bytes);
+  auto* c = new (std::nothrow) TypedCache<WIDTH, HEIGHT, uint64_t>(table_bytes);
+  if (c && c->isValid()) return std::unique_ptr<::GameSolver::Connect4::Cache>(c);
+  delete c;
+  return nullptr;
 }
 
 template <int WIDTH, int HEIGHT>
 std::unique_ptr<Solver<WIDTH, HEIGHT>> Solver<WIDTH, HEIGHT>::createWithCache(::GameSolver::Connect4::Cache* cache) {
   if (auto c64 = dynamic_cast<TypedCache<WIDTH, HEIGHT, uint64_t>*>(cache)) {
-    return std::make_unique<SolverImpl<WIDTH, HEIGHT, uint64_t>>(c64->transTable);
+    auto* s = new (std::nothrow) SolverImpl<WIDTH, HEIGHT, uint64_t>(c64->transTable);
+    if (!s) return nullptr;
+    return std::unique_ptr<Solver<WIDTH, HEIGHT>>(s);
   } else if (auto c128 = dynamic_cast<TypedCache<WIDTH, HEIGHT, WASM_U128_T>*>(cache)) {
-    return std::make_unique<SolverImpl<WIDTH, HEIGHT, WASM_U128_T>>(c128->transTable);
+    auto* s = new (std::nothrow) SolverImpl<WIDTH, HEIGHT, WASM_U128_T>(c128->transTable);
+    if (!s) return nullptr;
+    return std::unique_ptr<Solver<WIDTH, HEIGHT>>(s);
   } else {
-    throw std::invalid_argument("Unsupported cache type");
+    return nullptr;
   }
 }
 

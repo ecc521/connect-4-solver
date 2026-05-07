@@ -164,7 +164,7 @@ export abstract class BaseConnect4Solver {
   public width: number;
   public height: number;
   /** The cache size actually allocated after init(). May be less than requested if memory is tight. */
-  public allocatedCacheSizeMb: number = 0;
+  public allocatedCacheSizeMb = 0;
   protected initialized = false;
   protected _bookPtr: number | string | object = 0;
 
