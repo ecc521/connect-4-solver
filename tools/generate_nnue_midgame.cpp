@@ -43,11 +43,8 @@ void dump_cache(const std::shared_ptr<TranspositionTable<SlotType, uint8_t, Solv
     // just add a method to dump directly. Since we can't easily modify TranspositionTable 
     // without touching headers, we'll iterate and check bounds.
     
-    // Actually, we can just use the public size and reconstruct keys!
-    // But Data is private. We need to add a dump function to TranspositionTable.
-    // Wait, since we are doing this fast, let's just modify the TT header temporarily or provide a dump method.
-    // We will use a cleaner approach: We will extract the exact scores of the ROOT positions only first to guarantee quality,
-    // and if we need cache dumping, we will modify TT.
+    // To extract positions: We can reconstruct keys from public sizes or modify the TranspositionTable
+    // to provide a dedicated dump function. For now, extracting exact scores of ROOT positions ensures quality.
 }
 
 void worker_thread(int id, int num_positions, int depth, std::atomic<int>& progress) {

@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include "../../native/bindings_core.hpp"
+#include "../../native/dispatch_table.hpp"
 
 // Pointer conversion helpers
 template <typename T>
@@ -25,22 +26,21 @@ T* stringToPtr(JNIEnv *env, jstring str) {
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_connect4solver_Connect4SolverModule_nativeCreateCache(JNIEnv *env, jobject, jint w, jint h, jdouble sizeBytes, jboolean is_heuristic) {
-    void* ptr = nullptr;
     size_t bytes = static_cast<size_t>(sizeBytes);
+    void* ptr = nullptr;
     if (is_heuristic) {
-        if (w == 6 && h == 5) ptr = GameSolver::Connect4::HeuristicSolver<6, 5>::createCache(bytes).release();
-        else if (w == 6 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<6, 6>::createCache(bytes).release();
-        else if (w == 7 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<7, 6>::createCache(bytes).release();
-        else if (w == 7 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<7, 7>::createCache(bytes).release();
-        else if (w == 8 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<8, 6>::createCache(bytes).release();
-        else if (w == 9 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<9, 7>::createCache(bytes).release();
-        else if (w == 8 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<8, 8>::createCache(bytes).release();
-        else if (w == 10 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<10, 7>::createCache(bytes).release();
-        else if (w == 9 && h == 9) ptr = GameSolver::Connect4::HeuristicSolver<9, 9>::createCache(bytes).release();
-        else if (w == 10 && h == 10) ptr = GameSolver::Connect4::HeuristicSolver<10, 10>::createCache(bytes).release();
-        else if (w == 9 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<9, 6>::createCache(bytes).release();
-        else if (w == 11 && h == 4) ptr = GameSolver::Connect4::HeuristicSolver<11, 4>::createCache(bytes).release();
+        ptr = dispatch<void*>(w, h, [&](auto tag) {
+            using Size = typename decltype(tag)::type;
+            return Size::HeuristicSolver::createCache(bytes).release();
+        });
     } else {
+        ptr = dispatch<void*>(w, h, [&](auto tag) {
+            using Size = typename decltype(tag)::type;
+            return Size::Solver::createCache(bytes).release();
+        });
+    }
+    return ptrToString(env, ptr);
+} else {
         if (w == 6 && h == 5) ptr = C4_6x5::GameSolver::Connect4::Solver::createCache(bytes).release();
         else if (w == 6 && h == 6) ptr = C4_6x6::GameSolver::Connect4::Solver::createCache(bytes).release();
         else if (w == 7 && h == 6) ptr = C4_7x6::GameSolver::Connect4::Solver::createCache(bytes).release();
@@ -58,20 +58,11 @@ Java_com_connect4solver_Connect4SolverModule_nativeCreateBookFromBuffer(JNIEnv *
     jsize length = env->GetArrayLength(base64Bytes);
     jbyte* bytes = env->GetByteArrayElements(base64Bytes, 0);
     const uint8_t* unsignedBytes = reinterpret_cast<const uint8_t*>(bytes);
-    void* ptr = nullptr;
     
-    if (w == 6 && h == 5) ptr = GameSolver::Connect4::OpeningBookBase<6, 5>::load_from_memory(unsignedBytes, length, w, h).release();
-    else if (w == 6 && h == 6) ptr = GameSolver::Connect4::OpeningBookBase<6, 6>::load_from_memory(unsignedBytes, length, w, h).release();
-    else if (w == 7 && h == 6) ptr = GameSolver::Connect4::OpeningBookBase<7, 6>::load_from_memory(unsignedBytes, length, w, h).release();
-    else if (w == 7 && h == 7) ptr = GameSolver::Connect4::OpeningBookBase<7, 7>::load_from_memory(unsignedBytes, length, w, h).release();
-    else if (w == 8 && h == 6) ptr = GameSolver::Connect4::OpeningBookBase<8, 6>::load_from_memory(unsignedBytes, length, w, h).release();
-    else if (w == 9 && h == 7) ptr = GameSolver::Connect4::OpeningBookBase<9, 7>::load_from_memory(unsignedBytes, length, w, h).release();
-    else if (w == 8 && h == 8) ptr = GameSolver::Connect4::OpeningBookBase<8, 8>::load_from_memory(unsignedBytes, length, w, h).release();
-    else if (w == 10 && h == 7) ptr = GameSolver::Connect4::OpeningBookBase<10, 7>::load_from_memory(unsignedBytes, length, w, h).release();
-    else if (w == 9 && h == 9) ptr = GameSolver::Connect4::OpeningBookBase<9, 9>::load_from_memory(unsignedBytes, length, w, h).release();
-    else if (w == 10 && h == 10) ptr = GameSolver::Connect4::OpeningBookBase<10, 10>::load_from_memory(unsignedBytes, length, w, h).release();
-    else if (w == 9 && h == 6) ptr = GameSolver::Connect4::OpeningBookBase<9, 6>::load_from_memory(unsignedBytes, length, w, h).release();
-    else if (w == 11 && h == 4) ptr = GameSolver::Connect4::OpeningBookBase<11, 4>::load_from_memory(unsignedBytes, length, w, h).release();
+    void* ptr = dispatch<void*>(w, h, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        return GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>::load_from_memory(unsignedBytes, length, Size::w, Size::h).release();
+    });
     
     env->ReleaseByteArrayElements(base64Bytes, bytes, 0);
     return ptrToString(env, ptr);
@@ -82,18 +73,10 @@ Java_com_connect4solver_Connect4SolverModule_nativeDestroyBook(JNIEnv *env, jobj
     void* bookPtr = stringToPtr<void>(env, bookPtrStr);
     if (!bookPtr) return;
     
-    if (w == 6 && h == 5) delete static_cast<GameSolver::Connect4::OpeningBookBase<6, 5>*>(bookPtr);
-    else if (w == 6 && h == 6) delete static_cast<GameSolver::Connect4::OpeningBookBase<6, 6>*>(bookPtr);
-    else if (w == 7 && h == 6) delete static_cast<GameSolver::Connect4::OpeningBookBase<7, 6>*>(bookPtr);
-    else if (w == 7 && h == 7) delete static_cast<GameSolver::Connect4::OpeningBookBase<7, 7>*>(bookPtr);
-    else if (w == 8 && h == 6) delete static_cast<GameSolver::Connect4::OpeningBookBase<8, 6>*>(bookPtr);
-    else if (w == 9 && h == 7) delete static_cast<GameSolver::Connect4::OpeningBookBase<9, 7>*>(bookPtr);
-    else if (w == 8 && h == 8) delete static_cast<GameSolver::Connect4::OpeningBookBase<8, 8>*>(bookPtr);
-    else if (w == 10 && h == 7) delete static_cast<GameSolver::Connect4::OpeningBookBase<10, 7>*>(bookPtr);
-    else if (w == 9 && h == 9) delete static_cast<GameSolver::Connect4::OpeningBookBase<9, 9>*>(bookPtr);
-    else if (w == 10 && h == 10) delete static_cast<GameSolver::Connect4::OpeningBookBase<10, 10>*>(bookPtr);
-    else if (w == 9 && h == 6) delete static_cast<GameSolver::Connect4::OpeningBookBase<9, 6>*>(bookPtr);
-    else if (w == 11 && h == 4) delete static_cast<GameSolver::Connect4::OpeningBookBase<11, 4>*>(bookPtr);
+    dispatch_void(w, h, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        delete static_cast<GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>*>(bookPtr);
+    });
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -107,19 +90,18 @@ Java_com_connect4solver_Connect4SolverModule_nativeCreateSolver(JNIEnv *env, job
     auto cache = stringToPtr<GameSolver::Connect4::Cache>(env, cachePtrStr);
     void* ptr = nullptr;
     if (is_heuristic) {
-        if (w == 6 && h == 5) ptr = GameSolver::Connect4::HeuristicSolver<6, 5>::createWithCache(cache).release();
-        else if (w == 6 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<6, 6>::createWithCache(cache).release();
-        else if (w == 7 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<7, 6>::createWithCache(cache).release();
-        else if (w == 7 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<7, 7>::createWithCache(cache).release();
-        else if (w == 8 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<8, 6>::createWithCache(cache).release();
-        else if (w == 9 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<9, 7>::createWithCache(cache).release();
-        else if (w == 8 && h == 8) ptr = GameSolver::Connect4::HeuristicSolver<8, 8>::createWithCache(cache).release();
-        else if (w == 10 && h == 7) ptr = GameSolver::Connect4::HeuristicSolver<10, 7>::createWithCache(cache).release();
-        else if (w == 9 && h == 9) ptr = GameSolver::Connect4::HeuristicSolver<9, 9>::createWithCache(cache).release();
-        else if (w == 10 && h == 10) ptr = GameSolver::Connect4::HeuristicSolver<10, 10>::createWithCache(cache).release();
-        else if (w == 9 && h == 6) ptr = GameSolver::Connect4::HeuristicSolver<9, 6>::createWithCache(cache).release();
-        else if (w == 11 && h == 4) ptr = GameSolver::Connect4::HeuristicSolver<11, 4>::createWithCache(cache).release();
+        ptr = dispatch<void*>(w, h, [&](auto tag) {
+            using Size = typename decltype(tag)::type;
+            return Size::HeuristicSolver::createWithCache(cache).release();
+        });
     } else {
+        ptr = dispatch<void*>(w, h, [&](auto tag) {
+            using Size = typename decltype(tag)::type;
+            return Size::Solver::createWithCache(cache).release();
+        });
+    }
+    return ptrToString(env, ptr);
+} else {
         if (w == 6 && h == 5) ptr = C4_6x5::GameSolver::Connect4::Solver::createWithCache(cache).release();
         else if (w == 6 && h == 6) ptr = C4_6x6::GameSolver::Connect4::Solver::createWithCache(cache).release();
         else if (w == 7 && h == 6) ptr = C4_7x6::GameSolver::Connect4::Solver::createWithCache(cache).release();
@@ -138,19 +120,17 @@ Java_com_connect4solver_Connect4SolverModule_nativeDestroySolver(JNIEnv *env, jo
     if (!solver) return;
     
     if (is_heuristic) {
-        if (w == 6 && h == 5) delete static_cast<GameSolver::Connect4::HeuristicSolver<6, 5>*>(solver);
-        else if (w == 6 && h == 6) delete static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver);
-        else if (w == 7 && h == 6) delete static_cast<GameSolver::Connect4::HeuristicSolver<7, 6>*>(solver);
-        else if (w == 7 && h == 7) delete static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver);
-        else if (w == 8 && h == 6) delete static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver);
-        else if (w == 9 && h == 7) delete static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver);
-        else if (w == 8 && h == 8) delete static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver);
-        else if (w == 10 && h == 7) delete static_cast<GameSolver::Connect4::HeuristicSolver<10, 7>*>(solver);
-        else if (w == 9 && h == 9) delete static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver);
-        else if (w == 10 && h == 10) delete static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver);
-        else if (w == 9 && h == 6) delete static_cast<GameSolver::Connect4::HeuristicSolver<9, 6>*>(solver);
-        else if (w == 11 && h == 4) delete static_cast<GameSolver::Connect4::HeuristicSolver<11, 4>*>(solver);
+        dispatch_void(w, h, [&](auto tag) {
+            using Size = typename decltype(tag)::type;
+            delete static_cast<typename Size::HeuristicSolver*>(solver);
+        });
     } else {
+        dispatch_void(w, h, [&](auto tag) {
+            using Size = typename decltype(tag)::type;
+            delete static_cast<typename Size::Solver*>(solver);
+        });
+    }
+} else {
         if (w == 6 && h == 5) delete static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver);
         else if (w == 6 && h == 6) delete static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver);
         else if (w == 7 && h == 6) delete static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver);
@@ -168,19 +148,17 @@ Java_com_connect4solver_Connect4SolverModule_nativeStop(JNIEnv *env, jobject, js
     if (!solver) return;
     
     if (is_heuristic) {
-        if (w == 6 && h == 5) static_cast<GameSolver::Connect4::HeuristicSolver<6, 5>*>(solver)->stop();
-        else if (w == 6 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver)->stop();
-        else if (w == 7 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<7, 6>*>(solver)->stop();
-        else if (w == 7 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver)->stop();
-        else if (w == 8 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver)->stop();
-        else if (w == 9 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver)->stop();
-        else if (w == 8 && h == 8) static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver)->stop();
-        else if (w == 10 && h == 7) static_cast<GameSolver::Connect4::HeuristicSolver<10, 7>*>(solver)->stop();
-        else if (w == 9 && h == 9) static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver)->stop();
-        else if (w == 10 && h == 10) static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver)->stop();
-        else if (w == 9 && h == 6) static_cast<GameSolver::Connect4::HeuristicSolver<9, 6>*>(solver)->stop();
-        else if (w == 11 && h == 4) static_cast<GameSolver::Connect4::HeuristicSolver<11, 4>*>(solver)->stop();
+        dispatch_void(w, h, [&](auto tag) {
+            using Size = typename decltype(tag)::type;
+            static_cast<typename Size::HeuristicSolver*>(solver)->stop();
+        });
     } else {
+        dispatch_void(w, h, [&](auto tag) {
+            using Size = typename decltype(tag)::type;
+            static_cast<typename Size::Solver*>(solver)->stop();
+        });
+    }
+} else {
         if (w == 6 && h == 5) static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver)->stop();
         else if (w == 6 && h == 6) static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver)->stop();
         else if (w == 7 && h == 6) static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver)->stop();
@@ -302,16 +280,13 @@ Java_com_connect4solver_Connect4SolverModule_nativeAnalyze(JNIEnv *env, jobject,
     const char *posChars = env->GetStringUTFChars(position, 0);
     void* solver = stringToPtr<void>(env, solverPtrStr);
     void* bookPtr = stringToPtr<void>(env, bookPtrStr);
-    jintArray result = nullptr;
     
-    if (w == 6 && h == 5) result = runNativeAnalysis<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6, GameSolver::Connect4::OpeningBookBase<6,5>>(env, *static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 6 && h == 6) result = runNativeAnalysis<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6, GameSolver::Connect4::OpeningBookBase<6,6>>(env, *static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 7 && h == 6) result = runNativeAnalysis<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7, GameSolver::Connect4::OpeningBookBase<7,6>>(env, *static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 7 && h == 7) result = runNativeAnalysis<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7, GameSolver::Connect4::OpeningBookBase<7,7>>(env, *static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 8 && h == 6) result = runNativeAnalysis<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8, GameSolver::Connect4::OpeningBookBase<8,6>>(env, *static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 9 && h == 7) result = runNativeAnalysis<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9, GameSolver::Connect4::OpeningBookBase<9,7>>(env, *static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 9 && h == 6) result = runNativeAnalysis<C4_9x6::GameSolver::Connect4::Solver, C4_9x6::GameSolver::Connect4::Position, 9, GameSolver::Connect4::OpeningBookBase<9,6>>(env, *static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 11 && h == 4) result = runNativeAnalysis<C4_11x4::GameSolver::Connect4::Solver, C4_11x4::GameSolver::Connect4::Position, 11, GameSolver::Connect4::OpeningBookBase<11,4>>(env, *static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
+    jintArray result = dispatch<jintArray>(w, h, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        return runNativeAnalysis<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+            env, *static_cast<typename Size::Solver*>(solver), posChars, threads, bookPtr, 0
+        );
+    });
     
     env->ReleaseStringUTFChars(position, posChars);
     return result;
@@ -322,16 +297,13 @@ Java_com_connect4solver_Connect4SolverModule_nativeSolve(JNIEnv *env, jobject, j
     const char *posChars = env->GetStringUTFChars(position, 0);
     void* solver = stringToPtr<void>(env, solverPtrStr);
     void* bookPtr = stringToPtr<void>(env, bookPtrStr);
-    jintArray result = nullptr;
     
-    if (w == 6 && h == 5) result = runNativeSolve<C4_6x5::GameSolver::Connect4::Solver, C4_6x5::GameSolver::Connect4::Position, 6, GameSolver::Connect4::OpeningBookBase<6,5>>(env, *static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 6 && h == 6) result = runNativeSolve<C4_6x6::GameSolver::Connect4::Solver, C4_6x6::GameSolver::Connect4::Position, 6, GameSolver::Connect4::OpeningBookBase<6,6>>(env, *static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 7 && h == 6) result = runNativeSolve<C4_7x6::GameSolver::Connect4::Solver, C4_7x6::GameSolver::Connect4::Position, 7, GameSolver::Connect4::OpeningBookBase<7,6>>(env, *static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 7 && h == 7) result = runNativeSolve<C4_7x7::GameSolver::Connect4::Solver, C4_7x7::GameSolver::Connect4::Position, 7, GameSolver::Connect4::OpeningBookBase<7,7>>(env, *static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 8 && h == 6) result = runNativeSolve<C4_8x6::GameSolver::Connect4::Solver, C4_8x6::GameSolver::Connect4::Position, 8, GameSolver::Connect4::OpeningBookBase<8,6>>(env, *static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 9 && h == 7) result = runNativeSolve<C4_9x7::GameSolver::Connect4::Solver, C4_9x7::GameSolver::Connect4::Position, 9, GameSolver::Connect4::OpeningBookBase<9,7>>(env, *static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 9 && h == 6) result = runNativeSolve<C4_9x6::GameSolver::Connect4::Solver, C4_9x6::GameSolver::Connect4::Position, 9, GameSolver::Connect4::OpeningBookBase<9,6>>(env, *static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
-    else if (w == 11 && h == 4) result = runNativeSolve<C4_11x4::GameSolver::Connect4::Solver, C4_11x4::GameSolver::Connect4::Position, 11, GameSolver::Connect4::OpeningBookBase<11,4>>(env, *static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver), posChars, threads, bookPtr, 0);
+    jintArray result = dispatch<jintArray>(w, h, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        return runNativeSolve<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+            env, *static_cast<typename Size::Solver*>(solver), posChars, threads, bookPtr, 0
+        );
+    });
     
     env->ReleaseStringUTFChars(position, posChars);
     return result;
@@ -342,20 +314,13 @@ Java_com_connect4solver_Connect4SolverModule_nativeAnalyzeHeuristic(JNIEnv *env,
     const char *posChars = env->GetStringUTFChars(position, 0);
     void* solver = stringToPtr<void>(env, solverPtrStr);
     void* bookPtr = stringToPtr<void>(env, bookPtrStr);
-    jintArray result = nullptr;
     
-    if (w == 6 && h == 5) result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<6, 5>, GameSolver::Connect4::GenericPosition<6, 5>, 6, GameSolver::Connect4::OpeningBookBase<6,5>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<6, 5>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 6 && h == 6) result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<6, 6>, GameSolver::Connect4::GenericPosition<6, 6>, 6, GameSolver::Connect4::OpeningBookBase<6,6>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 7 && h == 6) result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 6>, GameSolver::Connect4::GenericPosition<7, 6>, 7, GameSolver::Connect4::OpeningBookBase<7,6>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<7, 6>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 7 && h == 7) result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7, GameSolver::Connect4::OpeningBookBase<7,7>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 8 && h == 6) result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<8, 6>, GameSolver::Connect4::GenericPosition<8, 6>, 8, GameSolver::Connect4::OpeningBookBase<8,6>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 9 && h == 7) result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 7>, GameSolver::Connect4::GenericPosition<9, 7>, 9, GameSolver::Connect4::OpeningBookBase<9,7>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 8 && h == 8) result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<8, 8>, GameSolver::Connect4::GenericPosition<8, 8>, 8, GameSolver::Connect4::OpeningBookBase<8,8>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 10 && h == 7) result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<10, 7>, GameSolver::Connect4::GenericPosition<10, 7>, 10, GameSolver::Connect4::OpeningBookBase<10,7>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<10, 7>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 9 && h == 9) result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 9>, GameSolver::Connect4::GenericPosition<9, 9>, 9, GameSolver::Connect4::OpeningBookBase<9,9>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 10 && h == 10) result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<10, 10>, GameSolver::Connect4::GenericPosition<10, 10>, 10, GameSolver::Connect4::OpeningBookBase<10,10>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 9 && h == 6) result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<9, 6>, GameSolver::Connect4::GenericPosition<9, 6>, 9, GameSolver::Connect4::OpeningBookBase<9,6>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<9, 6>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 11 && h == 4) result = runNativeHeuristicAnalysis<GameSolver::Connect4::HeuristicSolver<11, 4>, GameSolver::Connect4::GenericPosition<11, 4>, 11, GameSolver::Connect4::OpeningBookBase<11,4>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<11, 4>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
+    jintArray result = dispatch<jintArray>(w, h, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        return runNativeHeuristicAnalysis<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+            env, *static_cast<typename Size::HeuristicSolver*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr
+        );
+    });
     
     env->ReleaseStringUTFChars(position, posChars);
     return result;
@@ -366,20 +331,13 @@ Java_com_connect4solver_Connect4SolverModule_nativeSolveHeuristic(JNIEnv *env, j
     const char *posChars = env->GetStringUTFChars(position, 0);
     void* solver = stringToPtr<void>(env, solverPtrStr);
     void* bookPtr = stringToPtr<void>(env, bookPtrStr);
-    jintArray result = nullptr;
     
-    if (w == 6 && h == 5) result = runNativeHeuristicSolve<GameSolver::Connect4::HeuristicSolver<6, 5>, GameSolver::Connect4::GenericPosition<6, 5>, 6, GameSolver::Connect4::OpeningBookBase<6,5>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<6, 5>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 6 && h == 6) result = runNativeHeuristicSolve<GameSolver::Connect4::HeuristicSolver<6, 6>, GameSolver::Connect4::GenericPosition<6, 6>, 6, GameSolver::Connect4::OpeningBookBase<6,6>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<6, 6>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 7 && h == 6) result = runNativeHeuristicSolve<GameSolver::Connect4::HeuristicSolver<7, 6>, GameSolver::Connect4::GenericPosition<7, 6>, 7, GameSolver::Connect4::OpeningBookBase<7,6>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<7, 6>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 7 && h == 7) result = runNativeHeuristicSolve<GameSolver::Connect4::HeuristicSolver<7, 7>, GameSolver::Connect4::GenericPosition<7, 7>, 7, GameSolver::Connect4::OpeningBookBase<7,7>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<7, 7>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 8 && h == 6) result = runNativeHeuristicSolve<GameSolver::Connect4::HeuristicSolver<8, 6>, GameSolver::Connect4::GenericPosition<8, 6>, 8, GameSolver::Connect4::OpeningBookBase<8,6>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<8, 6>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 9 && h == 7) result = runNativeHeuristicSolve<GameSolver::Connect4::HeuristicSolver<9, 7>, GameSolver::Connect4::GenericPosition<9, 7>, 9, GameSolver::Connect4::OpeningBookBase<9,7>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<9, 7>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 8 && h == 8) result = runNativeHeuristicSolve<GameSolver::Connect4::HeuristicSolver<8, 8>, GameSolver::Connect4::GenericPosition<8, 8>, 8, GameSolver::Connect4::OpeningBookBase<8,8>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<8, 8>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 10 && h == 7) result = runNativeHeuristicSolve<GameSolver::Connect4::HeuristicSolver<10, 7>, GameSolver::Connect4::GenericPosition<10, 7>, 10, GameSolver::Connect4::OpeningBookBase<10,7>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<10, 7>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 9 && h == 9) result = runNativeHeuristicSolve<GameSolver::Connect4::HeuristicSolver<9, 9>, GameSolver::Connect4::GenericPosition<9, 9>, 9, GameSolver::Connect4::OpeningBookBase<9,9>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<9, 9>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 10 && h == 10) result = runNativeHeuristicSolve<GameSolver::Connect4::HeuristicSolver<10, 10>, GameSolver::Connect4::GenericPosition<10, 10>, 10, GameSolver::Connect4::OpeningBookBase<10,10>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<10, 10>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 9 && h == 6) result = runNativeHeuristicSolve<GameSolver::Connect4::HeuristicSolver<9, 6>, GameSolver::Connect4::GenericPosition<9, 6>, 9, GameSolver::Connect4::OpeningBookBase<9,6>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<9, 6>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
-    else if (w == 11 && h == 4) result = runNativeHeuristicSolve<GameSolver::Connect4::HeuristicSolver<11, 4>, GameSolver::Connect4::GenericPosition<11, 4>, 11, GameSolver::Connect4::OpeningBookBase<11,4>>(env, *static_cast<GameSolver::Connect4::HeuristicSolver<11, 4>*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr);
+    jintArray result = dispatch<jintArray>(w, h, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        return runNativeHeuristicSolve<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+            env, *static_cast<typename Size::HeuristicSolver*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr
+        );
+    });
     
     env->ReleaseStringUTFChars(position, posChars);
     return result;
