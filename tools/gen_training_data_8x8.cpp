@@ -90,28 +90,55 @@ static double now_ms() {
 }
 
 // ── Random position generation ────────────────────────────────────────────────
-static Pos make_random_position(int target_ply, std::mt19937& rng) {
+static Pos make_random_position(int target_ply, std::mt19937& rng, HeurSolver* heur_solver) {
     while (true) {
         Pos P;
-        std::uniform_int_distribution<int> col_dist(0, W - 1);
         int moves_played = 0;
         bool ok = true;
+        std::uniform_real_distribution<double> epsilon(0.0, 1.0);
+        std::uniform_int_distribution<int> col_dist(0, W - 1);
+
         for (int i = 0; i < target_ply; ++i) {
-            // Collect non-winning moves to avoid early termination
-            int tries = 0;
-            while (tries < 20) {
-                int col = col_dist(rng);
-                if (P.canPlay(col) && !P.isWinningMove(col)) {
-                    P.playCol(col);
-                    ++moves_played;
-                    break;
-                }
-                ++tries;
+            // If the game is already over, restart
+            if (P.canWinNext()) {
+                ok = false;
+                break;
             }
-            if (tries == 20) { ok = false; break; }
+
+            int move_to_play = -1;
+            
+            // 10% chance to play a random blunder, 90% chance to play heuristically
+            if (epsilon(rng) < 0.10) {
+                int tries = 0;
+                while (tries < 20) {
+                    int col = col_dist(rng);
+                    if (P.canPlay(col)) {
+                        move_to_play = col;
+                        break;
+                    }
+                    tries++;
+                }
+            } else {
+                // Shallow heuristic search (depth 2) to maintain structure
+                SolverResult res = heur_solver->solve(P, false, 2, nullptr, 1000.0);
+                if (res.bestMove != -1 && P.canPlay(res.bestMove)) {
+                    move_to_play = res.bestMove;
+                } else {
+                    // Fallback to random
+                    for (int c = 0; c < W; ++c) {
+                        if (P.canPlay(c)) { move_to_play = c; break; }
+                    }
+                }
+            }
+
+            if (move_to_play == -1) { ok = false; break; }
+            P.playCol(move_to_play);
+            moves_played++;
         }
-        if (ok && moves_played == target_ply && !P.canWinNext())
+
+        if (ok && moves_played == target_ply && !P.canWinNext()) {
             return P;
+        }
     }
 }
 
@@ -134,8 +161,8 @@ int main(int argc, char** argv) {
     // ── Allocate 54 GB shared exact cache ────────────────────────────────────
     // 54 GB split: we give 48 GB to the exact solver.
     // Each exact TT slot is 7 bytes; 48 GB / 7 ≈ 7.35 billion slots.
-    const size_t exact_cache_bytes = 48ULL * 1024 * 1024 * 1024;
-    printf("Allocating %zu GB shared exact TT... ", exact_cache_bytes >> 30);
+    const size_t exact_cache_bytes = 1ULL * 1024 * 1024 * 1024;
+    printf("Allocating %zu MB shared exact TT... ", exact_cache_bytes >> 20);
     fflush(stdout);
 
     auto exact_cache = ExactSolver::createCache(exact_cache_bytes);
@@ -146,8 +173,8 @@ int main(int argc, char** argv) {
     printf("OK\n");
 
     // ── Allocate heuristic cache (remaining ~6 GB) ────────────────────────────
-    const size_t heur_cache_bytes = 6ULL * 1024 * 1024 * 1024;
-    printf("Allocating %zu GB shared heuristic TT... ", heur_cache_bytes >> 30);
+    const size_t heur_cache_bytes = 256ULL * 1024 * 1024;
+    printf("Allocating %zu MB shared heuristic TT... ", heur_cache_bytes >> 20);
     fflush(stdout);
 
     auto heur_cache = HeuristicSolver<W, H>::createCache(heur_cache_bytes);
@@ -221,7 +248,7 @@ int main(int argc, char** argv) {
 
             // Convert remaining moves → ply count (pieces on board)
             const int target_ply = max_ply - current_remaining;
-            Pos P = make_random_position(target_ply, reinterpret_cast<std::mt19937&>(rng));
+            Pos P = make_random_position(target_ply, reinterpret_cast<std::mt19937&>(rng), heur_solver.get());
 
             const int remaining = max_ply - P.nbMoves();
             const int max_rem   = max_remaining_exact.load(std::memory_order_relaxed);

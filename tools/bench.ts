@@ -317,7 +317,8 @@ async function runBenchmark(
           threads,
           timeoutMs: opts.timeout,
         });
-        if (!result || (!isHeuristic && result.aborted) || !result.evaluation) continue;
+        if (!result || (!isHeuristic && result.aborted) || !result.evaluation)
+          continue;
         totalDepth += result.depthReached || 0;
 
         bestScore = result.evaluation.score;
@@ -345,7 +346,9 @@ async function runBenchmark(
         } else {
           // If the heuristic claims an EXACT forced win but the outcome is wrong, it's a fatal hallucination
           if (bestScore >= 31000 || bestScore <= -31000) {
-            console.log(`Failed! Pos: ${bp.pos}, EngineScore: ${bestScore}, ExpectedScore: ${bp.expectedScore}`);
+            console.log(
+              `Failed! Pos: ${bp.pos}, EngineScore: ${bestScore}, ExpectedScore: ${bp.expectedScore}`,
+            );
             hardFailures++;
             if (opts.verbose) {
               console.log(
@@ -592,7 +595,19 @@ async function main(): Promise<void> {
               heuristic: engine.heuristic,
             });
           }
-          await solver.init();
+          try {
+            await solver.init();
+          } catch (err) {
+            if (opts.verbose) {
+              console.log(
+                `| ${pad(mode + "()", 10)} | ${pad(engine.name, 10)} | ${pad(sizeStr, 5)} | ${pad(tCount.toString(), 3, false)} | ${pad("-", 7, false)} | ${pad("Skipped", 8, false)} | ${pad("-", 6, false)} | ${pad("-", 14, false)} | ${pad("-", 6, false)} | ${pad("-", 8, false)} |`,
+              );
+            }
+            try {
+              solver.release();
+            } catch {}
+            continue;
+          }
 
           // First thread count: apply budget to determine position set
           // Subsequent thread counts: use the same positions (no budget)

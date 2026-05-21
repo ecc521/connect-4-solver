@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 import argparse, os, sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from train_nnue import NNUE, Connect4Dataset
+from train_nnue import NNUE, ExactDataset
 
 
 def load_model(path, width, height, device):
@@ -81,7 +81,7 @@ def main():
     print(f"Device: {device}")
 
     files = [f.strip() for f in args.data.split(",")]
-    dataset = Connect4Dataset(files, args.width, args.height)
+    dataset = ExactDataset(files, args.width, args.height)
     loader  = DataLoader(dataset, batch_size=4096, shuffle=False, num_workers=2)
 
     max_score = (args.width * args.height) // 2

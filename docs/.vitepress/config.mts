@@ -26,6 +26,7 @@ export default defineConfig({
       {
         text: "Core API",
         items: [
+          { text: "AdaptiveSolver", link: "/api/adaptive-solver" },
           { text: "BaseConnect4Solver", link: "/api/base-solver" },
           { text: "OpeningBook", link: "/api/opening-book" },
         ],
