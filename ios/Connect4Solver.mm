@@ -6,6 +6,7 @@
 
 // Include the deeply optimized singleton instantiations seamlessly mapped into pure ARM binary output natively
 #include "../native/bindings_core.hpp"
+#include "../native/embedded_books.hpp"
 
 // Pointer conversion helpers
 template <typename T>
@@ -202,6 +203,18 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(stop:(NSString *)solverPtrStr width:(int)
     return @(YES);
 }
 
+template <int W, int H, typename CoreBook>
+const CoreBook* getEffectiveBookIOS(void* book_ptr) {
+    if (book_ptr) return static_cast<const CoreBook*>(book_ptr);
+    const uint8_t* data = EmbeddedBooks::getBookData(W, H);
+    if (!data) return nullptr;
+    static const CoreBook* embedded =
+        static_cast<const CoreBook*>(
+            GameSolver::Connect4::OpeningBookBase<W, H>::load_from_memory(
+                data, EmbeddedBooks::getBookSize(W, H), W, H).release());
+    return embedded;
+}
+
 template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
 NSArray* runNativeAnalysis(CoreSolver& solver, NSString* positionStr, int threads, void* book_ptr, double timeout_ms) {
   std::string positionString([positionStr UTF8String]);
@@ -213,8 +226,7 @@ NSArray* runNativeAnalysis(CoreSolver& solver, NSString* positionStr, int thread
     [result addObject:@(P.nbMoves())];
     for(int i = 0; i < W; i++) [result addObject:@(0)];
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookIOS<CorePosition::WIDTH, CorePosition::HEIGHT, CoreBook>(book_ptr)));
     [result addObject:@(0)];
     [result addObject:@(P.nbMoves())];
     std::vector<int> scores = solver.analyze(P, false, threads, nullptr, timeout_ms);
@@ -234,8 +246,7 @@ NSArray* runNativeSolve(CoreSolver& solver, NSString* positionStr, int threads, 
     [result addObject:@(P.nbMoves())];
     for(int i = 2; i < 8; i++) [result addObject:@(0)];
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookIOS<CorePosition::WIDTH, CorePosition::HEIGHT, CoreBook>(book_ptr)));
     auto res = solver.solve(P, false, threads, nullptr, timeout_ms);
     [result addObject:@(0)];
     [result addObject:@(P.nbMoves())];
@@ -261,8 +272,7 @@ NSArray* runNativeHeuristicAnalysis(CoreSolver& solver, NSString* positionStr, i
     for(int i = 0; i < W; i++) [result addObject:@(0)];
     [result addObject:@(0)];
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookIOS<CorePosition::WIDTH, CorePosition::HEIGHT, CoreBook>(book_ptr)));
     [result addObject:@(0)];
     [result addObject:@(P.nbMoves())];
     std::vector<int> scores = solver.analyze_heuristic(P, max_depth, threads, timeout_ms);
@@ -283,8 +293,7 @@ NSArray* runNativeHeuristicSolve(CoreSolver& solver, NSString* positionStr, int 
     [result addObject:@(P.nbMoves())];
     for(int i = 2; i < 8; i++) [result addObject:@(0)];
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookIOS<CorePosition::WIDTH, CorePosition::HEIGHT, CoreBook>(book_ptr)));
     auto res = solver.solve_heuristic(P, max_depth, timeout_ms, false, nullptr, threads);
     [result addObject:@(0)];
     [result addObject:@(P.nbMoves())];

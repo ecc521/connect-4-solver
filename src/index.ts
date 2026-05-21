@@ -3,6 +3,8 @@ export const BOARD_WIDTH = 7;
 
 export * from "./core.js";
 export * from "./book.js";
+export { getSolverCapability, AdaptiveSolver } from "./adaptive.js";
+export type { SolverCapability, AdaptiveSolverOptions } from "./adaptive.js";
 
 import { Connect4SolverOptions, BaseConnect4Solver } from "./core.js";
 

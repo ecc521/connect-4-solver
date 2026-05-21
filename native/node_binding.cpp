@@ -8,6 +8,7 @@
 
 #include "HeuristicSolver.hpp"
 #include "OpeningBook.hpp"
+#include "embedded_books.hpp"
 #include "bindings_core.hpp"
 
 using namespace Napi;
@@ -627,6 +628,22 @@ Value DestroyBook(const CallbackInfo& info) {
     return info.Env().Undefined();
 }
 
+
+// Resolves the book pointer to use: the user-supplied one if set, otherwise
+// the process-lifetime embedded book (loaded once and cached statically).
+// Returns nullptr if neither is available.
+template <int W, int H, typename CoreBook>
+const CoreBook* getEffectiveBookNode(void* book_ptr) {
+    if (book_ptr) return static_cast<const CoreBook*>(book_ptr);
+    const uint8_t* data = EmbeddedBooks::getBookData(W, H);
+    if (!data) return nullptr;
+    static const CoreBook* embedded =
+        static_cast<const CoreBook*>(
+            GameSolver::Connect4::OpeningBookBase<W, H>::load_from_memory(
+                data, EmbeddedBooks::getBookSize(W, H), W, H).release());
+    return embedded;
+}
+
 template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
 std::vector<int> runAnalysisRaw(CoreSolver& solver, const std::string& pos, bool weak, int threads, void* book_ptr, double timeout_ms) {
     CorePosition P;
@@ -647,7 +664,7 @@ std::vector<int> runAnalysisRaw(CoreSolver& solver, const std::string& pos, bool
 
     result[0] = 0;
     result[1] = P.nbMoves();
-    const CoreBook* book = static_cast<const CoreBook*>(book_ptr);
+    const CoreBook* book = getEffectiveBookNode<W, H, CoreBook>(book_ptr);
     std::vector<int> scores = solver.analyze(P, weak, threads, book, timeout_ms);
     for(int i = 0; i < W; i++) result[2 + i] = scores[i];
     result[2 + W] = 0; // depthReached
@@ -675,7 +692,7 @@ std::vector<int> runSolveRaw(CoreSolver& solver, const std::string& pos, bool we
 
     result[0] = 0;
     result[1] = P.nbMoves();
-    const CoreBook* book = static_cast<const CoreBook*>(book_ptr);
+    const CoreBook* book = getEffectiveBookNode<W, H, CoreBook>(book_ptr);
     auto res = solver.solve(P, weak, threads, book, timeout_ms);
     result[2] = res.score;
     result[3] = res.bestMove;
@@ -688,8 +705,8 @@ std::vector<int> runSolveRaw(CoreSolver& solver, const std::string& pos, bool we
 
 template <typename CoreSolver, typename CorePosition, int W, int H, typename BookType>
 std::vector<int> runSolveHeuristicRaw(CoreSolver& solver, const std::string& pos, int max_depth, int threads, double timeout_ms, void* book_ptr) {
-    if (book_ptr) solver.loadBook(static_cast<BookType*>(book_ptr));
-    else solver.loadBook(nullptr);
+    const BookType* resolved = getEffectiveBookNode<W, H, BookType>(book_ptr);
+    solver.loadBook(const_cast<BookType*>(resolved));
     CorePosition P;
     std::vector<int> result(8, 0);
     if(P.play(pos) != pos.size()) {

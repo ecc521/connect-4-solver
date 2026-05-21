@@ -46,10 +46,19 @@ export function setupWorkerHandler(): void {
     try {
       if (type === "init-threaded") {
         const { width, height, cacheSizeMb, heuristic } = payload;
-        const opts: Connect4SolverOptions = { width, height, cacheSizeMb, heuristic };
+        const opts: Connect4SolverOptions = {
+          width,
+          height,
+          cacheSizeMb,
+          heuristic,
+        };
         solver = new SyncWasmConnect4Solver(opts);
         await solver.init();
-        self.postMessage({ id, success: true, allocatedCacheSizeMb: solver.allocatedCacheSizeMb });
+        self.postMessage({
+          id,
+          success: true,
+          allocatedCacheSizeMb: solver.allocatedCacheSizeMb,
+        });
       } else if (type === "loadBook") {
         if (!solver) throw new Error("Solver not initialized");
         if (payload.data) await solver.loadBook(payload.data);
@@ -97,10 +106,19 @@ export function setupNoSABWorkerHandler(): void {
     try {
       if (type === "init-nosab") {
         const { width, height, cacheSizeMb, heuristic } = payload;
-        const opts: Connect4SolverOptions = { width, height, cacheSizeMb, heuristic };
+        const opts: Connect4SolverOptions = {
+          width,
+          height,
+          cacheSizeMb,
+          heuristic,
+        };
         solver = new SyncWasmNoSABConnect4Solver(opts);
         await solver.init();
-        self.postMessage({ id, success: true, allocatedCacheSizeMb: solver.allocatedCacheSizeMb });
+        self.postMessage({
+          id,
+          success: true,
+          allocatedCacheSizeMb: solver.allocatedCacheSizeMb,
+        });
       } else if (type === "loadBook") {
         if (!solver) throw new Error("Solver not initialized");
         if (payload.data) {

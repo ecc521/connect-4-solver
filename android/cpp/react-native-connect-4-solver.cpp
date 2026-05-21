@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include "../../native/bindings_core.hpp"
+#include "../../native/embedded_books.hpp"
 
 // Pointer conversion helpers
 template <typename T>
@@ -192,6 +193,19 @@ Java_com_connect4solver_Connect4SolverModule_nativeStop(JNIEnv *env, jobject, js
     }
 }
 
+// Resolves the effective book: user-supplied if set, else the embedded static book.
+template <int W, int H, typename CoreBook>
+const CoreBook* getEffectiveBookAndroid(void* book_ptr) {
+    if (book_ptr) return static_cast<const CoreBook*>(book_ptr);
+    const uint8_t* data = EmbeddedBooks::getBookData(W, H);
+    if (!data) return nullptr;
+    static const CoreBook* embedded =
+        static_cast<const CoreBook*>(
+            GameSolver::Connect4::OpeningBookBase<W, H>::load_from_memory(
+                data, EmbeddedBooks::getBookSize(W, H), W, H).release());
+    return embedded;
+}
+
 template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
 jintArray runNativeAnalysis(JNIEnv *env, CoreSolver& solver, const char* positionStr, int threads, void* book_ptr, double timeout_ms) {
   std::string positionString(positionStr);
@@ -203,8 +217,7 @@ jintArray runNativeAnalysis(JNIEnv *env, CoreSolver& solver, const char* positio
     result.push_back(P.nbMoves());
     for(int i = 0; i < W; i++) result.push_back(0);
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookAndroid<CorePosition::WIDTH, CorePosition::HEIGHT, CoreBook>(book_ptr)));
     result.push_back(0);
     result.push_back(P.nbMoves());
     std::vector<int> scores = solver.analyze(P, false, threads, nullptr, timeout_ms);
@@ -226,8 +239,7 @@ jintArray runNativeSolve(JNIEnv *env, CoreSolver& solver, const char* positionSt
     result.push_back(P.nbMoves());
     for(int i = 2; i < 8; i++) result.push_back(0);
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookAndroid<CorePosition::WIDTH, CorePosition::HEIGHT, CoreBook>(book_ptr)));
     auto res = solver.solve(P, false, threads, nullptr, timeout_ms);
     result.push_back(0);
     result.push_back(P.nbMoves());
@@ -255,8 +267,7 @@ jintArray runNativeHeuristicAnalysis(JNIEnv *env, CoreSolver& solver, const char
     for(int i = 0; i < W; i++) result.push_back(0);
     result.push_back(0);
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookAndroid<CorePosition::WIDTH, CorePosition::HEIGHT, CoreBook>(book_ptr)));
     result.push_back(0);
     result.push_back(P.nbMoves());
     auto res = solver.analyze_heuristic(P, max_depth, threads, timeout_ms);
@@ -280,8 +291,7 @@ jintArray runNativeHeuristicSolve(JNIEnv *env, CoreSolver& solver, const char* p
     result.push_back(P.nbMoves());
     for(int i = 2; i < 8; i++) result.push_back(0);
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookAndroid<CorePosition::WIDTH, CorePosition::HEIGHT, CoreBook>(book_ptr)));
     auto res = solver.solve_heuristic(P, max_depth, timeout_ms, false, nullptr, threads);
     result.push_back(0);
     result.push_back(P.nbMoves());
