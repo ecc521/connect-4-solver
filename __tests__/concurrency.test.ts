@@ -31,7 +31,9 @@ describe("Solver Concurrency Guard", () => {
 
     // Attach handlers BEFORE calling stop() to avoid unhandled rejection warnings
     const p2Expectation = expect(p2).rejects.toBeInstanceOf(SolverAbortedError);
-    const p1Settled = p1.catch(() => { /* allow rejection too */ });
+    const p1Settled = p1.catch(() => {
+      /* allow rejection too */
+    });
 
     // Stop immediately — flushes p2 from queue with SolverAbortedError
     await solver.stop();

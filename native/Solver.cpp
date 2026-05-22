@@ -303,8 +303,11 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::dispatch_solve_weak(const GenericPositi
         if (P.width() == 8 && P.height() == 6) {
             return negamax<HasBook, 8, 6>(P, min, max, book, book_depth, abort_flag, thread_history);
         }
-        if (P.width() == 8 && P.height() == 8) {
-            return negamax<HasBook, 8, 8>(P, min, max, book, book_depth, abort_flag, thread_history);
+        if (P.width() == 7 && P.height() == 7) {
+            return negamax<HasBook, 7, 7>(P, min, max, book, book_depth, abort_flag, thread_history);
+        }
+        if (P.width() == 6 && P.height() == 8) {
+            return negamax<HasBook, 6, 8>(P, min, max, book, book_depth, abort_flag, thread_history);
         }
     }
     return negamax<HasBook, WIDTH, HEIGHT>(P, min, max, book, book_depth, abort_flag, thread_history);

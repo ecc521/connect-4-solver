@@ -2,8 +2,8 @@
 #include <vector>
 #include <string>
 #include <sstream>
-#include "../../native/bindings_core.hpp"
 #include "../../native/dispatch_table.hpp"
+#include "../../native/embedded_books.hpp"
 
 // Pointer conversion helpers
 template <typename T>
@@ -131,34 +131,46 @@ Java_com_connect4solver_Connect4SolverModule_nativeStop(JNIEnv *env, jobject, js
     }
 }
 
+// Resolves the effective book: user-supplied if set, else the embedded static book.
+template <int W, int H, typename CoreBook>
+const CoreBook* getEffectiveBookAndroid(void* book_ptr) {
+    if (book_ptr) return static_cast<const CoreBook*>(book_ptr);
+    const uint8_t* data = EmbeddedBooks::getBookData(W, H);
+    if (!data) return nullptr;
+    static const CoreBook* embedded =
+        static_cast<const CoreBook*>(
+            GameSolver::Connect4::OpeningBookBase<W, H>::load_from_memory(
+                data, EmbeddedBooks::getBookSize(W, H), W, H).release());
+    return embedded;
+}
 
-template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
-jintArray runNativeAnalysis(JNIEnv *env, CoreSolver& solver, const char* positionStr, int threads, void* book_ptr, double timeout_ms) {
+template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
+jintArray runNativeAnalysis(JNIEnv *env, int w, int h, CoreSolver& solver, const char* positionStr, int threads, void* book_ptr, double timeout_ms) {
   std::string positionString(positionStr);
-  CorePosition P;
+  CorePosition P(w, h);
+  int active_w = W == -1 ? w : W;
   std::vector<int> result;
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
     result.push_back(P.isWinningMove(lastColPlayed) ? 1 : 2);
     result.push_back(P.nbMoves());
-    for(int i = 0; i < W; i++) result.push_back(0);
+    for(int i = 0; i < active_w; i++) result.push_back(0);
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookAndroid<W, H, CoreBook>(book_ptr)));
     result.push_back(0);
     result.push_back(P.nbMoves());
     std::vector<int> scores = solver.analyze(P, false, threads, nullptr, timeout_ms);
-    for(int i = 0; i < W; i++) result.push_back(scores[i]);
+    for(int i = 0; i < active_w; i++) result.push_back(scores[i]);
   }
   jintArray jResult = env->NewIntArray(result.size());
   env->SetIntArrayRegion(jResult, 0, result.size(), &result[0]);
   return jResult;
 }
 
-template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
-jintArray runNativeSolve(JNIEnv *env, CoreSolver& solver, const char* positionStr, int threads, void* book_ptr, double timeout_ms) {
+template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
+jintArray runNativeSolve(JNIEnv *env, int w, int h, CoreSolver& solver, const char* positionStr, int threads, void* book_ptr, double timeout_ms) {
   std::string positionString(positionStr);
-  CorePosition P;
+  CorePosition P(w, h);
   std::vector<int> result;
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
@@ -166,8 +178,7 @@ jintArray runNativeSolve(JNIEnv *env, CoreSolver& solver, const char* positionSt
     result.push_back(P.nbMoves());
     for(int i = 2; i < 8; i++) result.push_back(0);
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookAndroid<W, H, CoreBook>(book_ptr)));
     auto res = solver.solve(P, false, threads, nullptr, timeout_ms);
     result.push_back(0);
     result.push_back(P.nbMoves());
@@ -183,25 +194,25 @@ jintArray runNativeSolve(JNIEnv *env, CoreSolver& solver, const char* positionSt
   return jResult;
 }
 
-template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
-jintArray runNativeHeuristicAnalysis(JNIEnv *env, CoreSolver& solver, const char* positionStr, int max_depth, int threads, double timeout_ms, void* book_ptr) {
+template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
+jintArray runNativeHeuristicAnalysis(JNIEnv *env, int w, int h, CoreSolver& solver, const char* positionStr, int max_depth, int threads, double timeout_ms, void* book_ptr) {
   std::string positionString(positionStr);
-  CorePosition P;
+  CorePosition P(w, h);
+  int active_w = W == -1 ? w : W;
   std::vector<int> result;
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
     result.push_back(P.isWinningMove(lastColPlayed) ? 1 : 2);
     result.push_back(P.nbMoves());
-    for(int i = 0; i < W; i++) result.push_back(0);
+    for(int i = 0; i < active_w; i++) result.push_back(0);
     result.push_back(0);
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookAndroid<W, H, CoreBook>(book_ptr)));
     result.push_back(0);
     result.push_back(P.nbMoves());
     auto res = solver.analyze_heuristic(P, max_depth, threads, timeout_ms);
     std::vector<int> scores = res.first;
-    for(int i = 0; i < W; i++) result.push_back(scores[i]);
+    for(int i = 0; i < active_w; i++) result.push_back(scores[i]);
     result.push_back(res.second);
   }
   jintArray jResult = env->NewIntArray(result.size());
@@ -209,10 +220,10 @@ jintArray runNativeHeuristicAnalysis(JNIEnv *env, CoreSolver& solver, const char
   return jResult;
 }
 
-template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
-jintArray runNativeHeuristicSolve(JNIEnv *env, CoreSolver& solver, const char* positionStr, int max_depth, int threads, double timeout_ms, void* book_ptr) {
+template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
+jintArray runNativeHeuristicSolve(JNIEnv *env, int w, int h, CoreSolver& solver, const char* positionStr, int max_depth, int threads, double timeout_ms, void* book_ptr) {
   std::string positionString(positionStr);
-  CorePosition P;
+  CorePosition P(w, h);
   std::vector<int> result;
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
@@ -220,8 +231,7 @@ jintArray runNativeHeuristicSolve(JNIEnv *env, CoreSolver& solver, const char* p
     result.push_back(P.nbMoves());
     for(int i = 2; i < 8; i++) result.push_back(0);
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookAndroid<W, H, CoreBook>(book_ptr)));
     auto res = solver.solve_heuristic(P, max_depth, timeout_ms, false, nullptr, threads);
     result.push_back(0);
     result.push_back(P.nbMoves());
@@ -245,8 +255,8 @@ Java_com_connect4solver_Connect4SolverModule_nativeAnalyze(JNIEnv *env, jobject,
     
     jintArray result = dispatch<jintArray>(w, h, [&](auto tag) {
         using Size = typename decltype(tag)::type;
-        return runNativeAnalysis<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
-            env, *static_cast<typename Size::Solver*>(solver), posChars, threads, bookPtr, 0
+        return runNativeAnalysis<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+            env, w, h, *static_cast<typename Size::Solver*>(solver), posChars, threads, bookPtr, 0
         );
     });
     
@@ -262,8 +272,8 @@ Java_com_connect4solver_Connect4SolverModule_nativeSolve(JNIEnv *env, jobject, j
     
     jintArray result = dispatch<jintArray>(w, h, [&](auto tag) {
         using Size = typename decltype(tag)::type;
-        return runNativeSolve<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
-            env, *static_cast<typename Size::Solver*>(solver), posChars, threads, bookPtr, 0
+        return runNativeSolve<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+            env, w, h, *static_cast<typename Size::Solver*>(solver), posChars, threads, bookPtr, 0
         );
     });
     
@@ -279,8 +289,8 @@ Java_com_connect4solver_Connect4SolverModule_nativeAnalyzeHeuristic(JNIEnv *env,
     
     jintArray result = dispatch<jintArray>(w, h, [&](auto tag) {
         using Size = typename decltype(tag)::type;
-        return runNativeHeuristicAnalysis<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
-            env, *static_cast<typename Size::HeuristicSolver*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr
+        return runNativeHeuristicAnalysis<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+            env, w, h, *static_cast<typename Size::HeuristicSolver*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr
         );
     });
     
@@ -296,8 +306,8 @@ Java_com_connect4solver_Connect4SolverModule_nativeSolveHeuristic(JNIEnv *env, j
     
     jintArray result = dispatch<jintArray>(w, h, [&](auto tag) {
         using Size = typename decltype(tag)::type;
-        return runNativeHeuristicSolve<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
-            env, *static_cast<typename Size::HeuristicSolver*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr
+        return runNativeHeuristicSolve<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+            env, w, h, *static_cast<typename Size::HeuristicSolver*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr
         );
     });
     

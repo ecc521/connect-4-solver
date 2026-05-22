@@ -48,16 +48,33 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     // OOM retry: _createCache returns 0 if allocation fails. Halve the request until it succeeds.
     let sizeMb = this.cacheSizeMb;
     let ptr = 0;
-    while (sizeMb >= 4) {
-      ptr = mod._createCache(this.width, this.height, sizeMb * 1024 * 1024, this.isHeuristic);
+    while (sizeMb >= 8) {
+      ptr = mod._createCache(
+        this.width,
+        this.height,
+        sizeMb * 1024 * 1024,
+        this.isHeuristic,
+      );
       if (ptr !== 0) break;
       sizeMb = Math.floor(sizeMb / 2);
     }
-    if (ptr === 0) throw new Error(`Failed to allocate WASM cache (tried down to 4 MB)`);
+    if (ptr === 0)
+      throw new Error(`Failed to allocate WASM cache (tried down to 8 MB)`);
     this._cachePtr = ptr;
     this.allocatedCacheSizeMb = sizeMb;
 
-    this._solverPtr = mod._createSolver(this.width, this.height, this._cachePtr, this.isHeuristic);
+    this._solverPtr = mod._createSolver(
+      this.width,
+      this.height,
+      this._cachePtr,
+      this.isHeuristic,
+    );
+    if (this._solverPtr === 0) {
+      throw new Error(
+        `Failed to create ${this.isHeuristic ? "heuristic" : "exact"} solver for ` +
+          `${this.width}x${this.height}. This board size may not be supported by the current WASM build.`,
+      );
+    }
     this.initialized = true;
     return Promise.resolve();
   }
@@ -115,6 +132,12 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
       _data.length,
     );
     mod._free(ptr);
+    if (!this._bookPtr) {
+      throw new Error(
+        `Failed to load opening book for ${this.width}x${this.height}. ` +
+          `The book data may be invalid or the wrong format for this board size.`,
+      );
+    }
     return Promise.resolve();
   }
 
@@ -129,6 +152,10 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
         this.isHeuristic,
       );
     if (this._cachePtr !== 0) mod._destroyCache(this._cachePtr);
+    if (this._bookPtr) {
+      mod._destroyBook(this.width, this.height, this._bookPtr as number);
+      this._bookPtr = 0;
+    }
     this._solverPtr = 0;
     this._cachePtr = 0;
     this.initialized = false;

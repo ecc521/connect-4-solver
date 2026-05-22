@@ -437,7 +437,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         (nativeResArr[5] >>> 0) + (nativeResArr[6] >>> 0) * 4294967296;
       const aborted = nativeResArr[7] === 1;
 
-      const evaluation = (aborted && !isHeuristic) ? null : this.createEvaluation(score, nbMoves);
+      const evaluation =
+        aborted && !isHeuristic ? null : this.createEvaluation(score, nbMoves);
 
       return {
         position: currentPosition,

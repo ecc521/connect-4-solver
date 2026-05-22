@@ -37,6 +37,22 @@ class HeuristicCache : public Cache {
           transTable.reset(t);
       } else {
           delete t;
+          return;
+      }
+
+      // Calculate CRT safety for Heuristic Table
+      int shift_amount = 16 + 7 + 2 + 5; // ValueBits + WorkBits + FlagBits + MoveBits
+      int available_bits = sizeof(position_t) * 8 - shift_amount;
+      int board_bits = WIDTH * (HEIGHT + 1);
+
+      if (board_bits > available_bits) {
+          int index_bits = board_bits - available_bits;
+          if (index_bits < 64) {
+              uint64_t required_buckets = 1ULL << index_bits;
+              if (transTable->getSize() / 2 < required_buckets) {
+                  throw std::runtime_error("Heuristic Table allocated memory is mathematically too small to guarantee collision-free CRT for this board size.");
+              }
+          }
       }
   }
   bool isValid() const { return transTable != nullptr; }

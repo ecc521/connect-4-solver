@@ -191,6 +191,10 @@ export interface NodeConnect4SolverOptions extends Connect4SolverOptions {
 export class NodeConnect4Solver extends AbstractSyncSolver {
   private _sharedCache?: NativeCache;
 
+  public get _native(): NativeModuleType | null {
+    return getNativeModule();
+  }
+
   constructor(opts?: NodeConnect4SolverOptions | number, heightOpt?: number) {
     super(opts as NodeConnect4SolverOptions, heightOpt);
     if (
@@ -240,6 +244,12 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       this._cachePtr,
       this.isHeuristic,
     ) as number;
+    if (!this._solverPtr) {
+      throw new Error(
+        `Failed to create ${this.isHeuristic ? "heuristic" : "exact"} solver for ` +
+          `${this.width}x${this.height}. This board size may not be supported by the current native addon build.`,
+      );
+    }
     this.initialized = true;
     return Promise.resolve();
   }
@@ -261,6 +271,12 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         this.height,
         _data,
       ) as number;
+      if (!this._bookPtr) {
+        throw new Error(
+          `Failed to load opening book for ${this.width}x${this.height}. ` +
+            `The book data may be invalid or the wrong format for this board size.`,
+        );
+      }
     }
     return Promise.resolve();
   }

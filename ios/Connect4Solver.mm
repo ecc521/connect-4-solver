@@ -7,6 +7,7 @@
 // Include the deeply optimized singleton instantiations seamlessly mapped into pure ARM binary output natively
 #include "../native/bindings_core.hpp"
 #include "../native/dispatch_table.hpp"
+#include "../native/embedded_books.hpp"
 
 // Pointer conversion helpers
 template <typename T>
@@ -141,32 +142,44 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(stop:(NSString *)solverPtrStr width:(int)
     return @(YES);
 }
 
+// Resolves the effective book: user-supplied if set, else the embedded static book.
+template <int W, int H, typename CoreBook>
+const CoreBook* getEffectiveBookIOS(void* book_ptr) {
+    if (book_ptr) return static_cast<const CoreBook*>(book_ptr);
+    const uint8_t* data = EmbeddedBooks::getBookData(W, H);
+    if (!data) return nullptr;
+    static const CoreBook* embedded =
+        static_cast<const CoreBook*>(
+            GameSolver::Connect4::OpeningBookBase<W, H>::load_from_memory(
+                data, EmbeddedBooks::getBookSize(W, H), W, H).release());
+    return embedded;
+}
 
-template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
-NSArray* runNativeAnalysis(CoreSolver& solver, NSString* positionStr, int threads, void* book_ptr, double timeout_ms) {
+template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
+NSArray* runNativeAnalysis(int w, int h, CoreSolver& solver, NSString* positionStr, int threads, void* book_ptr, double timeout_ms) {
   std::string positionString([positionStr UTF8String]);
-  CorePosition P;
-  NSMutableArray *result = [NSMutableArray arrayWithCapacity:(2 + W)];
+  CorePosition P(w, h);
+  int active_w = W == -1 ? w : W;
+  NSMutableArray *result = [NSMutableArray arrayWithCapacity:(2 + active_w)];
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
     [result addObject:@(P.isWinningMove(lastColPlayed) ? 1 : 2)];
     [result addObject:@(P.nbMoves())];
-    for(int i = 0; i < W; i++) [result addObject:@(0)];
+    for(int i = 0; i < active_w; i++) [result addObject:@(0)];
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookIOS<W, H, CoreBook>(book_ptr)));
     [result addObject:@(0)];
     [result addObject:@(P.nbMoves())];
     std::vector<int> scores = solver.analyze(P, false, threads, nullptr, timeout_ms);
-    for(int i = 0; i < W; i++) [result addObject:@(scores[i])];
+    for(int i = 0; i < active_w; i++) [result addObject:@(scores[i])];
   }
   return result;
 }
 
-template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
-NSArray* runNativeSolve(CoreSolver& solver, NSString* positionStr, int threads, void* book_ptr, double timeout_ms) {
+template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
+NSArray* runNativeSolve(int w, int h, CoreSolver& solver, NSString* positionStr, int threads, void* book_ptr, double timeout_ms) {
   std::string positionString([positionStr UTF8String]);
-  CorePosition P;
+  CorePosition P(w, h);
   NSMutableArray *result = [NSMutableArray arrayWithCapacity:8];
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
@@ -174,8 +187,7 @@ NSArray* runNativeSolve(CoreSolver& solver, NSString* positionStr, int threads, 
     [result addObject:@(P.nbMoves())];
     for(int i = 2; i < 8; i++) [result addObject:@(0)];
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookIOS<W, H, CoreBook>(book_ptr)));
     auto res = solver.solve(P, false, threads, nullptr, timeout_ms);
     [result addObject:@(0)];
     [result addObject:@(P.nbMoves())];
@@ -189,33 +201,34 @@ NSArray* runNativeSolve(CoreSolver& solver, NSString* positionStr, int threads, 
   return result;
 }
 
-template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
-NSArray* runNativeHeuristicAnalysis(CoreSolver& solver, NSString* positionStr, int max_depth, int threads, double timeout_ms, void* book_ptr) {
+template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
+NSArray* runNativeHeuristicAnalysis(int w, int h, CoreSolver& solver, NSString* positionStr, int max_depth, int threads, double timeout_ms, void* book_ptr) {
   std::string positionString([positionStr UTF8String]);
-  CorePosition P;
-  NSMutableArray *result = [NSMutableArray arrayWithCapacity:(2 + W)];
+  CorePosition P(w, h);
+  int active_w = W == -1 ? w : W;
+  NSMutableArray *result = [NSMutableArray arrayWithCapacity:(3 + active_w)];
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
     [result addObject:@(P.isWinningMove(lastColPlayed) ? 1 : 2)];
     [result addObject:@(P.nbMoves())];
-    for(int i = 0; i < W; i++) [result addObject:@(0)];
+    for(int i = 0; i < active_w; i++) [result addObject:@(0)];
     [result addObject:@(0)];
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookIOS<W, H, CoreBook>(book_ptr)));
     [result addObject:@(0)];
     [result addObject:@(P.nbMoves())];
-    std::vector<int> scores = solver.analyze_heuristic(P, max_depth, threads, timeout_ms);
-    for(int i = 0; i < W; i++) [result addObject:@(scores[i])];
-    [result addObject:@(scores[i])];
+    auto res = solver.analyze_heuristic(P, max_depth, threads, timeout_ms);
+    std::vector<int> scores = res.first;
+    for(int i = 0; i < active_w; i++) [result addObject:@(scores[i])];
+    [result addObject:@(res.second)];
   }
   return result;
 }
 
-template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
-NSArray* runNativeHeuristicSolve(CoreSolver& solver, NSString* positionStr, int max_depth, int threads, double timeout_ms, void* book_ptr) {
+template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
+NSArray* runNativeHeuristicSolve(int w, int h, CoreSolver& solver, NSString* positionStr, int max_depth, int threads, double timeout_ms, void* book_ptr) {
   std::string positionString([positionStr UTF8String]);
-  CorePosition P;
+  CorePosition P(w, h);
   NSMutableArray *result = [NSMutableArray arrayWithCapacity:8];
   if(P.play(positionString) != positionString.size()) {
     int lastColPlayed = positionString[P.nbMoves()] - '1';
@@ -223,8 +236,7 @@ NSArray* runNativeHeuristicSolve(CoreSolver& solver, NSString* positionStr, int 
     [result addObject:@(P.nbMoves())];
     for(int i = 2; i < 8; i++) [result addObject:@(0)];
   } else {
-    if (book_ptr) solver.loadBook(static_cast<CoreBook*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookIOS<W, H, CoreBook>(book_ptr)));
     auto res = solver.solve_heuristic(P, max_depth, timeout_ms, false, nullptr, threads);
     [result addObject:@(0)];
     [result addObject:@(P.nbMoves())];
@@ -255,8 +267,8 @@ RCT_REMAP_METHOD(analyze,
     
     NSArray* resultArray = dispatch<NSArray*>(width, height, [&](auto tag) {
         using Size = typename decltype(tag)::type;
-        return runNativeAnalysis<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
-            *static_cast<typename Size::Solver*>(solver), positionStr, threads, bookPtr, 0
+        return runNativeAnalysis<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+            width, height, *static_cast<typename Size::Solver*>(solver), positionStr, threads, bookPtr, 0
         );
     });
     
@@ -286,8 +298,8 @@ RCT_REMAP_METHOD(solve,
     
     NSArray* resultArray = dispatch<NSArray*>(width, height, [&](auto tag) {
         using Size = typename decltype(tag)::type;
-        return runNativeSolve<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
-            *static_cast<typename Size::Solver*>(solver), positionStr, threads, bookPtr, 0
+        return runNativeSolve<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+            width, height, *static_cast<typename Size::Solver*>(solver), positionStr, threads, bookPtr, 0
         );
     });
     
@@ -318,8 +330,8 @@ RCT_REMAP_METHOD(analyzeHeuristic,
     
     NSArray* resultArray = dispatch<NSArray*>(width, height, [&](auto tag) {
         using Size = typename decltype(tag)::type;
-        return runNativeHeuristicAnalysis<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
-            *static_cast<typename Size::HeuristicSolver*>(solver), positionStr, maxDepth, threads, timeoutMs, bookPtr
+        return runNativeHeuristicAnalysis<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+            width, height, *static_cast<typename Size::HeuristicSolver*>(solver), positionStr, maxDepth, threads, timeoutMs, bookPtr
         );
     });
     
@@ -350,8 +362,8 @@ RCT_REMAP_METHOD(solveHeuristic,
     
     NSArray* resultArray = dispatch<NSArray*>(width, height, [&](auto tag) {
         using Size = typename decltype(tag)::type;
-        return runNativeHeuristicSolve<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
-            *static_cast<typename Size::HeuristicSolver*>(solver), positionStr, maxDepth, threads, timeoutMs, bookPtr
+        return runNativeHeuristicSolve<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+            width, height, *static_cast<typename Size::HeuristicSolver*>(solver), positionStr, maxDepth, threads, timeoutMs, bookPtr
         );
     });
     

@@ -12,5 +12,5 @@
     "allowJs": true,
     "checkJs": false
   },
-  "include": ["src/**/*", "tools/**/*", "__tests__/**/*"]
+  "include": ["src/**/*", "tools/**/*", "__tests__/**/*", "examples/**/*"]
 }

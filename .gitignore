@@ -36,6 +36,10 @@ android/build/
 
 # Ignore generated data directory
 data/
+# ...except the 3 embedded opening books that are compiled into the binary
+!data/6x6_dense3.efbook
+!data/6x7_dense6.efbook
+!data/7x6_dense7.efbook
 
 # VitePress Generated
 docs/.vitepress/dist

@@ -72,6 +72,8 @@ export default tseslint.config(
       "c4_benchmark2/",
       "wasm-out/",
       "scratch/",
+      "scratch_*.ts",
+      "scratch_test_timeout.ts",
     ],
   },
 );

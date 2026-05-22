@@ -403,8 +403,8 @@ class GenericPosition {
     return (bool)(winning_position() & possible() & column_mask(col));
   }
 
-  static GenericPosition fromKey(position_t key) {
-    GenericPosition P;
+  static GenericPosition fromKey(position_t key, uint8_t w = W == -1 ? 7 : W, uint8_t h = W == -1 ? 6 : H) {
+    GenericPosition P(w, h);
     P.current_position = 0;
     P.mask = 0;
     P.moves = 0;

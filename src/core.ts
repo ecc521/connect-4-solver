@@ -211,7 +211,11 @@ export abstract class BaseConnect4Solver {
 
   // ─── Internal search queue ───────────────────────────────────────────────
 
-  protected _queue: { task: () => Promise<unknown>; resolve: (val: unknown) => void; reject: (err: unknown) => void; }[] = [];
+  protected _queue: {
+    task: () => Promise<unknown>;
+    resolve: (val: unknown) => void;
+    reject: (err: unknown) => void;
+  }[] = [];
 
   /** Resolves when the currently active runTask() call finishes (or null if idle). */
   private _taskSettledPromise: Promise<void> | null = null;
@@ -237,7 +241,9 @@ export abstract class BaseConnect4Solver {
   private async _executeTask<T>(task: () => Promise<T> | T): Promise<T> {
     this._isBusy = true;
     let settle!: () => void;
-    this._taskSettledPromise = new Promise<void>((r) => { settle = r; });
+    this._taskSettledPromise = new Promise<void>((r) => {
+      settle = r;
+    });
     try {
       const res = task();
       return res instanceof Promise ? await res : res;
@@ -324,7 +330,9 @@ export abstract class BaseConnect4Solver {
    * Sends the platform-specific abort signal to the engine.
    * Override in subclasses (do not call stop() — that is handled by the base class).
    */
-  protected _sendAbortSignal(): void { /* no-op default */ }
+  protected _sendAbortSignal(): void {
+    /* no-op default */
+  }
 
   /**
    * Signals the solver to stop the current search and all queued search tasks.

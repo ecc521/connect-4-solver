@@ -6,6 +6,7 @@
 #include <memory>
 #include <atomic>
 #include "bindings_core.hpp"
+#include "embedded_books.hpp"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -14,6 +15,17 @@
 #endif
 
 using namespace GameSolver::Connect4;
+
+template <int W, int H>
+const OpeningBookBase<W, H>* getEffectiveBook(void* book_ptr) {
+  if (book_ptr) return static_cast<const OpeningBookBase<W, H>*>(book_ptr);
+  const uint8_t* data = EmbeddedBooks::getBookData(W, H);
+  if (!data) return nullptr;
+  // Load once per board size, cache for the lifetime of the process.
+  static const OpeningBookBase<W, H>* embedded =
+      OpeningBookBase<W, H>::load_from_memory(data, EmbeddedBooks::getBookSize(W, H), W, H).release();
+  return embedded;
+}
 
 template <int W, int H>
 int32_t* runAnalysis(Solver<W, H>& solver, const char* positionCharArr, bool weak, int threads, void* book_ptr, double timeout_ms) {
@@ -30,8 +42,7 @@ int32_t* runAnalysis(Solver<W, H>& solver, const char* positionCharArr, bool wea
     result[4 + W] = 0;
     result[5 + W] = 0;
   } else {
-    if (book_ptr) solver.loadBook(static_cast<OpeningBookBase<W, H>*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(getEffectiveBook<W, H>(book_ptr));
     double end_time_ms = 0;
     if (timeout_ms > 0) end_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() + timeout_ms;
     auto res = solver.analyze(P, weak, threads, nullptr, end_time_ms);
@@ -58,8 +69,7 @@ int32_t* runSolve(Solver<W, H>& solver, const char* positionCharArr, bool weak, 
     result[1] = P.nbMoves();
     for(int i = 2; i < 8; i++) result[i] = 0;
   } else {
-    if (book_ptr) solver.loadBook(static_cast<OpeningBookBase<W, H>*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(getEffectiveBook<W, H>(book_ptr));
     double end_time_ms = 0;
     if (timeout_ms > 0) end_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() + timeout_ms;
     auto res = solver.solve(P, weak, threads, nullptr, end_time_ms);
@@ -86,8 +96,7 @@ int32_t* runSolveHeuristic(Solver<W, H>& solver, const char* positionCharArr, in
     result[1] = P.nbMoves();
     for(int i = 2; i < 8; i++) result[i] = 0;
   } else {
-    if (book_ptr) solver.loadBook(static_cast<OpeningBookBase<W, H>*>(book_ptr));
-    else solver.loadBook(nullptr);
+    solver.loadBook(getEffectiveBook<W, H>(book_ptr));
     double end_time_ms = 0;
     if (timeout_ms > 0) end_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() + timeout_ms;
     auto res = solver.solve(P, false, threads, nullptr, end_time_ms);

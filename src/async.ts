@@ -7,7 +7,6 @@ import {
   Player,
 } from "./core.js";
 
-
 export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
   private worker: Worker;
   private workerProvider: () => Worker;
@@ -163,7 +162,9 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
     }
 
     if (!hasActiveSearch) {
-      this.sendMessage("stop").catch(() => { /* ignore */ });
+      this.sendMessage("stop").catch(() => {
+        /* ignore */
+      });
       return;
     }
 
@@ -206,7 +207,9 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
       const bookData = this.loadedBookData;
       this.initPromise = newInitPromise
         .then(() => this.sendMessage("loadBook", { data: bookData }))
-        .then(() => { /* void */ });
+        .then(() => {
+          /* void */
+        });
     } else {
       this.initPromise = newInitPromise;
     }

@@ -32,6 +32,10 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       if (opts.heuristic !== undefined) heuristic = opts.heuristic;
     }
 
+    if (cacheSizeMb < 8) {
+        throw new Error("cacheSizeMb must be at least 8 (8MB). This ensures enough bits are available for the mathematical partial key and prevents silent dataset collision on edge-case board sizes (like 8x7).");
+    }
+
     this.cacheSizeMb = cacheSizeMb;
     this.allocatedCacheSizeMb = cacheSizeMb; // updated in init() after actual allocation
     this.isHeuristic = heuristic;
@@ -93,7 +97,10 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         outcome: Outcome.Win,
         winner: currentPlayer,
         movesToEnd: halfMovesRemaining - score + 1,
-        score: score >= SCORE_FORCED_WIN_BASE ? score : SCORE_FORCED_WIN_BASE + score,
+        score:
+          score >= SCORE_FORCED_WIN_BASE
+            ? score
+            : SCORE_FORCED_WIN_BASE + score,
       };
     } else {
       return {
@@ -101,7 +108,10 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         outcome: Outcome.Loss,
         winner: opponent,
         movesToEnd: halfMovesRemaining + score + 1,
-        score: score <= -SCORE_FORCED_WIN_BASE ? score : -SCORE_FORCED_WIN_BASE + score,
+        score:
+          score <= -SCORE_FORCED_WIN_BASE
+            ? score
+            : -SCORE_FORCED_WIN_BASE + score,
       };
     }
   }
@@ -144,7 +154,10 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       for (let i = 0; i < this.width; i++) {
         const n = resArr[2 + i];
         if (isUnplayable(n)) moveOptions.push(null);
-        else moveOptions.push(this.createEvaluation(n, nbMoves, depthReached, isHeuristic));
+        else
+          moveOptions.push(
+            this.createEvaluation(n, nbMoves, depthReached, isHeuristic),
+          );
       }
 
       let bestEval: Evaluation | null = null;
