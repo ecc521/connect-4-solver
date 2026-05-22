@@ -68,6 +68,7 @@ export default tseslint.config(
       "data/",
       "test-data/",
       "*.js",
+      "*.cjs",
       "test-ptrs.ts",
       "bench_*.ts",
       "c4_benchmark2/",
