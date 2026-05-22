@@ -43,7 +43,7 @@ for SIZE in "${SIZES[@]}"; do
     BIN="tools/benchmarks/bench_native_${SIZE}"
 
     echo "Compiling core engine for ${SIZE}..."
-    clang++ -std=c++20 -O3 -flto -DNDEBUG -DUSE_PTHREADS -Inative -march=native \
+    clang++ -std=c++20 -O3 -DNDEBUG -DUSE_PTHREADS -Inative -march=native \
         -DBOARD_WIDTH_MACRO=${WIDTH} -DBOARD_HEIGHT_MACRO=${HEIGHT} \
         tools/benchmarks/bench_native.cpp \
         -o ${BIN}

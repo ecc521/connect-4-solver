@@ -30,13 +30,13 @@
         }],
         ['use_pgo=="true" and OS=="mac"', {
           "xcode_settings": {
-            "OTHER_CPLUSPLUSFLAGS": [ "-flto", "-fprofile-instr-use=<(module_root_dir)/default.profdata" ],
-            "OTHER_LDFLAGS": [ "-flto", "-fprofile-instr-use=<(module_root_dir)/default.profdata" ]
+            "OTHER_CPLUSPLUSFLAGS": [ "-fprofile-instr-use=<(module_root_dir)/default.profdata" ],
+            "OTHER_LDFLAGS": [ "-fprofile-instr-use=<(module_root_dir)/default.profdata" ]
           }
         }],
         ['use_pgo=="true" and OS!="mac"', {
-          "cflags_cc": [ "-flto", "-fprofile-use" ],
-          "ldflags": [ "-flto", "-fprofile-use" ]
+          "cflags_cc": [ "-fprofile-use" ],
+          "ldflags": [ "-fprofile-use" ]
         }],
         ['OS=="linux"', {
           "libraries": [ "-latomic" ]

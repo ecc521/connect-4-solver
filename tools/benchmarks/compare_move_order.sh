@@ -44,7 +44,7 @@ for SIZE in "${SIZES[@]}"; do
   for STRAT in "${STRAT_IDS[@]}"; do
     BIN="$TMPDIR_BIN/bench_${SIZE}_s${STRAT}"
     LOG="$TMPDIR_OUT/compile_${SIZE}_s${STRAT}.log"
-    clang++ -std=c++20 -O3 -flto -DNDEBUG -DUSE_PTHREADS -Inative \
+    clang++ -std=c++20 -O3 -DNDEBUG -DUSE_PTHREADS -Inative \
       -DBOARD_WIDTH_MACRO="${W}" -DBOARD_HEIGHT_MACRO="${H}" \
       -DMOVE_ORDER_STRATEGY="${STRAT}" \
       tools/benchmarks/bench_native.cpp \

@@ -30,19 +30,19 @@ This repository provides an extremely fast, high-performance, and "perfect" Conn
 
 ## Building the Native Addon
 
-When compiling the native C++ bindings for Node.js (especially during development or by agents), you should use the `--jobs` flag to enable parallel compilation. The `package.json` install script is already configured to use `--jobs max`, but if running manually, prefer:
+When compiling the native C++ bindings for Node.js (especially during development or by agents), you should use the standard build commands. Do NOT attempt to compile with Profile-Guided Optimization (PGO) or Link-Time Optimization (LTO), as LTO is not recommended, offers negligible benefit, and can cause issues with WebAssembly builds.
+
+Use the following command for compiling the native addon:
+
+```bash
+npm run build:native
+```
+
+Or run manually with parallel compilation:
 
 ```bash
 npx node-gyp rebuild --jobs max
 ```
-
-To compile the native addon with Profile-Guided Optimization (PGO) and Link-Time Optimization (LTO) for maximum node-throughput, run:
-
-```bash
-npm run build:native:pgo
-```
-
-This generates the `default.profdata` profile via the C++ benchmark suite and automatically injects `-flto` and the profile data into `node-gyp`.
 
 ## Generating New Books
 
