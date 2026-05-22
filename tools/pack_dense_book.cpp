@@ -30,22 +30,22 @@ int main(int argc, char** argv) {
 
     Position P;
     if(iss.fail() || !iss.eof() || P.play(pos) != pos.length() || 
-       score < Position::MIN_SCORE || score > Position::MAX_SCORE ||
+       score < P.min_score() || score > P.max_score() ||
        P.nbMoves() > depth) {
       continue;
     }
-    all_items.push_back({P.key3(), static_cast<uint8_t>(score - Position::MIN_SCORE + 1)});
+    all_items.push_back({P.key3(), static_cast<uint8_t>(score - P.min_score() + 1)});
   }
 
   std::ostringstream book_file;
-  book_file << "../data/" << Position::WIDTH << "x" << Position::HEIGHT << (use_ef ? "_ef" : "_dense") << depth << ".book";
+  book_file << "../data/" << BOARD_WIDTH_MACRO << "x" << BOARD_HEIGHT_MACRO << (use_ef ? "_ef" : "_dense") << depth << ".book";
 
   std::cerr << "Saving " << all_items.size() << " positions to " << book_file.str() << "...\n";
 
   if (use_ef) {
-      OpeningBookBase<Position::WIDTH, Position::HEIGHT>::save_elias_fano(book_file.str(), depth, all_items);
+      OpeningBookBase<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>::save_elias_fano(book_file.str(), depth, all_items);
   } else {
-      OpeningBookBase<Position::WIDTH, Position::HEIGHT>::save_dense(book_file.str(), depth, all_items);
+      OpeningBookBase<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>::save_dense(book_file.str(), depth, all_items);
   }
   
   std::cerr << "Successfully saved " << (use_ef ? "Elias-Fano" : "Dense Array") << " Book.\n";

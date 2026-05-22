@@ -73,7 +73,7 @@ class GenericMoveSorter {
   /**
    * Build an empty container
    */
-  GenericMoveSorter(): size{0} {
+  GenericMoveSorter(int width = WIDTH): size{0} {
   }
 
  private:
@@ -81,10 +81,11 @@ class GenericMoveSorter {
   unsigned int size;
 
   // Contains size moves with their score ordered by score
-  struct {
+  struct Entry {
     position_t move;
     int score;
-  } entries[WIDTH];
+  };
+  std::array<Entry, WIDTH == -1 ? 16 : WIDTH> entries;
 };
 
 

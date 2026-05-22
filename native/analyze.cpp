@@ -162,9 +162,9 @@ void runHeuristicDelete(HeuristicSolver<W, H>& solver, bool /*dummy*/) {
     delete &solver;
 }
 
-extern "C" {
-
 #include "dispatch_table.hpp"
+
+extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 void* createCache(int w, int h, size_t bytes, bool is_heuristic) {

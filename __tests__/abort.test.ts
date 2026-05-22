@@ -4,7 +4,7 @@ describe("Solver Abort/Timeout", () => {
   let solver: NodeConnect4Solver;
 
   beforeAll(async () => {
-    solver = new NodeConnect4Solver();
+    solver = new NodeConnect4Solver({ width: 8, height: 6 });
     await solver.init();
   });
 

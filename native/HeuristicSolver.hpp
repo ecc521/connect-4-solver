@@ -24,8 +24,6 @@
 namespace GameSolver {
 namespace Connect4 {
 
-
-
 template <int WIDTH, int HEIGHT>
 class HeuristicCache : public Cache {
  public:
@@ -60,6 +58,7 @@ class HeuristicCache : public Cache {
   bool isValid() const { return transTable != nullptr; }
   void reset() override { transTable->reset(); }
   int getSlotWidth() const override { return 128; }
+  std::shared_ptr<void> getSharedPtr() override { return transTable; }
 };
 
 #ifndef HEURISTIC_TABLE_SIZE
@@ -80,8 +79,50 @@ class HeuristicSolver : public ::GameSolver::Connect4::Solver<WIDTH, HEIGHT> {
   std::atomic<double> endTime{0.0};
   std::unique_ptr<ThreadPool> pool;
 
-  // Dynamic history heuristic table
-  mutable uint32_t history[WIDTH * (HEIGHT + 1)];
+  using TrompWeightsT = typename std::conditional<WIDTH == -1, std::vector<int32_t>, std::array<int32_t, WIDTH == -1 ? 1 : WIDTH * (HEIGHT + 1)>>::type;
+  using ColumnOrderT = typename std::conditional<WIDTH == -1, std::vector<int>, std::array<int, WIDTH == -1 ? 1 : WIDTH>>::type;
+  using CenterMasksT = typename std::conditional<WIDTH == -1, std::vector<position_t>, std::array<position_t, WIDTH == -1 ? 1 : WIDTH>>::type;
+  using CenterWeightsT = typename std::conditional<WIDTH == -1, std::vector<int>, std::array<int, WIDTH == -1 ? 1 : WIDTH>>::type;
+
+  TrompWeightsT TROMP_WEIGHTS;
+  ColumnOrderT COLUMN_ORDER;
+  CenterMasksT CENTER_MASKS;
+  CenterWeightsT CENTER_WEIGHTS;
+
+  void init_tables(int w, int h) {
+      if constexpr (WIDTH == -1) {
+          TROMP_WEIGHTS.resize(w * (h + 1));
+          COLUMN_ORDER.resize(w);
+          CENTER_MASKS.resize(w);
+          CENTER_WEIGHTS.resize(w);
+          history.resize(w);
+      }
+      for (int i = 0; i < w; i++) {
+          COLUMN_ORDER[i] = w / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
+          CENTER_MASKS[i] = ((position_t(1) << h) - 1) << (i * (h + 1));
+          int dist = i - w / 2;
+          if (dist < 0) dist = -dist;
+          CENTER_WEIGHTS[i] = w - dist;
+      }
+      for (int col = 0; col < w; col++) {
+        for (int row = 0; row < h; row++) {
+            int i = col < w / 2 ? col : w - 1 - col;
+            int hh = row < h / 2 ? row : h - 1 - row;
+            int min_3_i = i < 3 ? i : 3;
+            int min_3_h = hh < 3 ? hh : 3;
+            int max_0_3_i = (3 - i) > 0 ? (3 - i) : 0;
+            int diff = min_3_h - max_0_3_i;
+            int max_neg1_diff = diff > -1 ? diff : -1;
+            int min_i_h = i < hh ? i : hh;
+            int min_3_min_i_h = min_i_h < 3 ? min_i_h : 3;
+            int val = 4 + min_3_i + max_neg1_diff + min_3_min_i_h + min_3_h;
+            TROMP_WEIGHTS[col * (h + 1) + row] = val;
+        }
+      }
+  }
+
+  using HistoryT = typename std::conditional<WIDTH == -1, std::vector<uint32_t>, std::array<uint32_t, WIDTH == -1 ? 1 : WIDTH>>::type;
+  mutable HistoryT history;
 
   /**
    * Heuristic negamax with depth limit.
@@ -116,8 +157,8 @@ class HeuristicSolver : public ::GameSolver::Connect4::Solver<WIDTH, HEIGHT> {
     nodeCount = 0;
     stopSearch = false;
     transTable->reset();
-    for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
-      history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
+    for (size_t i = 0; i < history.size(); i++) {
+      history[i] = 0; // HeuristicSolver just uses history per-column, initialize to 0
     }
   }
 
@@ -128,19 +169,21 @@ class HeuristicSolver : public ::GameSolver::Connect4::Solver<WIDTH, HEIGHT> {
   bool isBusy() const override { return isSearching.load(std::memory_order_relaxed); }
   void setBusy(bool busy) override { isSearching.store(busy, std::memory_order_relaxed); }
 
-  HeuristicSolver(std::shared_ptr<TransTable> cache);
+  HeuristicSolver(std::shared_ptr<TransTable> cache, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT) : transTable(cache), nodeCount(0), pool(std::make_unique<ThreadPool>()) {
+    init_tables(w, h);
+  }
   HeuristicSolver() : HeuristicSolver(std::make_shared<TransTable>((1ULL << HEURISTIC_TABLE_SIZE) * 16ULL)) {}
 
-  static std::unique_ptr<::GameSolver::Connect4::Cache> createCache(size_t table_bytes) {
+  static std::unique_ptr<::GameSolver::Connect4::Cache> createCache(size_t table_bytes, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT) {
     auto* c = new (std::nothrow) HeuristicCache<WIDTH, HEIGHT>(table_bytes);
     if (c && c->isValid()) return std::unique_ptr<::GameSolver::Connect4::Cache>(c);
     delete c;
     return nullptr;
   }
 
-  static std::unique_ptr<HeuristicSolver<WIDTH, HEIGHT>> createWithCache(::GameSolver::Connect4::Cache* cache) {
+  static std::unique_ptr<HeuristicSolver<WIDTH, HEIGHT>> createWithCache(::GameSolver::Connect4::Cache* cache, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT) {
     if (auto c = dynamic_cast<HeuristicCache<WIDTH, HEIGHT>*>(cache)) {
-      auto* s = new (std::nothrow) HeuristicSolver<WIDTH, HEIGHT>(c->transTable);
+      auto* s = new (std::nothrow) HeuristicSolver<WIDTH, HEIGHT>(c->transTable, w, h);
       if (!s) return nullptr;
       return std::unique_ptr<HeuristicSolver<WIDTH, HEIGHT>>(s);
     }

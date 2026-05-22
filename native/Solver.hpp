@@ -69,8 +69,8 @@ class Solver {
   virtual void loadBook(const OpeningBookBase<WIDTH, HEIGHT>* b) = 0;
   virtual void setTimeout(double end_time_ms) = 0;
 
-  static std::unique_ptr<::GameSolver::Connect4::Cache> createCache(size_t table_bytes);
-  static std::unique_ptr<Solver<WIDTH, HEIGHT>> createWithCache(::GameSolver::Connect4::Cache* cache);
+  static std::unique_ptr<::GameSolver::Connect4::Cache> createCache(size_t table_bytes, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT);
+  static std::unique_ptr<Solver<WIDTH, HEIGHT>> createWithCache(::GameSolver::Connect4::Cache* cache, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT);
   static std::unique_ptr<Solver<WIDTH, HEIGHT>> create(size_t table_bytes);
 };
 
@@ -79,8 +79,8 @@ class Solver {
 template <int WIDTH, int HEIGHT, typename SlotType>
 class SolverImpl : public Solver<WIDTH, HEIGHT> {
  public:
-  static constexpr int VALUE_BITS = getRequiredValueBits<WIDTH, HEIGHT>();
-  static constexpr int MOVE_BITS = WIDTH >= 16 ? 5 : (WIDTH >= 8 ? 4 : 3);
+  static constexpr int VALUE_BITS = WIDTH == -1 ? 8 : getRequiredValueBits<WIDTH, HEIGHT>();
+  static constexpr int MOVE_BITS = WIDTH == -1 ? 4 : (WIDTH >= 16 ? 5 : (WIDTH >= 8 ? 4 : 3));
   using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
   std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, position_t>> transTable;
   std::atomic<unsigned long long> nodeCount;
@@ -91,25 +91,54 @@ class SolverImpl : public Solver<WIDTH, HEIGHT> {
   const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr;
 
  private:
-  mutable int32_t history[WIDTH * (HEIGHT + 1)];
+  using TrompWeightsT = typename std::conditional<WIDTH == -1, std::vector<int32_t>, std::array<int32_t, WIDTH == -1 ? 1 : WIDTH * (HEIGHT + 1)>>::type;
+  using ColumnOrderT = typename std::conditional<WIDTH == -1, std::vector<int>, std::array<int, WIDTH == -1 ? 1 : WIDTH>>::type;
+  using HistoryT = typename std::conditional<WIDTH == -1, std::vector<int32_t>, std::array<int32_t, WIDTH == -1 ? 1 : WIDTH * (HEIGHT + 1)>>::type;
 
-  template <bool HasBook>
+  TrompWeightsT TROMP_WEIGHTS;
+  ColumnOrderT COLUMN_ORDER;
+  mutable HistoryT history;
+
+  void init_tables(int w, int h) {
+      if constexpr (WIDTH == -1) {
+          TROMP_WEIGHTS.resize(w * (h + 1));
+          COLUMN_ORDER.resize(w);
+          history.resize(w * (h + 1));
+      }
+      for (int i = 0; i < w; i++) {
+          COLUMN_ORDER[i] = w / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
+      }
+      for (int col = 0; col < w; col++) {
+        for (int row = 0; row < h; row++) {
+            int i = col < w / 2 ? col : w - 1 - col;
+            int hh = row < h / 2 ? row : h - 1 - row;
+            int min_3_i = i < 3 ? i : 3;
+            int min_3_h = hh < 3 ? hh : 3;
+            int max_0_3_i = (3 - i) > 0 ? (3 - i) : 0;
+            int diff = min_3_h - max_0_3_i;
+            int max_neg1_diff = diff > -1 ? diff : -1;
+            int min_i_h = i < hh ? i : hh;
+            int min_3_min_i_h = min_i_h < 3 ? min_i_h : 3;
+            int val = 4 + min_3_i + max_neg1_diff + min_3_min_i_h + min_3_h;
+            TROMP_WEIGHTS[col * (h + 1) + row] = val;
+            history[col * (h + 1) + row] = val;
+        }
+      }
+  }
+
+  template <bool HasBook, int W_CONST = WIDTH, int H_CONST = HEIGHT>
   int negamax(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
 
  public:
 
-  SolverImpl(size_t table_bytes) 
+  SolverImpl(size_t table_bytes, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT) 
     : transTable(std::make_shared<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, position_t>>(table_bytes)), nodeCount{0}, pool(std::make_unique<::GameSolver::Connect4::ThreadPool>()) {
-    for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
-      history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
-    }
+    init_tables(w, h);
   }
 
-  SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, position_t>> cache)
+  SolverImpl(std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, position_t>> cache, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT)
     : transTable(cache), nodeCount{0}, pool(std::make_unique<::GameSolver::Connect4::ThreadPool>()) {
-    for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
-      history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
-    }
+    init_tables(w, h);
   }
 
   ::GameSolver::Connect4::SolverResult solve(const GenericPosition<WIDTH, HEIGHT> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) override;
@@ -118,6 +147,9 @@ class SolverImpl : public Solver<WIDTH, HEIGHT> {
  private:
   template <bool HasBook>
   ::GameSolver::Connect4::SolverResult solve_single(const GenericPosition<WIDTH, HEIGHT> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
+
+  template <bool HasBook>
+  int dispatch_solve_weak(const GenericPosition<WIDTH, HEIGHT>& P, int min, int max, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history);
 
  public:
 
@@ -128,8 +160,8 @@ class SolverImpl : public Solver<WIDTH, HEIGHT> {
   void reset() override {
     nodeCount = 0;
     transTable->reset();
-    for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
-      history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
+    for (size_t i = 0; i < history.size(); i++) {
+      history[i] = TROMP_WEIGHTS[i];
     }
   }
 

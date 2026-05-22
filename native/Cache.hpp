@@ -9,6 +9,7 @@ class Cache {
   virtual ~Cache() = default;
   virtual void reset() = 0;
   virtual int getSlotWidth() const = 0;
+  virtual std::shared_ptr<void> getSharedPtr() { return nullptr; }
 };
 
 } // namespace Connect4

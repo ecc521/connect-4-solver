@@ -11,4 +11,3 @@ cp wasm-out/analyze.js build/ 2>/dev/null || true
 cp wasm-out/analyze.wasm build/ 2>/dev/null || true
 cp wasm-out/analyze_threaded.js build/ 2>/dev/null || true
 cp wasm-out/analyze_threaded.wasm build/ 2>/dev/null || true
-
