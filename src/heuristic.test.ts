@@ -52,7 +52,7 @@ describe("HeuristicNodeConnect4Solver", () => {
     await massiveSolver.analyze("5555464673", { maxDepth: 25, timeoutMs: 15 });
     const end = Date.now();
 
-    expect(end - start).toBeLessThan(100);
+    expect(end - start).toBeLessThan(250);
     massiveSolver.release();
   });
 

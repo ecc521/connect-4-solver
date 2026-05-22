@@ -64,9 +64,10 @@ describe("Embedded book transparent fallback", () => {
         // A correct solver should return a non-null evaluation for the empty board.
         const result = await solver.analyze("", {});
         expect(result).toBeDefined();
-        expect(result.evaluation).not.toBeNull();
+        const evaluation = result.evaluation;
+        if (!evaluation) throw new Error("evaluation is null");
         // The empty 7x6 board is a first-player win — score should be positive
-        expect(result.evaluation!.score).toBeGreaterThan(0);
+        expect(evaluation.score).toBeGreaterThan(0);
       },
     );
 
@@ -83,8 +84,9 @@ describe("Embedded book transparent fallback", () => {
       async () => {
         // Position '4' — center column first. Well-known positive score for P1.
         const result = await solver.solve("4", {});
-        expect(result.evaluation).not.toBeNull();
-        expect(result.evaluation!.score).toBeDefined();
+        const evaluation = result.evaluation;
+        if (!evaluation) throw new Error("evaluation is null");
+        expect(evaluation.score).toBeDefined();
       },
     );
   });
@@ -133,12 +135,13 @@ describe("Embedded book transparent fallback", () => {
 
         // Solver should still return correct results with the override book
         const result = await solver.analyze("", {});
-        expect(result.evaluation).not.toBeNull();
-        expect(result.evaluation!.score).toBeGreaterThan(0);
+        const evaluation = result.evaluation;
+        if (!evaluation) throw new Error("evaluation is null");
+        expect(evaluation.score).toBeGreaterThan(0);
       },
     );
 
-    skipIf("should release correctly after loadBook()", async () => {
+    skipIf("should release correctly after loadBook()", () => {
       // release() should not throw even when _bookPtr is set
       expect(() => solver.release()).not.toThrow();
     });
@@ -171,7 +174,7 @@ describe("Embedded book transparent fallback", () => {
       }
       const bookData = new Uint8Array(fs.readFileSync(efbookPath));
       const solver = new AdaptiveSolver({
-        bookLoader: async () => bookData,
+        bookLoader: (): Promise<Uint8Array> => Promise.resolve(bookData),
       });
       // Use 7x6 — it has an embedded book already, but the bookLoader overrides it
       await solver.setBoard(7, 6);

@@ -1,26 +1,31 @@
 import { NodeConnect4Solver } from "../src/node.js";
 
 describe("Small Cache Allocation Test", () => {
-  it("does not crash or throw on 0 MB cache size", async () => {
-    const engine = new NodeConnect4Solver({
-      width: 7,
-      height: 6,
-      cacheSizeMb: 0,
-      heuristic: true,
-    });
-    await engine.init();
+  it("throws on cache size less than 8 MB", () => {
+    expect(() => {
+      new NodeConnect4Solver({
+        width: 7,
+        height: 6,
+        cacheSizeMb: 0,
+        heuristic: true,
+      });
+    }).toThrow();
 
-    // Just testing that it doesn't crash and returns a valid result.
-    const pos = "444452233";
-    const result = await engine.analyze(pos, { threads: 1, maxDepth: 4 });
-    expect(result.evaluation).toBeDefined();
+    expect(() => {
+      new NodeConnect4Solver({
+        width: 7,
+        height: 6,
+        cacheSizeMb: 7,
+        heuristic: true,
+      });
+    }).toThrow();
   });
 
-  it("does not crash or throw on 1 MB cache size", async () => {
+  it("does not crash or throw on minimum 8 MB cache size", async () => {
     const engine = new NodeConnect4Solver({
       width: 7,
       height: 6,
-      cacheSizeMb: 1,
+      cacheSizeMb: 8,
       heuristic: true,
     });
     await engine.init();
@@ -28,5 +33,6 @@ describe("Small Cache Allocation Test", () => {
     const pos = "444452233";
     const result = await engine.analyze(pos, { threads: 1, maxDepth: 4 });
     expect(result.evaluation).toBeDefined();
+    engine.release();
   });
 });
