@@ -19,16 +19,28 @@ R dispatch_impl(int w, int h, F&& f, std::tuple<Ts...>) {
     ) : false) || ...);
     
     if (found) return *result;
-    return R{};
+    
+    if (w * (h + 1) > 127) {
+        throw std::invalid_argument("Board dimensions too large. Max supported generic configuration requires w * (h + 1) <= 127 bits.");
+    }
+    return f(SizeTag<SupportedSize<-1, -1, C4_Dynamic::Solver, C4_Dynamic::HeuristicSolver>>{});
 }
 
 // Void dispatcher function
 template <typename F, typename... Ts>
 void dispatch_void_impl(int w, int h, F&& f, std::tuple<Ts...>) {
+    bool found = false;
     (void)((w == Ts::w && h == Ts::h ? (
         f(SizeTag<Ts>{}),
-        true
+        found = true
     ) : false) || ...);
+    
+    if (!found) {
+        if (w * (h + 1) > 127) {
+            throw std::invalid_argument("Board dimensions too large. Max supported generic configuration requires w * (h + 1) <= 127 bits.");
+        }
+        f(SizeTag<SupportedSize<-1, -1, C4_Dynamic::Solver, C4_Dynamic::HeuristicSolver>>{});
+    }
 }
 
 template <typename R, typename F>
@@ -45,7 +57,7 @@ void dispatch_void(int w, int h, F&& f) {
 // to keep legacy API transitions minimal and localized.
 
 #define DISPATCH_EXACT(ACTION, ...) \
-    return dispatch<decltype(ACTION<4,4>(*static_cast<C4_4x4::Solver*>(solver), __VA_ARGS__))>(w, h, [&](auto tag) { \
+    return dispatch<decltype(ACTION<7,6>(*static_cast<C4_7x6::Solver*>(solver), __VA_ARGS__))>(w, h, [&](auto tag) { \
         using Size = typename decltype(tag)::type; \
         return ACTION<Size::w, Size::h>(*static_cast<typename Size::Solver*>(solver), __VA_ARGS__); \
     });
@@ -58,7 +70,7 @@ void dispatch_void(int w, int h, F&& f) {
     return;
 
 #define DISPATCH_HEURISTIC_RETURN(ACTION, ...) \
-    return dispatch<decltype(ACTION<4,4>(*static_cast<C4_4x4::HeuristicSolver*>(solver), __VA_ARGS__))>(w, h, [&](auto tag) { \
+    return dispatch<decltype(ACTION<7,6>(*static_cast<C4_7x6::HeuristicSolver*>(solver), __VA_ARGS__))>(w, h, [&](auto tag) { \
         using Size = typename decltype(tag)::type; \
         return ACTION<Size::w, Size::h>(*static_cast<typename Size::HeuristicSolver*>(solver), __VA_ARGS__); \
     });
@@ -74,13 +86,13 @@ void dispatch_void(int w, int h, F&& f) {
 #define DISPATCH_CREATE_EXACT(W, H, CACHE_PTR) \
     return dispatch<void*>(W, H, [&](auto tag) { \
         using Size = typename decltype(tag)::type; \
-        return Size::Solver::createWithCache(static_cast<::GameSolver::Connect4::Cache*>(CACHE_PTR)).release(); \
+        return Size::Solver::createWithCache(static_cast<::GameSolver::Connect4::Cache*>(CACHE_PTR), W, H).release(); \
     });
 
 #define DISPATCH_CREATE_HEURISTIC(W, H, CACHE_PTR) \
     return dispatch<void*>(W, H, [&](auto tag) { \
         using Size = typename decltype(tag)::type; \
-        return Size::HeuristicSolver::createWithCache(static_cast<::GameSolver::Connect4::Cache*>(CACHE_PTR)).release(); \
+        return Size::HeuristicSolver::createWithCache(static_cast<::GameSolver::Connect4::Cache*>(CACHE_PTR), W, H).release(); \
     });
 
 #define DISPATCH_DELETE(W, H, SOLVER) \
@@ -93,13 +105,13 @@ void dispatch_void(int w, int h, F&& f) {
 #define DISPATCH_CREATE_EXACT_CACHE(W, H, TABLE_BYTES) \
     return dispatch<void*>(W, H, [&](auto tag) { \
         using Size = typename decltype(tag)::type; \
-        return Size::Solver::createCache(TABLE_BYTES).release(); \
+        return Size::Solver::createCache(TABLE_BYTES, W, H).release(); \
     });
 
 #define DISPATCH_CREATE_HEURISTIC_CACHE(W, H, TABLE_BYTES) \
     return dispatch<void*>(W, H, [&](auto tag) { \
         using Size = typename decltype(tag)::type; \
-        return Size::HeuristicSolver::createCache(TABLE_BYTES).release(); \
+        return Size::HeuristicSolver::createCache(TABLE_BYTES, W, H).release(); \
     });
 
 #define DISPATCH_DELETE_BOOK(W, H, BOOK) \
@@ -117,13 +129,13 @@ void dispatch_void(int w, int h, F&& f) {
     return;
 
 #define DISPATCH_EXACT_RETURN(W, H, ACTION, SOLVER, ...) \
-    return dispatch<decltype(static_cast<C4_4x4::Solver*>(SOLVER)->ACTION(__VA_ARGS__))>(W, H, [&](auto tag) { \
+    return dispatch<decltype(static_cast<C4_7x6::Solver*>(SOLVER)->ACTION(__VA_ARGS__))>(W, H, [&](auto tag) { \
         using Size = typename decltype(tag)::type; \
         return static_cast<typename Size::Solver*>(SOLVER)->ACTION(__VA_ARGS__); \
     });
 
 #define DISPATCH_STATIC(W, H, ACTION, ...) \
-    return dispatch<decltype(ACTION<4, 4>(__VA_ARGS__))>(W, H, [&](auto tag) { \
+    return dispatch<decltype(ACTION<7, 6>(__VA_ARGS__))>(W, H, [&](auto tag) { \
         using Size = typename decltype(tag)::type; \
         return ACTION<Size::w, Size::h>(__VA_ARGS__); \
     });

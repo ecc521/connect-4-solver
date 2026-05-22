@@ -83,7 +83,7 @@ class TranspositionTable {
   Bucket *Data;
 
   size_t index(KeyType key) const {
-    return static_cast<size_t>(static_cast<uint64_t>(key % num_buckets));
+    return static_cast<size_t>(key % num_buckets);
   }
 
  public:
@@ -209,7 +209,7 @@ class TranspositionTable {
     SlotType move_mask = (static_cast<SlotType>(1) << MoveBits) - 1;
 
     SlotType first = Data[b].slots[0].data.load(std::memory_order_relaxed);
-    if ((first >> (ValueBits + WorkBits + MoveBits + FlagBits)) == partial_key) {
+    if (first != 0 && (first >> (ValueBits + WorkBits + MoveBits + FlagBits)) == partial_key) {
         ValueType val = static_cast<ValueType>(first & val_mask);
         uint8_t work = static_cast<uint8_t>((first >> ValueBits) & work_mask);
         uint8_t flags = static_cast<uint8_t>((first >> (ValueBits + WorkBits)) & flag_mask);
@@ -217,7 +217,7 @@ class TranspositionTable {
         return {move, work, flags, val};
     }
     SlotType second = Data[b].slots[1].data.load(std::memory_order_relaxed);
-    if ((second >> (ValueBits + WorkBits + MoveBits + FlagBits)) == partial_key) {
+    if (second != 0 && (second >> (ValueBits + WorkBits + MoveBits + FlagBits)) == partial_key) {
         ValueType val = static_cast<ValueType>(second & val_mask);
         uint8_t work = static_cast<uint8_t>((second >> ValueBits) & work_mask);
         uint8_t flags = static_cast<uint8_t>((second >> (ValueBits + WorkBits)) & flag_mask);
@@ -232,11 +232,11 @@ class TranspositionTable {
     size_t b = index(key);
     SlotType first = Data[b].slots[0].data.load(std::memory_order_relaxed);
     SlotType val_mask = (static_cast<SlotType>(1) << ValueBits) - 1;
-    if ((first >> (ValueBits + WorkBits + MoveBits + FlagBits)) == partial_key) {
+    if (first != 0 && (first >> (ValueBits + WorkBits + MoveBits + FlagBits)) == partial_key) {
       return static_cast<ValueType>(first & val_mask);
     }
     SlotType second = Data[b].slots[1].data.load(std::memory_order_relaxed);
-    if ((second >> (ValueBits + WorkBits + MoveBits + FlagBits)) == partial_key) {
+    if (second != 0 && (second >> (ValueBits + WorkBits + MoveBits + FlagBits)) == partial_key) {
       return static_cast<ValueType>(second & val_mask);
     }
     return 0;

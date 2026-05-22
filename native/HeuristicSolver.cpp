@@ -26,28 +26,25 @@ namespace {
   }
 }
 
-template <int WIDTH, int HEIGHT>
-HeuristicSolver<WIDTH, HEIGHT>::HeuristicSolver(std::shared_ptr<TransTable> cache)
-    : transTable(cache), nodeCount(0), pool(std::make_unique<ThreadPool>()) {
-  for (int i = 0; i < WIDTH * (HEIGHT + 1); i++) {
-    history[i] = GenericPosition<WIDTH, HEIGHT>::TROMP_WEIGHTS[i];
-  }
-}
 
 template <int WIDTH, int HEIGHT>
 int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc, uint32_t& localCount) {
   if (P.canWinNext()) {
-      return SCORE_FORCED_WIN_BASE + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
+      return SCORE_FORCED_WIN_BASE + (P.width() * P.height() + 1 - P.nbMoves()) / 2;
   }
 
   auto moves = P.possibleNonLosingMoves();
   if (moves == 0) {
-      if (P.nbMoves() == WIDTH * HEIGHT) return 0; // Board is full, it's a draw.
-      return -SCORE_FORCED_WIN_BASE - (WIDTH * HEIGHT - P.nbMoves()) / 2;
+      if (P.nbMoves() == P.width() * P.height()) return 0; // Board is full, it's a draw.
+      return -SCORE_FORCED_WIN_BASE - (P.width() * P.height() - P.nbMoves()) / 2;
   }
 
   if (depth <= 0 && (moves & (moves - 1)) != 0) {
-    return NNUE<WIDTH, HEIGHT>::evaluate_accumulated(acc, P);
+    if constexpr (WIDTH != -1) {
+      return NNUE<WIDTH, HEIGHT>::evaluate_accumulated(acc, P);
+    } else {
+      return P.heuristic_evaluate(this->CENTER_MASKS, this->CENTER_WEIGHTS);
+    }
   }
 
   if (++localCount >= 16384) [[unlikely]] {
@@ -76,8 +73,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     GenericPosition<WIDTH, HEIGHT> P2(P);
     P2.play(moves);
     unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(moves);
-    int col = bit_idx / (HEIGHT + 1);
-    int row = bit_idx % (HEIGHT + 1);
+    int col = bit_idx / (P.height() + 1);
+    int row = bit_idx % (P.height() + 1);
     int player = P.nbMoves() % 2;
     
     acc.addPiece(player, col, row);
@@ -90,12 +87,12 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     typename GenericPosition<WIDTH, HEIGHT>::position_t move;
     int score;
   };
-  Move sorted_moves[WIDTH];
+  std::vector<Move> sorted_moves(P.width());
   int n_moves = 0;
 
-  for (int i = 0; i < WIDTH; i++) {
-    int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
-    auto m = moves & GenericPosition<WIDTH, HEIGHT>::column_mask(col);
+  for (int i = 0; i < P.width(); i++) {
+    int col = this->COLUMN_ORDER[i];
+    auto m = moves & P.column_mask(col);
     if (m) {
       sorted_moves[n_moves++] = {m, (int)history[col]};
 
@@ -104,7 +101,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
       this->transTable->prefetch(child.symmetric_key());
     }
   }
-  std::sort(sorted_moves, sorted_moves + n_moves, [](const Move &a, const Move &b) {
+  std::sort(sorted_moves.begin(), sorted_moves.begin() + n_moves, [](const Move &a, const Move &b) {
     return a.score > b.score;
   });
 
@@ -117,8 +114,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     P2.play(sorted_moves[i].move);
     
     unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(sorted_moves[i].move);
-    int col = bit_idx / (HEIGHT + 1);
-    int row = bit_idx % (HEIGHT + 1);
+    int col = bit_idx / (P.height() + 1);
+    int row = bit_idx % (P.height() + 1);
     int player = P.nbMoves() % 2;
     
     acc.addPiece(player, col, row);
@@ -128,7 +125,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
 
     if (score > best_score) {
       best_score = score;
-      best_seen_col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
+      best_seen_col = this->COLUMN_ORDER[i];
     }
     if (score > alpha) {
       alpha = score;
@@ -140,8 +137,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     }
   }
 
-  uint8_t stored_move = best_seen_col == -1 ? WIDTH : best_seen_col;
-  if (stored_move < WIDTH && is_reverse) stored_move = WIDTH - 1 - stored_move;
+  uint8_t stored_move = best_seen_col == -1 ? P.width() : best_seen_col;
+  if (stored_move < P.width() && is_reverse) stored_move = P.width() - 1 - stored_move;
   this->transTable->put(key, (int16_t)(best_score), (uint8_t)depth, stored_move, flags); 
   return best_score;
 }
@@ -160,20 +157,20 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
   } guard{this->isSearching};
 
   if(P.canWinNext()) {
-    int score = SCORE_FORCED_WIN_BASE + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
-    for (int i = 0; i < WIDTH; i++) {
+    int score = SCORE_FORCED_WIN_BASE + (P.width() * P.height() + 1 - P.nbMoves()) / 2;
+    for (int i = 0; i < P.width(); i++) {
         if (P.canPlay(i) && P.isWinningMove(i)) return {score, i, (int)P.nbMoves(), getNodeCount()};
     }
     return {score, -1, (int)P.nbMoves(), getNodeCount()};
   }
   
-  if (P.nbMoves() == WIDTH * HEIGHT) {
+  if (P.nbMoves() == P.width() * P.height()) {
       return {0, -1, (int)P.nbMoves(), getNodeCount()};
   }
   
   if (this->book) {
       if (int val = this->book->get(P)) {
-          int exact_score = val + GenericPosition<WIDTH, HEIGHT>::MIN_SCORE - 1;
+          int exact_score = val + P.min_score() - 1;
           int heur_score = exact_score > 0 ? SCORE_FORCED_WIN_BASE + exact_score : -SCORE_FORCED_WIN_BASE + exact_score;
           if (exact_score == 0) heur_score = 0;
           return {heur_score, -1, (int)P.nbMoves(), getNodeCount(), this->stopSearch.load(std::memory_order_relaxed)};
@@ -198,7 +195,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
   };
   std::vector<RootMove> root_moves;
   for (int i = 0; i < WIDTH; i++) {
-    int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
+    int col = this->COLUMN_ORDER[i];
     if (P.canPlay(col)) {
       root_moves.push_back({col, -SCORE_INFINITY});
     }
@@ -207,7 +204,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
   for (int d = 1; d <= max_depth; d++) {
     if (root_moves.empty()) break;
     // If our depth equals the moves remaining, the board is exhaustively searched.
-    if (d > WIDTH * HEIGHT - P.nbMoves()) break;
+    if (d > P.width() * P.height() - P.nbMoves()) break;
 
     std::atomic<int> next_move_idx{0};
     std::mutex root_mutex;
@@ -223,7 +220,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
         int score = -SCORE_INFINITY;
 
         if (P.isWinningMove(col)) {
-          score = SCORE_FORCED_WIN_BASE + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
+          score = SCORE_FORCED_WIN_BASE + (P.width() * P.height() + 1 - P.nbMoves()) / 2;
         } else {
           GenericPosition<WIDTH, HEIGHT> P2(P);
           P2.playCol(col);
@@ -231,7 +228,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
           bool book_hit = false;
           if (this->book) {
             if (int val = this->book->get(P2)) {
-              int exact_score = val + GenericPosition<WIDTH, HEIGHT>::MIN_SCORE - 1;
+              int exact_score = val + P.min_score() - 1;
               int heur_score = exact_score > 0 ? SCORE_FORCED_WIN_BASE + exact_score : -SCORE_FORCED_WIN_BASE + exact_score;
               if (exact_score == 0) heur_score = 0;
               score = -heur_score;
@@ -243,7 +240,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
             NNUEAccumulator<WIDTH, HEIGHT> local_acc = root_acc;
             typename GenericPosition<WIDTH, HEIGHT>::position_t move = (P.getMask() + P.bottom_mask_col(col)) & P.column_mask(col);
             unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(move);
-            local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (HEIGHT + 1));
+            local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (P.height() + 1));
             score = -negamax_heuristic(P2, -SCORE_INFINITY, SCORE_INFINITY, d - 1, end_time_ms, local_acc, localCount);
         }
         }
@@ -293,7 +290,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
       bool is_reverse = false;
       auto key = P.symmetric_key(is_reverse);
       uint8_t stored_move = best_move;
-      if (stored_move < WIDTH && is_reverse) stored_move = WIDTH - 1 - stored_move;
+      if (stored_move < P.width() && is_reverse) stored_move = P.width() - 1 - stored_move;
       // Store best result in TT for next iteration's move ordering
       this->transTable->put(key, (int16_t)best_score, (uint8_t)d, stored_move, 1);
     }
@@ -316,7 +313,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
     std::atomic<bool>& flag;
     ~LockGuard() { flag.store(false, std::memory_order_release); }
   } guard{this->isSearching};
-  std::vector<int> scores(WIDTH, -SCORE_INFINITY);
+  std::vector<int> scores(P.width(), -SCORE_INFINITY);
   int final_depth_reached = 0;
   this->stopSearch = false;
 
@@ -324,12 +321,12 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
   root_acc.init(P);
 
   int total_valid_cols = 0;
-  for (int i = 0; i < WIDTH; i++) if (P.canPlay(i)) total_valid_cols++;
+  for (int i = 0; i < P.width(); i++) if (P.canPlay(i)) total_valid_cols++;
   if (total_valid_cols == 0) return {scores, 0};
 
   for (int d = 1; d <= max_depth; d++) {
     // If our depth equals the moves remaining, the board is exhaustively searched.
-    if (d > WIDTH * HEIGHT - P.nbMoves()) break;
+    if (d > P.width() * P.height() - P.nbMoves()) break;
     std::vector<int> current_scores = scores;
     std::atomic<int> next_col{0};
 
@@ -338,13 +335,13 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
       uint32_t localCount = 0;
       while (true) {
         int i = next_col.fetch_add(1, std::memory_order_relaxed);
-        if (i >= WIDTH) break;
+        if (i >= P.width()) break;
         if (this->stopSearch.load(std::memory_order_relaxed)) break;
 
-        int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
+        int col = this->COLUMN_ORDER[i];
         if (P.canPlay(col)) {
           if (P.isWinningMove(col)) {
-            current_scores[col] = SCORE_FORCED_WIN_BASE + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
+            current_scores[col] = SCORE_FORCED_WIN_BASE + (P.width() * P.height() + 1 - P.nbMoves()) / 2;
           } else {
             GenericPosition<WIDTH, HEIGHT> P2(P);
             P2.playCol(col);
@@ -352,7 +349,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
             bool book_hit = false;
             if (this->book) {
                 if (int val = this->book->get(P2)) {
-                    int exact_score = val + GenericPosition<WIDTH, HEIGHT>::MIN_SCORE - 1;
+                    int exact_score = val + P.min_score() - 1;
                     int heur_score = exact_score > 0 ? SCORE_FORCED_WIN_BASE + exact_score : -SCORE_FORCED_WIN_BASE + exact_score;
                     if (exact_score == 0) heur_score = 0;
                     current_scores[col] = -heur_score;
@@ -364,7 +361,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
                 NNUEAccumulator<WIDTH, HEIGHT> local_acc = root_acc;
                 typename GenericPosition<WIDTH, HEIGHT>::position_t move = (P.getMask() + P.bottom_mask_col(col)) & P.column_mask(col);
                 unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(move);
-                local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (HEIGHT + 1));
+                local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (P.height() + 1));
                 int score = -negamax_heuristic(P2, -SCORE_INFINITY, SCORE_INFINITY, d - 1, end_time_ms, local_acc, localCount);
                 if (score >= SCORE_INFINITY || score <= -SCORE_INFINITY) break;
                 current_scores[col] = score;
@@ -375,7 +372,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
       this->nodeCount.fetch_add(localCount, std::memory_order_relaxed);
     };
 
-    unsigned int num_threads = std::min((unsigned int)WIDTH, (unsigned int)threads);
+    unsigned int num_threads = std::min((unsigned int)P.width(), (unsigned int)threads);
     if (num_threads <= 1) {
       worker();
     } else {
@@ -396,10 +393,10 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
     }
 #else
     uint32_t localCount = 0;
-    for (int i = 0; i < WIDTH; i++) {
-        int col = GenericPosition<WIDTH, HEIGHT>::COLUMN_ORDER[i];
+    for (int i = 0; i < P.width(); i++) {
+        int col = this->COLUMN_ORDER[i];
         if (P.canPlay(col)) {
-            if(P.isWinningMove(col)) current_scores[col] = SCORE_FORCED_WIN_BASE + (WIDTH * HEIGHT + 1 - P.nbMoves()) / 2;
+            if(P.isWinningMove(col)) current_scores[col] = SCORE_FORCED_WIN_BASE + (P.width() * P.height() + 1 - P.nbMoves()) / 2;
             else {
                 GenericPosition<WIDTH, HEIGHT> P2(P);
                 P2.playCol(col);
@@ -407,7 +404,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
                 bool book_hit = false;
                 if (this->book) {
                     if (int val = this->book->get(P2)) {
-                        int exact_score = val + GenericPosition<WIDTH, HEIGHT>::MIN_SCORE - 1;
+                        int exact_score = val + P.min_score() - 1;
                         int heur_score = exact_score > 0 ? SCORE_FORCED_WIN_BASE + exact_score : -SCORE_FORCED_WIN_BASE + exact_score;
                         if (exact_score == 0) heur_score = 0;
                         current_scores[col] = -heur_score;
@@ -419,7 +416,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
                     NNUEAccumulator<WIDTH, HEIGHT> local_acc = root_acc;
                     typename GenericPosition<WIDTH, HEIGHT>::position_t move = (P.getMask() + P.bottom_mask_col(col)) & P.column_mask(col);
                     unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(move);
-                    local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (HEIGHT + 1));
+                    local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (P.height() + 1));
                     int score = -negamax_heuristic(P2, -SCORE_INFINITY, SCORE_INFINITY, d - 1, end_time_ms, local_acc, localCount);
                     if (score >= SCORE_INFINITY || score <= -SCORE_INFINITY) break;
                     current_scores[col] = score;
@@ -435,7 +432,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
     final_depth_reached = d;
     
     bool all_terminal = true;
-    for (int i = 0; i < WIDTH; i++) {
+    for (int i = 0; i < P.width(); i++) {
       if (P.canPlay(i) && current_scores[i] < SCORE_FORCED_WIN_BASE && current_scores[i] > -SCORE_FORCED_WIN_BASE) all_terminal = false;
     }
     if (all_terminal) break;

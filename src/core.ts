@@ -183,14 +183,14 @@ export abstract class BaseConnect4Solver {
       if (widthOrOpts.height !== undefined) height = widthOrOpts.height;
     }
 
-    if (width < 4 || width > 13 || height < 4 || height > 13) {
+    if (width < 4 || width > 16 || height < 4 || height > 16) {
       throw new Error(
-        `Board size ${width}x${height} is outside the supported range (4x4 to 13x13).`,
+        `Board size ${width}x${height} is outside the supported range (4x4 to 16x16).`,
       );
     }
-    if (width * (height + 1) > 128) {
+    if (width * (height + 1) > 127) {
       throw new Error(
-        `Board size ${width}x${height} exceeds the maximum supported 128-bit position mask.`,
+        `Board size ${width}x${height} exceeds the maximum supported 127-bit position mask.`,
       );
     }
     this.width = width;

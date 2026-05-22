@@ -173,68 +173,24 @@ class GenericPosition {
 
   // Board size is 64bits or 128 bits depending on W and H
 #if defined(__EMSCRIPTEN__)
-  using position_t = typename std::conditional < W * (H + 1) <= 64, uint64_t, wasm_uint128_t>::type;
+  using position_t = typename std::conditional<W == -1, wasm_uint128_t, typename std::conditional < W * (H + 1) <= 64, uint64_t, wasm_uint128_t>::type>::type;
 #else
-  using position_t = typename std::conditional < W * (H + 1) <= 64, uint64_t, unsigned __int128>::type;
+  using position_t = typename std::conditional<W == -1, unsigned __int128, typename std::conditional < W * (H + 1) <= 64, uint64_t, unsigned __int128>::type>::type;
 #endif
 
-  static constexpr int WIDTH = W;
-  static constexpr int HEIGHT = H;
+  uint8_t dynamic_w = 0;
+  uint8_t dynamic_h = 0;
 
-  static constexpr int MIN_SCORE = -(W * H + 1) / 2;
-  static constexpr int MAX_SCORE = (W * H + 1) / 2;
-  std::string move_history; // Added for debugging
+  constexpr int width() const { return W == -1 ? dynamic_w : W; }
+  constexpr int height() const { return W == -1 ? dynamic_h : H; }
 
-  static constexpr std::array<int32_t, WIDTH * (HEIGHT + 1)> compute_tromp_weights() {
-    std::array<int32_t, WIDTH * (HEIGHT + 1)> weights = {};
-    for (int col = 0; col < WIDTH; col++) {
-      for (int row = 0; row < HEIGHT; row++) {
-        int i = col < WIDTH / 2 ? col : WIDTH - 1 - col;
-        int h = row < HEIGHT / 2 ? row : HEIGHT - 1 - row;
-        
-        int min_3_i = i < 3 ? i : 3;
-        int min_3_h = h < 3 ? h : 3;
-        int max_0_3_i = (3 - i) > 0 ? (3 - i) : 0;
-        int diff = min_3_h - max_0_3_i;
-        int max_neg1_diff = diff > -1 ? diff : -1;
-        int min_i_h = i < h ? i : h;
-        int min_3_min_i_h = min_i_h < 3 ? min_i_h : 3;
-        
-        int val = 4 + min_3_i + max_neg1_diff + min_3_min_i_h + min_3_h;
-        weights[col * (HEIGHT + 1) + row] = val;
-      }
-    }
-    return weights;
-  }
+  static constexpr int WIDTH_MACRO = W;
+  static constexpr int HEIGHT_MACRO = H;
 
-  static constexpr std::array<position_t, WIDTH> compute_center_masks() {
-    std::array<position_t, WIDTH> masks = {};
-    for(int i = 0; i < WIDTH; i++) masks[i] = column_mask(i);
-    return masks;
-  }
+  constexpr int min_score() const { return -(width() * height() + 1) / 2; }
+  constexpr int max_score() const { return (width() * height() + 1) / 2; }
 
-  static constexpr std::array<int, WIDTH> compute_center_weights() {
-    std::array<int, WIDTH> w = {};
-    for(int i = 0; i < WIDTH; i++) {
-        int dist = i - WIDTH / 2;
-        if (dist < 0) dist = -dist;
-        w[i] = WIDTH - dist; 
-    }
-    return w;
-  }
-
-  static constexpr std::array<int, WIDTH> compute_column_order() {
-    std::array<int, WIDTH> order = {};
-    for (int i = 0; i < WIDTH; i++) {
-      order[i] = WIDTH / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
-    }
-    return order;
-  }
-
-  static constexpr std::array<int32_t, WIDTH * (HEIGHT + 1)> TROMP_WEIGHTS = compute_tromp_weights();
-  static constexpr std::array<position_t, WIDTH> CENTER_MASKS = compute_center_masks();
-  static constexpr std::array<int, WIDTH> CENTER_WEIGHTS = compute_center_weights();
-  static constexpr std::array<int, WIDTH> COLUMN_ORDER = compute_column_order();
+  // Static arrays like TROMP_WEIGHTS and CENTER_MASKS are now dynamically instantiated in the Solver
 
   static_assert(W <= 16, "Board's width must be <= 16 due to alphanumeric parsing limits");
   static_assert(W * (H + 1) <= sizeof(position_t)*8, "Board does not fit into position_t bitmask");
@@ -250,7 +206,7 @@ class GenericPosition {
       int col = seq[i] - '1';
       if (seq[i] >= 'a' && seq[i] <= 'z') col = seq[i] - 'a' + 9;
       else if (seq[i] >= 'A' && seq[i] <= 'Z') col = seq[i] - 'A' + 9;
-      if(col < 0 || col >= WIDTH || !canPlay(col) || isWinningMove(col)) return i;
+      if(col < 0 || col >= width() || !canPlay(col) || isWinningMove(col)) return i;
       playCol(col);
     }
     return seq.size();
@@ -268,20 +224,45 @@ class GenericPosition {
     return current_position + mask;
   }
 
-  position_t mirror_key(position_t k) const {
+  template <int W_CONST, int H_CONST>
+  position_t mirror_key_impl(position_t k) const {
       position_t res = 0;
-      for (int i = 0; i < WIDTH; i++) {
-          position_t col_mask = ((position_t(1) << (HEIGHT + 1)) - 1) << (i * (HEIGHT + 1));
-          int target_i = WIDTH - 1 - i;
+      for (int i = 0; i < W_CONST; i++) {
+          position_t col_mask = ((position_t(1) << (H_CONST + 1)) - 1) << (i * (H_CONST + 1));
+          int target_i = W_CONST - 1 - i;
           if (target_i > i) {
-              res |= (k & col_mask) << ((target_i - i) * (HEIGHT + 1));
+              res |= (k & col_mask) << ((target_i - i) * (H_CONST + 1));
           } else if (target_i < i) {
-              res |= (k & col_mask) >> ((i - target_i) * (HEIGHT + 1));
+              res |= (k & col_mask) >> ((i - target_i) * (H_CONST + 1));
           } else {
               res |= (k & col_mask);
           }
       }
       return res;
+  }
+
+  position_t mirror_key(position_t k) const {
+      if constexpr (W != -1) {
+          return mirror_key_impl<W, H>(k);
+      } else {
+          if (width() == 7 && height() == 6) return mirror_key_impl<7, 6>(k);
+          if (width() == 8 && height() == 6) return mirror_key_impl<8, 6>(k);
+          if (width() == 8 && height() == 8) return mirror_key_impl<8, 8>(k);
+          
+          position_t res = 0;
+          for (int i = 0; i < width(); i++) {
+              position_t col_mask = ((position_t(1) << (height() + 1)) - 1) << (i * (height() + 1));
+              int target_i = width() - 1 - i;
+              if (target_i > i) {
+                  res |= (k & col_mask) << ((target_i - i) * (height() + 1));
+              } else if (target_i < i) {
+                  res |= (k & col_mask) >> ((i - target_i) * (height() + 1));
+              } else {
+                  res |= (k & col_mask);
+              }
+          }
+          return res;
+      }
   }
 
   position_t symmetric_key(bool &is_reverse) const {
@@ -303,10 +284,10 @@ class GenericPosition {
 
   position_t key3(bool &is_reverse) const {
     position_t key_forward = 0;
-    for(int i = 0; i < WIDTH; i++) partialKey3(key_forward, i);
+    for(int i = 0; i < width(); i++) partialKey3(key_forward, i);
 
     position_t key_reverse = 0;
-    for(int i = WIDTH; i--;) partialKey3(key_reverse, i);
+    for(int i = width(); i--;) partialKey3(key_reverse, i);
 
     if (key_forward < key_reverse) {
         is_reverse = false;
@@ -338,37 +319,38 @@ class GenericPosition {
     return popcount_impl(compute_winning_position(current_position | move, mask));
   }
 
-  int heuristic_evaluate(int double_threat_weight = 10, int uncontested_parity_weight = 57, int tempo_weight = 76, int center_multiplier = 5, int base_threat_weight = 23) const {
+  template <typename CenterMasksT, typename CenterWeightsT>
+  int heuristic_evaluate(const CenterMasksT& center_masks, const CenterWeightsT& center_weights, int double_threat_weight = 10, int uncontested_parity_weight = 57, int tempo_weight = 76, int center_multiplier = 5, int base_threat_weight = 23) const {
     int score = 0;
     position_t opp_position = current_position ^ mask;
     position_t my_threats = compute_winning_position(current_position, mask);
     position_t opp_threats = compute_winning_position(opp_position, mask);
     position_t playable = possible();
-    position_t double_edged = (playable << 1) & board_mask;
+    position_t double_edged = (playable << 1) & get_board_mask();
 
     score += popcount(my_threats & double_edged) * double_threat_weight;
     score -= popcount(opp_threats & double_edged) * double_threat_weight;
 
-    position_t opp_threats_above = (opp_threats << 1) & board_mask;
-    opp_threats_above |= (opp_threats_above << 1) & board_mask;
-    opp_threats_above |= (opp_threats_above << 2) & board_mask;
-    opp_threats_above |= (opp_threats_above << 4) & board_mask;
-    if constexpr (HEIGHT >= 8) opp_threats_above |= (opp_threats_above << 8) & board_mask;
+    position_t opp_threats_above = (opp_threats << 1) & get_board_mask();
+    opp_threats_above |= (opp_threats_above << 1) & get_board_mask();
+    opp_threats_above |= (opp_threats_above << 2) & get_board_mask();
+    opp_threats_above |= (opp_threats_above << 4) & get_board_mask();
+    if (height() >= 8) opp_threats_above |= (opp_threats_above << 8) & get_board_mask();
 
-    position_t my_threats_above = (my_threats << 1) & board_mask;
-    my_threats_above |= (my_threats_above << 1) & board_mask;
-    my_threats_above |= (my_threats_above << 2) & board_mask;
-    my_threats_above |= (my_threats_above << 4) & board_mask;
-    if constexpr (HEIGHT >= 8) my_threats_above |= (my_threats_above << 8) & board_mask;
+    position_t my_threats_above = (my_threats << 1) & get_board_mask();
+    my_threats_above |= (my_threats_above << 1) & get_board_mask();
+    my_threats_above |= (my_threats_above << 2) & get_board_mask();
+    my_threats_above |= (my_threats_above << 4) & get_board_mask();
+    if (height() >= 8) my_threats_above |= (my_threats_above << 8) & get_board_mask();
 
     position_t my_useless_threats = my_threats & opp_threats_above;
     position_t opp_useless_threats = opp_threats & my_threats_above;
 
     position_t even_rows = 0;
-    for (int r = 0; r < HEIGHT; r += 2) {
-        even_rows |= (bottom_mask << r);
+    for (int r = 0; r < height(); r += 2) {
+        even_rows |= (get_bottom_mask() << r);
     }
-    position_t odd_rows = (even_rows << 1) & board_mask;
+    position_t odd_rows = (even_rows << 1) & get_board_mask();
     
     position_t my_parity = (moves % 2 == 0) ? even_rows : odd_rows;
     position_t opp_parity = (moves % 2 == 0) ? odd_rows : even_rows;
@@ -383,13 +365,13 @@ class GenericPosition {
     score -= popcount(opp_uncontested_parity) * uncontested_parity_weight;
     
     position_t all_threats = my_threats | opp_threats;
-    position_t empty_squares = board_mask ^ (current_position | opp_position);
+    position_t empty_squares = get_board_mask() ^ (current_position | opp_position);
 
     position_t all_threats_above = all_threats;
-    all_threats_above |= (all_threats_above << 1) & board_mask;
-    all_threats_above |= (all_threats_above << 2) & board_mask;
-    all_threats_above |= (all_threats_above << 4) & board_mask;
-    if constexpr (HEIGHT >= 8) all_threats_above |= (all_threats_above << 8) & board_mask;
+    all_threats_above |= (all_threats_above << 1) & get_board_mask();
+    all_threats_above |= (all_threats_above << 2) & get_board_mask();
+    all_threats_above |= (all_threats_above << 4) & get_board_mask();
+    if (height() >= 8) all_threats_above |= (all_threats_above << 8) & get_board_mask();
 
     int safe_squares = popcount(empty_squares & ~all_threats_above);
     
@@ -397,14 +379,17 @@ class GenericPosition {
     
     score += (popcount(lowest_my_threats & ~my_useless_threats) - popcount(lowest_opp_threats & ~opp_useless_threats)) * base_threat_weight;
     
-    for(int i = 0; i < WIDTH; i++) {
-      score += (popcount(current_position & CENTER_MASKS[i]) - popcount(opp_position & CENTER_MASKS[i])) * CENTER_WEIGHTS[i] * center_multiplier;
+    for(int i = 0; i < width(); i++) {
+      score += (popcount(current_position & center_masks[i]) - popcount(opp_position & center_masks[i])) * center_weights[i] * center_multiplier;
     }
     
     return score;
   }
 
-  GenericPosition() : current_position{0}, mask{0}, moves{0} {}
+  GenericPosition(uint8_t w = W == -1 ? 7 : W, uint8_t h = W == -1 ? 6 : H) : dynamic_w(w), dynamic_h(h), current_position{0}, mask{0}, moves{0} {}
+
+  template <int OW, int OH>
+  GenericPosition(const GenericPosition<OW, OH>& o) : dynamic_w(o.width()), dynamic_h(o.height()), current_position(static_cast<position_t>(o.getCurrentPosition())), mask(static_cast<position_t>(o.getMask())), moves(o.nbMoves()) {}
 
   bool canPlay(int col) const {
     return (mask & top_mask_col(col)) == 0;
@@ -423,17 +408,16 @@ class GenericPosition {
     P.current_position = 0;
     P.mask = 0;
     P.moves = 0;
-    for (int col = 0; col < WIDTH; col++) {
-      position_t col_shift = col * (HEIGHT + 1);
-      position_t col_mask = (position_t(1) << (HEIGHT + 1)) - 1;
+    for (int col = 0; col < P.width(); col++) {
+      position_t col_shift = col * (P.height() + 1);
+      position_t col_mask = (position_t(1) << (P.height() + 1)) - 1;
       position_t k_col = (key >> col_shift) & col_mask;
       
       if (k_col == 0) continue;
       
       
-      // Actually we need to find MSB.
       int msb = 0;
-      for(int i = HEIGHT; i >= 0; i--) if(k_col & (position_t(1) << i)) { msb = i; break; }
+      for(int i = P.height(); i >= 0; i--) if(k_col & (position_t(1) << i)) { msb = i; break; }
       
       position_t pos_col = k_col - (position_t(1) << msb);
       position_t m_col = (position_t(1) << msb) - 1;
@@ -455,9 +439,9 @@ class GenericPosition {
 
 public:
   void printBoard() const {
-      for (int r = HEIGHT - 1; r >= 0; r--) {
-          for (int c = 0; c < WIDTH; c++) {
-              position_t bit = position_t(1) << (c * (HEIGHT + 1) + r);
+      for (int r = height() - 1; r >= 0; r--) {
+          for (int c = 0; c < width(); c++) {
+              position_t bit = position_t(1) << (c * (height() + 1) + r);
               if (mask & bit) {
                   if (current_position & bit) std::cout << "O ";
                   else std::cout << "X ";
@@ -472,7 +456,7 @@ public:
 private:
 
   void partialKey3(position_t &key, int col) const {
-    for(position_t pos = position_t(1) << (col * (HEIGHT + 1)); pos & mask; pos <<= 1) {
+    for(position_t pos = position_t(1) << (col * (height() + 1)); pos & mask; pos <<= 1) {
       key *= 3;
       if(pos & current_position) key += 1;
       else key += 2;
@@ -481,16 +465,16 @@ private:
   }
 
  public:
-  position_t winning_position() const {
-    return compute_winning_position(current_position, mask);
-  }
-
-  position_t opponent_winning_position() const {
+  inline __attribute__((always_inline)) position_t opponent_winning_position() const {
     return compute_winning_position(current_position ^ mask, mask);
   }
 
-  position_t possible() const {
-    return (mask + bottom_mask) & board_mask;
+  inline __attribute__((always_inline)) position_t winning_position() const {
+    return compute_winning_position(current_position, mask);
+  }
+
+  inline __attribute__((always_inline)) position_t possible() const {
+    return (mask + get_bottom_mask()) & get_board_mask();
   }
 
   template <typename T>
@@ -521,85 +505,175 @@ private:
     return 64 + __builtin_ctzll((uint64_t)(m >> 64));
   }
 
-  static unsigned int getCol(position_t m) {
-    return ctz_impl<position_t>(m) / (HEIGHT + 1);
+  unsigned int getCol(position_t m) const {
+    return ctz_impl<position_t>(m) / (height() + 1);
   }
 
-  static position_t compute_winning_position(position_t position, position_t mask) {
+  template <int W_CONST, int H_CONST>
+  struct PositionConstants {
+      static constexpr position_t bottom_mask() {
+          position_t res = 0;
+          for (int i = 0; i < W_CONST; i++) res |= position_t(1) << (i * (H_CONST + 1));
+          return res;
+      }
+      static constexpr position_t board_mask() {
+          return bottom_mask() * ((position_t(1) << H_CONST) - 1);
+      }
+      static constexpr position_t top() {
+          return bottom_mask() << H_CONST;
+      }
+      static constexpr position_t alt_col() {
+          position_t res = 0;
+          for (int i = 0; i < H_CONST; i += 2) res |= (position_t(1) << i);
+          return res;
+      }
+      static constexpr position_t altx() {
+          return (bottom_mask() * alt_col()) << 1;
+      }
+  };
+
+  template <int W_CONST, int H_CONST>
+  inline __attribute__((always_inline)) position_t compute_winning_position_impl(position_t position, position_t mask) const {
     position_t r = (position << 1) & (position << 2) & (position << 3);
-    position_t p = (position << (HEIGHT + 1)) & (position << 2 * (HEIGHT + 1));
-    r |= p & (position << 3 * (HEIGHT + 1));
-    r |= p & (position >> (HEIGHT + 1));
-    p = (position >> (HEIGHT + 1)) & (position >> 2 * (HEIGHT + 1));
-    r |= p & (position << (HEIGHT + 1));
-    r |= p & (position >> 3 * (HEIGHT + 1));
-    p = (position << HEIGHT) & (position << 2 * HEIGHT);
-    r |= p & (position << 3 * HEIGHT);
-    r |= p & (position >> HEIGHT);
-    p = (position >> HEIGHT) & (position >> 2 * HEIGHT);
-    r |= p & (position << HEIGHT);
-    r |= p & (position >> 3 * HEIGHT);
-    p = (position << (HEIGHT + 2)) & (position << 2 * (HEIGHT + 2));
-    r |= p & (position << 3 * (HEIGHT + 2));
-    r |= p & (position >> (HEIGHT + 2));
-    p = (position >> (HEIGHT + 2)) & (position >> 2 * (HEIGHT + 2));
-    r |= p & (position << (HEIGHT + 2));
-    r |= p & (position >> 3 * (HEIGHT + 2));
-    return r & (board_mask ^ mask);
+    position_t p = (position << (H_CONST + 1)) & (position << 2 * (H_CONST + 1));
+    r |= p & (position << 3 * (H_CONST + 1));
+    r |= p & (position >> (H_CONST + 1));
+    p = (position >> (H_CONST + 1)) & (position >> 2 * (H_CONST + 1));
+    r |= p & (position << (H_CONST + 1));
+    r |= p & (position >> 3 * (H_CONST + 1));
+    p = (position << H_CONST) & (position << 2 * H_CONST);
+    r |= p & (position << 3 * H_CONST);
+    r |= p & (position >> H_CONST);
+    p = (position >> H_CONST) & (position >> 2 * H_CONST);
+    r |= p & (position << H_CONST);
+    r |= p & (position >> 3 * H_CONST);
+    p = (position << (H_CONST + 2)) & (position << 2 * (H_CONST + 2));
+    r |= p & (position << 3 * (H_CONST + 2));
+    r |= p & (position >> (H_CONST + 2));
+    p = (position >> (H_CONST + 2)) & (position >> 2 * (H_CONST + 2));
+    r |= p & (position << (H_CONST + 2));
+    r |= p & (position >> 3 * (H_CONST + 2));
+    return r & (PositionConstants<W_CONST, H_CONST>::board_mask() ^ mask);
+  }
+
+  inline __attribute__((always_inline)) position_t compute_winning_position_dynamic(position_t position, position_t mask, int h) const {
+    position_t r = (position << 1) & (position << 2) & (position << 3);
+    position_t p = (position << (h + 1)) & (position << 2 * (h + 1));
+    r |= p & (position << 3 * (h + 1));
+    r |= p & (position >> (h + 1));
+    p = (position >> (h + 1)) & (position >> 2 * (h + 1));
+    r |= p & (position << (h + 1));
+    r |= p & (position >> 3 * (h + 1));
+    p = (position << h) & (position << 2 * h);
+    r |= p & (position << 3 * h);
+    r |= p & (position >> h);
+    p = (position >> h) & (position >> 2 * h);
+    r |= p & (position << h);
+    r |= p & (position >> 3 * h);
+    p = (position << (h + 2)) & (position << 2 * (h + 2));
+    r |= p & (position << 3 * (h + 2));
+    r |= p & (position >> (h + 2));
+    p = (position >> (h + 2)) & (position >> 2 * (h + 2));
+    r |= p & (position << (h + 2));
+    r |= p & (position >> 3 * (h + 2));
+    return r & (get_board_mask() ^ mask);
+  }
+
+  inline __attribute__((always_inline)) position_t compute_winning_position(position_t position, position_t mask) const {
+      if constexpr (W != -1) {
+          return compute_winning_position_impl<W, H>(position, mask);
+      } else {
+          if (width() == 7 && height() == 6) return compute_winning_position_impl<7, 6>(position, mask);
+          if (width() == 8 && height() == 6) return compute_winning_position_impl<8, 6>(position, mask);
+          if (width() == 8 && height() == 8) return compute_winning_position_impl<8, 8>(position, mask);
+          return compute_winning_position_dynamic(position, mask, height());
+      }
   }
 
   template<int width, int height> struct bottom {static constexpr position_t mask = bottom<width-1, height>::mask | position_t(1) << (width - 1) * (height + 1);};
   template <int height> struct bottom<0, height> {static constexpr position_t mask = 0;};
 
-  static constexpr position_t bottom_mask = bottom<WIDTH, HEIGHT>::mask;
-  static constexpr position_t board_mask = bottom_mask * ((position_t(1) << HEIGHT) - 1);
-  static constexpr position_t TOP = bottom_mask << HEIGHT;
-  static constexpr position_t TOP_PLUS_1 = TOP + 1;
-
-  static constexpr position_t get_alt_col() {
+  constexpr position_t get_bottom_mask() const {
+      if constexpr (W != -1) return bottom<W, H>::mask;
       position_t res = 0;
-      for (int i = 0; i < HEIGHT; i += 2) res |= (position_t(1) << i);
+      for (int i = 0; i < dynamic_w; i++) res |= position_t(1) << (i * (dynamic_h + 1));
       return res;
   }
-  static constexpr position_t ALTO = bottom_mask * get_alt_col();
-  static constexpr position_t ALTX = ALTO << 1;
+  constexpr position_t get_board_mask() const {
+      return get_bottom_mask() * ((position_t(1) << height()) - 1);
+  }
+  constexpr position_t get_top() const {
+      return get_bottom_mask() << height();
+  }
+  constexpr position_t get_top_plus_1() const {
+      return get_top() + 1;
+  }
+  constexpr position_t get_alt_col() const {
+      position_t res = 0;
+      for (int i = 0; i < height(); i += 2) res |= (position_t(1) << i);
+      return res;
+  }
+  constexpr position_t get_alto() const {
+      return get_bottom_mask() * get_alt_col();
+  }
+  constexpr position_t get_altx() const {
+      return get_alto() << 1;
+  }
+
+  template <int dir>
+  static position_t haswond_const(position_t x1) {
+    position_t x2 = x1 & (x1 >> dir);
+    return x2 & (x2 >> (2 * dir));
+  }
 
   static position_t haswond(position_t x1, int dir) {
     position_t x2 = x1 & (x1 >> dir);
     return x2 & (x2 >> (2 * dir));
   }
 
-  int computeEvensStrategy() const {
-    if constexpr (HEIGHT % 2 != 0) return 1000;
+  template <int W_CONST, int H_CONST>
+  int computeEvensStrategy_impl() const {
+    if (H_CONST % 2 != 0) return 1000;
     if (moves % 2 != 0) return 1000;
     position_t color0 = current_position;
     position_t color1 = current_position ^ mask;
-    position_t xe = color1 | (ALTX & ~(color0 * 2 + color1 + bottom_mask));
+    
+    position_t bottom_mask = PositionConstants<W_CONST, H_CONST>::bottom_mask();
+    position_t altx = PositionConstants<W_CONST, H_CONST>::altx();
+    position_t board_mask = PositionConstants<W_CONST, H_CONST>::board_mask();
+    
+    position_t xe = color1 | (altx & ~(color0 * 2 + color1 + bottom_mask));
     position_t oe = board_mask - xe;
-    if (haswond(oe, 1)) return 1000;
-    position_t xeh = haswond(xe, HEIGHT + 1);
-    position_t xed1 = haswond(xe, HEIGHT);
-    position_t xed2 = haswond(xe, HEIGHT + 2);
+    
+    if (haswond_const<1>(oe)) return 1000;
+    position_t xeh = haswond_const<H_CONST + 1>(xe);
+    position_t xed1 = haswond_const<H_CONST>(xe);
+    position_t xed2 = haswond_const<H_CONST + 2>(xe);
     position_t xeany = xeh | xed1 | xed2;
-    position_t oeh = haswond(oe, HEIGHT + 1);
-    position_t oed1 = haswond(oe, HEIGHT);
-    position_t oed2 = haswond(oe, HEIGHT + 2);
-    if (oeh & (xeany - TOP_PLUS_1)) return 1000;
-    if (oed1 && ((oeh | oed1) & ((xeh | xed1) - TOP_PLUS_1))) return 1000;
-    if (oed2 && ((oeh | oed2) & ((xeh | xed2) - TOP_PLUS_1))) return 1000;
+    
+    position_t oeh = haswond_const<H_CONST + 1>(oe);
+    position_t oed1 = haswond_const<H_CONST>(oe);
+    position_t oed2 = haswond_const<H_CONST + 2>(oe);
+    position_t oeany = oeh | oed1 | oed2;
+    
+    position_t top_plus_1 = PositionConstants<W_CONST, H_CONST>::top() + 1;
+    
+    if (oeh & (xeany - top_plus_1)) return 1000;
+    if (oed1 && ((oeh | oed1) & ((xeh | xed1) - top_plus_1))) return 1000;
+    if (oed2 && ((oeh | oed2) & ((xeh | xed2) - top_plus_1))) return 1000;
     if (xeany) {
       if (xeh) {
-        for (int r = HEIGHT / 2; r > 1; r--) {
-          int check_row = HEIGHT - (2 * r - 1);
+        for (int r = H_CONST / 2; r > 1; r--) {
+          int check_row = H_CONST - (2 * r - 1);
           if (xeh & (bottom_mask << check_row)) return -r;
         }
       } else {
         position_t diag_cells = 0;
-        if (xed1) diag_cells |= xed1 | (xed1 << HEIGHT) | (xed1 << (2*HEIGHT)) | (xed1 << (3*HEIGHT));
-        if (xed2) diag_cells |= xed2 | (xed2 << (HEIGHT + 2)) | (xed2 << (2*(HEIGHT + 2))) | (xed2 << (3*(HEIGHT + 2)));
+        if (xed1) diag_cells |= xed1 | (xed1 << H_CONST) | (xed1 << (2*H_CONST)) | (xed1 << (3*H_CONST));
+        if (xed2) diag_cells |= xed2 | (xed2 << (H_CONST + 2)) | (xed2 << (2*(H_CONST + 2))) | (xed2 << (3*(H_CONST + 2)));
         position_t empty_cells = diag_cells & ~(color0 | color1);
-        for (int r = 1; r <= HEIGHT / 2; r++) {
-          int check_row = HEIGHT - (2 * r - 1);
+        for (int r = 1; r <= H_CONST / 2; r++) {
+          int check_row = H_CONST - (2 * r - 1);
           if (empty_cells & (bottom_mask << check_row)) return -r;
         }
       }
@@ -608,16 +682,96 @@ private:
     return 0;
   }
 
-  static constexpr position_t top_mask_col(int col) {
-    return position_t(1) << ((HEIGHT - 1) + col * (HEIGHT + 1));
+  int computeEvensStrategy() const {
+    if constexpr (W != -1) {
+        return computeEvensStrategy_impl<W, H>();
+    } else {
+        if (width() == 7 && height() == 6) return computeEvensStrategy_impl<7, 6>();
+        if (width() == 8 && height() == 6) return computeEvensStrategy_impl<8, 6>();
+        if (width() == 8 && height() == 8) return computeEvensStrategy_impl<8, 8>();
+        
+        if (height() % 2 != 0) return 1000;
+        if (moves % 2 != 0) return 1000;
+        position_t color0 = current_position;
+        position_t color1 = current_position ^ mask;
+        position_t xe = color1 | (get_altx() & ~(color0 * 2 + color1 + get_bottom_mask()));
+        position_t oe = get_board_mask() - xe;
+        if (haswond(oe, 1)) return 1000;
+        position_t xeh = haswond(xe, height() + 1);
+        position_t xed1 = haswond(xe, height());
+        position_t xed2 = haswond(xe, height() + 2);
+        position_t xeany = xeh | xed1 | xed2;
+        position_t oeh = haswond(oe, height() + 1);
+        position_t oed1 = haswond(oe, height());
+        position_t oed2 = haswond(oe, height() + 2);
+        if (oeh & (xeany - get_top_plus_1())) return 1000;
+        if (oed1 && ((oeh | oed1) & ((xeh | xed1) - get_top_plus_1()))) return 1000;
+        if (oed2 && ((oeh | oed2) & ((xeh | xed2) - get_top_plus_1()))) return 1000;
+        if (xeany) {
+          if (xeh) {
+            for (int r = height() / 2; r > 1; r--) {
+              int check_row = height() - (2 * r - 1);
+              if (xeh & (get_bottom_mask() << check_row)) return -r;
+            }
+          } else {
+            position_t diag_cells = 0;
+            if (xed1) diag_cells |= xed1 | (xed1 << height()) | (xed1 << (2*height())) | (xed1 << (3*height()));
+            if (xed2) diag_cells |= xed2 | (xed2 << (height() + 2)) | (xed2 << (2*(height() + 2))) | (xed2 << (3*(height() + 2)));
+            position_t empty_cells = diag_cells & ~(color0 | color1);
+            for (int r = 1; r <= height() / 2; r++) {
+              int check_row = height() - (2 * r - 1);
+              if (empty_cells & (get_bottom_mask() << check_row)) return -r;
+            }
+          }
+          return -1;
+        }
+        return 0;
+    }
   }
 
-  static constexpr position_t bottom_mask_col(int col) {
-    return position_t(1) << (col * (HEIGHT + 1));
+  struct DynamicCache {
+      position_t column_masks[13][13];
+      position_t top_mask_cols[13][13];
+      position_t bottom_mask_cols[13][13];
+
+      DynamicCache() {
+          for (int h = 1; h <= 12; h++) {
+              for (int col = 0; col <= 12; col++) {
+                  column_masks[h][col] = ((position_t(1) << h) - 1) << (col * (h + 1));
+                  top_mask_cols[h][col] = position_t(1) << ((h - 1) + col * (h + 1));
+                  bottom_mask_cols[h][col] = position_t(1) << (col * (h + 1));
+              }
+          }
+      }
+  };
+  
+  static const DynamicCache& get_dynamic_cache() {
+      static DynamicCache cache;
+      return cache;
   }
 
-  static constexpr position_t column_mask(int col) {
-    return ((position_t(1) << HEIGHT) - 1) << (col * (HEIGHT + 1));
+  constexpr position_t top_mask_col(int col) const {
+    if constexpr (W != -1) {
+        return position_t(1) << ((H - 1) + col * (H + 1));
+    } else {
+        return get_dynamic_cache().top_mask_cols[height()][col];
+    }
+  }
+
+  constexpr position_t bottom_mask_col(int col) const {
+    if constexpr (W != -1) {
+        return position_t(1) << (col * (H + 1));
+    } else {
+        return get_dynamic_cache().bottom_mask_cols[height()][col];
+    }
+  }
+
+  constexpr position_t column_mask(int col) const {
+    if constexpr (W != -1) {
+        return ((position_t(1) << H) - 1) << (col * (H + 1));
+    } else {
+        return get_dynamic_cache().column_masks[height()][col];
+    }
   }
 };
 

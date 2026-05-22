@@ -40,18 +40,8 @@ Java_com_connect4solver_Connect4SolverModule_nativeCreateCache(JNIEnv *env, jobj
         });
     }
     return ptrToString(env, ptr);
-} else {
-        if (w == 6 && h == 5) ptr = C4_6x5::GameSolver::Connect4::Solver::createCache(bytes).release();
-        else if (w == 6 && h == 6) ptr = C4_6x6::GameSolver::Connect4::Solver::createCache(bytes).release();
-        else if (w == 7 && h == 6) ptr = C4_7x6::GameSolver::Connect4::Solver::createCache(bytes).release();
-        else if (w == 7 && h == 7) ptr = C4_7x7::GameSolver::Connect4::Solver::createCache(bytes).release();
-        else if (w == 8 && h == 6) ptr = C4_8x6::GameSolver::Connect4::Solver::createCache(bytes).release();
-        else if (w == 9 && h == 7) ptr = C4_9x7::GameSolver::Connect4::Solver::createCache(bytes).release();
-        else if (w == 9 && h == 6) ptr = C4_9x6::GameSolver::Connect4::Solver::createCache(bytes).release();
-        else if (w == 11 && h == 4) ptr = C4_11x4::GameSolver::Connect4::Solver::createCache(bytes).release();
-    }
-    return ptrToString(env, ptr);
 }
+
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_connect4solver_Connect4SolverModule_nativeCreateBookFromBuffer(JNIEnv *env, jobject, jint w, jint h, jbyteArray base64Bytes) {
@@ -101,18 +91,8 @@ Java_com_connect4solver_Connect4SolverModule_nativeCreateSolver(JNIEnv *env, job
         });
     }
     return ptrToString(env, ptr);
-} else {
-        if (w == 6 && h == 5) ptr = C4_6x5::GameSolver::Connect4::Solver::createWithCache(cache).release();
-        else if (w == 6 && h == 6) ptr = C4_6x6::GameSolver::Connect4::Solver::createWithCache(cache).release();
-        else if (w == 7 && h == 6) ptr = C4_7x6::GameSolver::Connect4::Solver::createWithCache(cache).release();
-        else if (w == 7 && h == 7) ptr = C4_7x7::GameSolver::Connect4::Solver::createWithCache(cache).release();
-        else if (w == 8 && h == 6) ptr = C4_8x6::GameSolver::Connect4::Solver::createWithCache(cache).release();
-        else if (w == 9 && h == 7) ptr = C4_9x7::GameSolver::Connect4::Solver::createWithCache(cache).release();
-        else if (w == 9 && h == 6) ptr = C4_9x6::GameSolver::Connect4::Solver::createWithCache(cache).release();
-        else if (w == 11 && h == 4) ptr = C4_11x4::GameSolver::Connect4::Solver::createWithCache(cache).release();
-    }
-    return ptrToString(env, ptr);
 }
+
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_connect4solver_Connect4SolverModule_nativeDestroySolver(JNIEnv *env, jobject, jstring solverPtrStr, jint w, jint h, jboolean is_heuristic) {
@@ -130,17 +110,8 @@ Java_com_connect4solver_Connect4SolverModule_nativeDestroySolver(JNIEnv *env, jo
             delete static_cast<typename Size::Solver*>(solver);
         });
     }
-} else {
-        if (w == 6 && h == 5) delete static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver);
-        else if (w == 6 && h == 6) delete static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver);
-        else if (w == 7 && h == 6) delete static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver);
-        else if (w == 7 && h == 7) delete static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver);
-        else if (w == 8 && h == 6) delete static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver);
-        else if (w == 9 && h == 7) delete static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver);
-        else if (w == 9 && h == 6) delete static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver);
-        else if (w == 11 && h == 4) delete static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver);
-    }
 }
+
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_connect4solver_Connect4SolverModule_nativeStop(JNIEnv *env, jobject, jstring solverPtrStr, jint w, jint h, jboolean is_heuristic) {
@@ -158,17 +129,8 @@ Java_com_connect4solver_Connect4SolverModule_nativeStop(JNIEnv *env, jobject, js
             static_cast<typename Size::Solver*>(solver)->stop();
         });
     }
-} else {
-        if (w == 6 && h == 5) static_cast<C4_6x5::GameSolver::Connect4::Solver*>(solver)->stop();
-        else if (w == 6 && h == 6) static_cast<C4_6x6::GameSolver::Connect4::Solver*>(solver)->stop();
-        else if (w == 7 && h == 6) static_cast<C4_7x6::GameSolver::Connect4::Solver*>(solver)->stop();
-        else if (w == 7 && h == 7) static_cast<C4_7x7::GameSolver::Connect4::Solver*>(solver)->stop();
-        else if (w == 8 && h == 6) static_cast<C4_8x6::GameSolver::Connect4::Solver*>(solver)->stop();
-        else if (w == 9 && h == 7) static_cast<C4_9x7::GameSolver::Connect4::Solver*>(solver)->stop();
-        else if (w == 9 && h == 6) static_cast<C4_9x6::GameSolver::Connect4::Solver*>(solver)->stop();
-        else if (w == 11 && h == 4) static_cast<C4_11x4::GameSolver::Connect4::Solver*>(solver)->stop();
-    }
 }
+
 
 template <typename CoreSolver, typename CorePosition, int W, typename CoreBook>
 jintArray runNativeAnalysis(JNIEnv *env, CoreSolver& solver, const char* positionStr, int threads, void* book_ptr, double timeout_ms) {
