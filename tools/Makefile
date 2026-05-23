@@ -1,5 +1,6 @@
-CXX=g++
-CXXFLAGS=--std=c++17 -W -Wall -O3 -DNDEBUG -I../native -march=native -pthread
+CXX := g++
+CXXFLAGS := --std=c++17 -W -Wall -O3 -DNDEBUG -I../native -march=native -pthread
+
 LDLIBS=
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Linux)
@@ -29,6 +30,8 @@ verify_book: verify_book.o
 generate_nnue_data: generate_nnue_data.o
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o generate_nnue_data generate_nnue_data.o $(LDLIBS)
 
+
+
 .depend: $(SRCS)
 	$(CXX) $(CXXFLAGS) -MM $^ > ./.depend
 	
@@ -36,3 +39,4 @@ generate_nnue_data: generate_nnue_data.o
 
 clean:
 	rm -f *.o ../native/*.o .depend c4solver generator pack_book pack_dense_book benchmark_book test_nps generate_nnue_data
+
