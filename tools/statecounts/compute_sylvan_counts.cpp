@@ -184,7 +184,7 @@ VOID_TASK_1(main_task, void*, arg) {
     std::cout << "Total Allocated: " << final_gb << " GB\n";
     std::cout << "----------------------------\n";
 
-    sylvan_set_sizes(1ULL<<20, 1ULL<<n, 1ULL<<20, 1ULL<<(n-4));
+    sylvan_set_sizes(1ULL<<n, 1ULL<<n, 1ULL<<(n-4), 1ULL<<(n-4));
     sylvan_init_package();
     sylvan_init_bdd();
 
