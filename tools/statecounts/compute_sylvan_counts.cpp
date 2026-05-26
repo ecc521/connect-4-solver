@@ -14,6 +14,8 @@ int W = 6;
 int H = 6;
 bool row_major = false;
 int ram_gb = -1;
+int partition_mode = 0;
+
 
 VOID_TASK_0(solve_connect4) {
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -81,12 +83,72 @@ VOID_TASK_0(solve_connect4) {
         }
     }
 
+    Bdd filter_mask = Bdd::bddOne();
+    if (partition_mode == 1) {
+        filter_mask = !q[W/2][0];
+        std::cout << "Partition 1: Filtering out states where P2 owns bottom of column " << W/2 << "\n";
+    } else if (partition_mode == 2) {
+        filter_mask = !p[W/2][0];
+        std::cout << "Partition 2: Filtering out states where P1 owns bottom of column " << W/2 << "\n";
+    } else if (partition_mode == 3) {
+        filter_mask = (!p[W/2][0]) * (!q[W/2][0]);
+        std::cout << "Partition 3: Filtering out states where anyone owns bottom of column " << W/2 << "\n";
+    } else if (partition_mode >= 4 && partition_mode <= 12) {
+        int A = W / 2;
+        int B = W / 2 - 1;
+        if (B < 0) {
+            std::cerr << "Error: Board width too small for 9-way partition.\n";
+            exit(1);
+        }
+        Bdd nA = !p[A][0]; // Exclude P1 from A
+        Bdd mA = !q[A][0]; // Exclude P2 from A
+        Bdd eA = (!p[A][0]) * (!q[A][0]); // Exclude both from A
+
+        Bdd nB = !p[B][0]; // Exclude P1 from B
+        Bdd mB = !q[B][0]; // Exclude P2 from B
+        Bdd eB = (!p[B][0]) * (!q[B][0]); // Exclude both from B
+
+        if (partition_mode == 4) {
+            filter_mask = mA * mB;
+            std::cout << "Partition 4 (Q_P2_P2): Exclude P2 from col " << A << ", Exclude P2 from col " << B << "\n";
+        } else if (partition_mode == 5) {
+            filter_mask = mA * nB;
+            std::cout << "Partition 5 (Q_P2_P1): Exclude P2 from col " << A << ", Exclude P1 from col " << B << "\n";
+        } else if (partition_mode == 6) {
+            filter_mask = mA * eB;
+            std::cout << "Partition 6 (Q_P2_both): Exclude P2 from col " << A << ", col " << B << " empty\n";
+        } else if (partition_mode == 7) {
+            filter_mask = nA * mB;
+            std::cout << "Partition 7 (Q_P1_P2): Exclude P1 from col " << A << ", Exclude P2 from col " << B << "\n";
+        } else if (partition_mode == 8) {
+            filter_mask = nA * nB;
+            std::cout << "Partition 8 (Q_P1_P1): Exclude P1 from col " << A << ", Exclude P1 from col " << B << "\n";
+        } else if (partition_mode == 9) {
+            filter_mask = nA * eB;
+            std::cout << "Partition 9 (Q_P1_both): Exclude P1 from col " << A << ", col " << B << " empty\n";
+        } else if (partition_mode == 10) {
+            filter_mask = eA * mB;
+            std::cout << "Partition 10 (Q_both_P2): col " << A << " empty, Exclude P2 from col " << B << "\n";
+        } else if (partition_mode == 11) {
+            filter_mask = eA * nB;
+            std::cout << "Partition 11 (Q_both_P1): col " << A << " empty, Exclude P1 from col " << B << "\n";
+        } else if (partition_mode == 12) {
+            filter_mask = eA * eB;
+            std::cout << "Partition 12 (Q_both_both): col " << A << " empty, col " << B << " empty\n";
+        }
+    }
+
     std::cout << "Starting BFS...\n";
     long long total_states = 0;
+
 
     for (int d = 0; d <= W * H; ++d) {
         auto lvl_start = std::chrono::high_resolution_clock::now();
         
+        if (partition_mode > 0) {
+            S = S * filter_mask;
+        }
+
         long long current_states = (long long)S.SatCount(nvars);
         total_states += current_states;
         
@@ -101,8 +163,8 @@ VOID_TASK_0(solve_connect4) {
         if (d == W * H) break;
 
         Bdd S_filtered = (d % 2 == 0) ? (S * (!W2)) : (S * (!W1));
+        S = Bdd::bddZero(); // Aggressively free previous level to enable GC
         if (S_filtered.isZero()) {
-            S = Bdd::bddZero();
             continue;
         }
 
@@ -204,16 +266,18 @@ int main(int argc, char **argv) {
         {"order", required_argument, 0, 'o'},
         {"threads", required_argument, 0, 't'},
         {"ram", required_argument, 0, 'r'},
+        {"partition", required_argument, 0, 'p'},
         {0, 0, 0, 0}
     };
 
-    while ((opt = getopt_long(argc, argv, "w:h:o:t:r:", long_options, nullptr)) != -1) {
+    while ((opt = getopt_long(argc, argv, "w:h:o:t:r:p:", long_options, nullptr)) != -1) {
         switch (opt) {
             case 'w': W = std::atoi(optarg); break;
             case 'h': H = std::atoi(optarg); break;
             case 'o': row_major = (std::string(optarg) == "row"); break;
             case 't': threads = std::atoi(optarg); break;
             case 'r': ram_gb = std::atoi(optarg); break;
+            case 'p': partition_mode = std::atoi(optarg); break;
         }
     }
 

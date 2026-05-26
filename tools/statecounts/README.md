@@ -40,3 +40,13 @@ The standard $7\times6$ board is perfectly viable on modern laptops.
 
 ## Out of Memory Errors
 If you request a computation that requires more intermediate nodes than your provided RAM can physically store, Sylvan will throw a fatal `sylvan_unique_table_full` error and crash. To fix this, you must run the computation on a machine with more physical RAM and increase the `--ram` argument.
+
+## Partitioned BFS for Massive Boards (7x8 and 8x7)
+For boards larger than available memory space, we use a partitioned BFS scheme based on Negative-Constraint BDD Partitioning and the Inclusion-Exclusion Principle.
+
+See the detailed [Partitioning Methodology](./PARTITIONING.md) guide for:
+- Mathematical proof of Negative Constraints (preserving Level 0 empty board states).
+- 3-Way single-column partitioning formula for $8\times7$.
+- 9-Way two-column partitioning formula for $7\times8$.
+- Using `compute_board.py` to run partitions sequentially and automatically aggregate counts.
+

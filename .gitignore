@@ -20,7 +20,9 @@ tools/bench_*
 tools/verify_book
 tools/generator_*
 tools/pack_dense_book
-tools/.depend
+tools/statecounts/compute_sylvan_counts
+tools/compute_sylvan_counts
+**/.depend
 !tools/benchmarks/
 tools/benchmarks/bench_native*
 tools/benchmarks/gen*
@@ -57,3 +59,6 @@ test-ptrs.*
 venv/
 __pycache__/
 wasm-out/
+
+# Sylvan Dependency
+tools/statecounts/sylvan/
