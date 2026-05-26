@@ -23,19 +23,32 @@ make compute_sylvan_counts
 
 ## Usage
 
-The solver uses a column-major node expansion order.
-You MUST provide the `--ram <GB>` flag to instruct the solver on how much memory it can safely allocate. Because Sylvan tables must be precise powers of 2, the script will automatically round down the requested gigabytes to the nearest safe mathematical tier.
+We provide a Python orchestrator [compute_board.py](./compute_board.py) to execute the BDD solver. It supports standard single-pass runs as well as partitioned runs for massive boards.
 
-### Example: Computing 6x8 on a Desktop (Requires 48GB+ RAM)
-The $6\times8$ board peaks at 900 Million intermediate nodes, requiring a massive 48 GB table limit. 
+The script accepts the following arguments:
+* `-w`, `--width`: Board width (required)
+* `-H`, `--height`: Board height (required)
+* `-r`, `--ram`: RAM limit in GB (required)
+* `-m`, `--mode`: Partitioning mode (`none`, `3-way`, `9-way`) (required)
+* `-t`, `--threads`: Number of Sylvan threads (optional, default auto-detect)
+* `-o`, `--order`: Variable ordering (`col`/`row`) (optional, default `col`)
+
+### Example: Standard 7x6 Run (Requires ~8GB RAM)
+The standard $7\times6$ board is perfectly viable on modern laptops in a single pass:
 ```bash
-./compute_sylvan_counts -w 6 -h 8 --ram 64
+python3 compute_board.py -w 7 -H 6 -r 8 -m none
 ```
 
-### Example: Computing 7x6 on a Laptop (Requires ~8GB RAM)
-The standard $7\times6$ board is perfectly viable on modern laptops.
+### Example: Partitioned 8x7 Run (Requires ~106GB RAM)
+The $8\times7$ board can be solved using the center column 3-way partition:
 ```bash
-./compute_sylvan_counts -w 7 -h 6 --ram 8
+python3 compute_board.py -w 8 -H 7 -r 106 -m 3-way
+```
+
+### Example: Partitioned 7x8 Run (Requires ~106GB RAM)
+The $7\times8$ board has a deep height of 8, causing BDD node counts to swell during intermediate levels. We solve it using the two-column 9-way partition:
+```bash
+python3 compute_board.py -w 7 -H 8 -r 106 -m 9-way
 ```
 
 ## Out of Memory Errors

@@ -163,7 +163,7 @@ The exact number of legal game states for various Connect-4 board sizes.
 
 \* _Independent verification welcome_
 
-> **Note:** See the [`tools/statecounts`](./tools/statecounts) directory for BDD generator scripts. ~58GB of memory is required for the largest board sizes.
+> **Note:** See the [`tools/statecounts`](./tools/statecounts) directory for BDD generator scripts. ~106GB of memory is required for the largest board sizes (7x8 and 8x7) using the partitioned solver.
 
 ## Credits & License
 
