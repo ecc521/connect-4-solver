@@ -157,7 +157,14 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     // sits in the queue until WASM returns. Use timeoutMs instead for WASM.
     if (!this.initialized) return;
     const mod = getNoSABModule();
-    mod._stopSolver(this.width, this.height, this._solverPtr, this.isHeuristic, this.align, this.wrap);
+    mod._stopSolver(
+      this.width,
+      this.height,
+      this._solverPtr,
+      this.isHeuristic,
+      this.align,
+      this.wrap,
+    );
   }
 
   getNodeCount(): Promise<number> {

@@ -12,7 +12,6 @@
 import { EMBEDDED_BOOK_SIZES } from "./embedded-book-sizes.js";
 export { EMBEDDED_BOOK_SIZES };
 
-
 /**
  * Describes the quality of analysis the engine can provide for a board.
  *
@@ -64,7 +63,7 @@ export function getSolverCapability(
 
   // Small boards: exact is always fast enough (≤6x6, low branching factor)
   if (width < 7 && height < 7) return "exact";
-  
+
   if (align !== 4 || wrap !== false) return "tactical";
 
   // Boards with an embedded opening book compiled into the binary

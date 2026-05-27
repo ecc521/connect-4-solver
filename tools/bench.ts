@@ -31,7 +31,6 @@
  *
  * Output:
  *   --verbose         Print individual position failures
- *   --json            Output results as JSON (for PGO comparison)
  */
 
 import * as fs from "fs";
@@ -51,8 +50,12 @@ function discoverSizes(): string[] {
     .filter((f) => f.startsWith("positions_") && f.endsWith(".txt"))
     .map((f) => f.replace("positions_", "").replace(".txt", ""))
     .sort((a, b) => {
-      const [aw, ah] = a.split("x").map(Number);
-      const [bw, bh] = b.split("x").map(Number);
+      const aParts = a.split("_")[0].split("x");
+      const aw = Number(aParts[0]),
+        ah = Number(aParts[1]);
+      const bParts = b.split("_")[0].split("x");
+      const bw = Number(bParts[0]),
+        bh = Number(bParts[1]);
       return aw * ah - bw * bh; // sort by board area
     });
 }
@@ -137,7 +140,6 @@ function parseArgs(): BenchOptions {
   let budget = 2000;
   let maxPositions = 100;
   let verbose = false;
-  let json = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -220,7 +222,6 @@ Output:
     budget,
     maxPositions,
     verbose,
-    json,
   };
 }
 
@@ -391,7 +392,10 @@ async function runBenchmark(
           unsupported: true,
         };
       }
-      if (opts.verbose) console.log(`${RED}  Error at ${bp.pos}: ${e}${RESET}`);
+      if (opts.verbose)
+        console.log(
+          `${RED}  Error at ${bp.pos}: ${e}\n${e instanceof Error ? e.stack : ""}${RESET}`,
+        );
     }
   }
 
@@ -431,27 +435,6 @@ async function runBenchmark(
 async function main(): Promise<void> {
   const opts = parseArgs();
   const rng = new SeededRNG(opts.seed);
-
-  if (!opts.json) {
-    console.log(`\n${BOLD}Connect 4 Benchmark${RESET}`);
-    console.log(`${DIM}────────────────────────────────────────${RESET}`);
-    console.log(`Runtime:   ${CYAN}${opts.runtime.toUpperCase()}${RESET}`);
-    console.log(
-      `Engines:   ${YELLOW}${[opts.testExact ? "exact" : null, opts.testHeuristic ? "heuristic" : null].filter(Boolean).join(", ")}${RESET}`,
-    );
-    console.log(
-      `Modes:     ${YELLOW}${[opts.runSolve ? "solve" : null, opts.runAnalyze ? "analyze" : null, opts.runBook ? "book" : null].filter(Boolean).join(", ")}${RESET}`,
-    );
-    console.log(`Sizes:     ${YELLOW}${opts.sizes.join(", ")}${RESET}`);
-    console.log(`Threads:   ${YELLOW}${opts.threads.join(", ")}${RESET}`);
-    console.log(`Seed:      ${YELLOW}${opts.seed}${RESET}`);
-    console.log(
-      `Budget:    ${YELLOW}${opts.budget}ms${RESET} per combo, ${YELLOW}${opts.timeout}ms${RESET} per position`,
-    );
-    console.log(
-      `Positions: ${YELLOW}${opts.maxPositions}${RESET} max sampled\n`,
-    );
-  }
 
   const allResults: BenchResult[] = [];
   let parityFailures = 0;
@@ -538,24 +521,24 @@ async function main(): Promise<void> {
   // ─── Main benchmark loop ──────────────────────────────────────
   const dataDir = path.join(__dirname, "..", "test-data");
 
-  if (!opts.json) {
-    console.log(
-      `| ${pad("Mode", 10)} | ${pad("Engine", 10)} | ${pad("Board", 5)} | ${pad("Thr", 3, false)} | ${pad("Pos", 7, false)} | ${pad("Accuracy", 8, false)} | ${pad("AvgDpt", 6, false)} | ${pad("Nodes", 14, false)} | ${pad("MN/s", 6, false)} | ${pad("Time", 8, false)} |`,
-    );
-    console.log(
-      `|${"-".repeat(12)}|${"-".repeat(12)}|${"-".repeat(7)}|${"-".repeat(5)}|${"-".repeat(9)}|${"-".repeat(10)}|${"-".repeat(8)}|${"-".repeat(16)}|${"-".repeat(8)}|${"-".repeat(10)}|`,
-    );
-  }
+  console.log(
+    `| ${pad("Mode", 10)} | ${pad("Engine", 10)} | ${pad("Board", 8)} | ${pad("Thr", 3, false)} | ${pad("Pos", 7, false)} | ${pad("Accuracy", 8, false)} | ${pad("AvgDpt", 6, false)} | ${pad("Nodes", 14, false)} | ${pad("MN/s", 6, false)} | ${pad("Time", 8, false)} |`,
+  );
+  console.log(
+    `|${"-".repeat(12)}|${"-".repeat(12)}|${"-".repeat(10)}|${"-".repeat(5)}|${"-".repeat(9)}|${"-".repeat(10)}|${"-".repeat(8)}|${"-".repeat(16)}|${"-".repeat(8)}|${"-".repeat(10)}|`,
+  );
 
   for (const sizeStr of opts.sizes) {
-    const [w, h] = sizeStr.split("x").map(Number);
+    const parts = sizeStr.split("_");
+    const [w, h] = parts[0].split("x").map(Number);
+    const align = parts.includes("c5") ? 5 : 4;
+    const wrap = parts.includes("wrap");
     const posPath = path.join(dataDir, `positions_${sizeStr}.txt`);
     const allPositions = loadPositions(posPath);
     if (allPositions.length === 0) {
-      if (!opts.json)
-        console.log(
-          `${DIM}  No positions found for ${sizeStr}, skipping${RESET}`,
-        );
+      console.log(
+        `${DIM}  No positions found for ${sizeStr}, skipping${RESET}`,
+      );
       continue;
     }
 
@@ -585,6 +568,8 @@ async function main(): Promise<void> {
             solver = new NodeConnect4Solver({
               width: w,
               height: h,
+              align,
+              wrap,
               heuristic: engine.heuristic,
             });
           } else {
@@ -592,6 +577,8 @@ async function main(): Promise<void> {
             solver = new SyncWasmNoSABConnect4Solver({
               width: w,
               height: h,
+              align,
+              wrap,
               heuristic: engine.heuristic,
             });
           }
@@ -680,18 +667,14 @@ async function main(): Promise<void> {
     }
   }
 
-  if (opts.json) {
-    console.log(JSON.stringify(allResults, null, 2));
+  console.log("");
+  if (parityFailures > 0) {
+    console.error(
+      `${RED}${BOLD}✗ ${parityFailures} parity failure(s) detected!${RESET}`,
+    );
+    process.exit(1);
   } else {
-    console.log("");
-    if (parityFailures > 0) {
-      console.error(
-        `${RED}${BOLD}✗ ${parityFailures} parity failure(s) detected!${RESET}`,
-      );
-      process.exit(1);
-    } else {
-      console.log(`${GREEN}${BOLD}✓ All parity checks passed${RESET}`);
-    }
+    console.log(`${GREEN}${BOLD}✓ All parity checks passed${RESET}`);
   }
 }
 

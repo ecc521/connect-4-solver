@@ -103,43 +103,40 @@ describe("Embedded book transparent fallback", () => {
       solver.release();
     });
 
-    skipIf(
-      "should work correctly after loadBook() override",
-      async () => {
-        if (!native) return;
+    skipIf("should work correctly after loadBook() override", async () => {
+      if (!native) return;
 
-        // Load the actual embedded efbook file as a custom book to simulate override
-        const efbookPath = path.join(
-          __dirname,
-          "..",
-          "data",
-          "7x6_dense7.efbook",
+      // Load the actual embedded efbook file as a custom book to simulate override
+      const efbookPath = path.join(
+        __dirname,
+        "..",
+        "data",
+        "7x6_dense7.efbook",
+      );
+
+      // If the efbook file doesn't exist (CI), skip this sub-test
+      if (!fs.existsSync(efbookPath)) {
+        console.warn(
+          "Skipping loadBook override test — data/7x6_dense7.efbook not found",
         );
+        return;
+      }
 
-        // If the efbook file doesn't exist (CI), skip this sub-test
-        if (!fs.existsSync(efbookPath)) {
-          console.warn(
-            "Skipping loadBook override test — data/7x6_dense7.efbook not found",
-          );
-          return;
-        }
+      const bookData = fs.readFileSync(efbookPath);
+      await solver.loadBook(new Uint8Array(bookData));
 
-        const bookData = fs.readFileSync(efbookPath);
-        await solver.loadBook(new Uint8Array(bookData));
+      // After loadBook(), _bookPtr should be non-zero (user book wins over embedded)
+      const bookPtr = (solver as unknown as { _bookPtr: unknown })._bookPtr;
+      expect(bookPtr).not.toBe(0);
+      expect(bookPtr).not.toBeNull();
+      expect(bookPtr).not.toBeUndefined();
 
-        // After loadBook(), _bookPtr should be non-zero (user book wins over embedded)
-        const bookPtr = (solver as unknown as { _bookPtr: unknown })._bookPtr;
-        expect(bookPtr).not.toBe(0);
-        expect(bookPtr).not.toBeNull();
-        expect(bookPtr).not.toBeUndefined();
-
-        // Solver should still return correct results with the override book
-        const result = await solver.analyze("", {});
-        const evaluation = result.evaluation;
-        if (!evaluation) throw new Error("evaluation is null");
-        expect(evaluation.score).toBeGreaterThan(0);
-      },
-    );
+      // Solver should still return correct results with the override book
+      const result = await solver.analyze("", {});
+      const evaluation = result.evaluation;
+      if (!evaluation) throw new Error("evaluation is null");
+      expect(evaluation.score).toBeGreaterThan(0);
+    });
 
     skipIf("should release correctly after loadBook()", () => {
       // release() should not throw even when _bookPtr is set
@@ -167,9 +164,16 @@ describe("Embedded book transparent fallback", () => {
     it("should respect bookLoader override: hasBook=true when bookLoader supplies valid data", async () => {
       // Use the real 7x6 efbook for a non-embedded-book size if available, else skip.
       // (We need valid book data — passing garbage to the native C++ causes a crash.)
-      const efbookPath = path.join(__dirname, "..", "data", "7x6_dense7.efbook");
+      const efbookPath = path.join(
+        __dirname,
+        "..",
+        "data",
+        "7x6_dense7.efbook",
+      );
       if (!fs.existsSync(efbookPath)) {
-        console.warn("Skipping bookLoader override test — data/7x6_dense7.efbook not found");
+        console.warn(
+          "Skipping bookLoader override test — data/7x6_dense7.efbook not found",
+        );
         return;
       }
       const bookData = new Uint8Array(fs.readFileSync(efbookPath));

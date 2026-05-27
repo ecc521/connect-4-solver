@@ -25,7 +25,11 @@ import {
   AnalyzeOptions,
   Connect4SolverOptions,
 } from "./core.js";
-import { getSolverCapability, SolverCapability, EMBEDDED_BOOK_SIZES } from "./capabilities.js";
+import {
+  getSolverCapability,
+  SolverCapability,
+  EMBEDDED_BOOK_SIZES,
+} from "./capabilities.js";
 
 export type { SolverCapability };
 export { getSolverCapability };
@@ -35,7 +39,12 @@ export { getSolverCapability };
 // EMBEDDED_BOOK_SIZES is imported from capabilities.ts — single source of truth.
 // Used to pre-determine solver type before init(), avoiding the
 // "create as heuristic → detect book → recreate as exact" anti-pattern.
-function hasEmbeddedBook(width: number, height: number, align = 4, wrap = false): boolean {
+function hasEmbeddedBook(
+  width: number,
+  height: number,
+  align = 4,
+  wrap = false,
+): boolean {
   if (align !== 4 || wrap !== false) return false;
   return EMBEDDED_BOOK_SIZES.has(`${width}x${height}`);
 }
@@ -135,7 +144,9 @@ export class AdaptiveSolver {
 
   /** The cache size actually allocated (in MB). */
   get allocatedCacheSizeMb(): number {
-    return this._solver ? this._solver.allocatedCacheSizeMb : (this._opts.cacheSizeMb ?? 128);
+    return this._solver
+      ? this._solver.allocatedCacheSizeMb
+      : (this._opts.cacheSizeMb ?? 128);
   }
 
   // ── Constructor ────────────────────────────────────────────────────────────
@@ -156,7 +167,12 @@ export class AdaptiveSolver {
    * 5. Loads embedded book if available (zero network cost).
    * 6. Calls bookLoader (if provided); non-null result replaces embedded book.
    */
-  async setBoard(width: number, height: number, align = 4, wrap = false): Promise<void> {
+  async setBoard(
+    width: number,
+    height: number,
+    align = 4,
+    wrap = false,
+  ): Promise<void> {
     this._isSwitching = true;
     this._isReady = false;
 
@@ -214,7 +230,13 @@ export class AdaptiveSolver {
     }
 
     // 6. Finalize capability (book state is now settled)
-    this._capability = getSolverCapability(width, height, this._hasBook, align, wrap);
+    this._capability = getSolverCapability(
+      width,
+      height,
+      this._hasBook,
+      align,
+      wrap,
+    );
 
     this._isReady = true;
     this._isSwitching = false;
@@ -264,7 +286,13 @@ export class AdaptiveSolver {
     if (!this._solver) throw new Error("Call setBoard() before loadBook().");
     await this._solver.loadBook(data);
     this._hasBook = true;
-    this._capability = getSolverCapability(this._width, this._height, true, this._align, this._wrap);
+    this._capability = getSolverCapability(
+      this._width,
+      this._height,
+      true,
+      this._align,
+      this._wrap,
+    );
   }
 
   /**
@@ -349,7 +377,10 @@ export class AdaptiveSolver {
         return new WebWorkerWasmConnect4Solver(this._opts.workerProvider, opts);
       } else {
         const { WebWorkerWasmNoSABConnect4Solver } = await import("./async.js");
-        return new WebWorkerWasmNoSABConnect4Solver(this._opts.workerProvider, opts);
+        return new WebWorkerWasmNoSABConnect4Solver(
+          this._opts.workerProvider,
+          opts,
+        );
       }
     }
 
@@ -361,5 +392,4 @@ export class AdaptiveSolver {
     const { SyncWasmNoSABConnect4Solver } = await import("./sync.js");
     return new SyncWasmNoSABConnect4Solver(opts);
   }
-
 }

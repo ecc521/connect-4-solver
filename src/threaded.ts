@@ -112,7 +112,14 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     // pthreads share memory but the JS thread is blocked. Use timeoutMs instead.
     if (!this.initialized) return;
     const mod = getThreadedModule();
-    mod._stopSolver(this.width, this.height, this._solverPtr, this.isHeuristic, this.align, this.wrap);
+    mod._stopSolver(
+      this.width,
+      this.height,
+      this._solverPtr,
+      this.isHeuristic,
+      this.align,
+      this.wrap,
+    );
   }
 
   loadBook(_data: Uint8Array): Promise<void> {

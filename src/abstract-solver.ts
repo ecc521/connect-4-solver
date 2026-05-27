@@ -33,7 +33,9 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     }
 
     if (cacheSizeMb < 8) {
-        throw new Error("cacheSizeMb must be at least 8 (8MB). This ensures enough bits are available for the mathematical partial key and prevents silent dataset collision on edge-case board sizes (like 8x7).");
+      throw new Error(
+        "cacheSizeMb must be at least 8 (8MB). This ensures enough bits are available for the mathematical partial key and prevents silent dataset collision on edge-case board sizes (like 8x7).",
+      );
     }
 
     this.cacheSizeMb = cacheSizeMb;

@@ -42,7 +42,14 @@ interface NativeSolverType {
   ): void;
   createBookFromBuffer(w: number, h: number, base64: string): string;
   destroyBook(w: number, h: number, bookPtr: string): void;
-  stop(solverPtr: string, w: number, h: number, heuristic: boolean, align: number, wrap: boolean): void;
+  stop(
+    solverPtr: string,
+    w: number,
+    h: number,
+    heuristic: boolean,
+    align: number,
+    wrap: boolean,
+  ): void;
   // Exact analysis — returns [status, nbMoves, col0..colN-1, aborted]
   analyze(
     solverPtr: string,
