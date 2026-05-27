@@ -52,7 +52,7 @@ python3 compute_board.py -w 7 -H 8 -r 106 -m 9-way
 ```
 
 ## Out of Memory Errors
-If you request a computation that requires more intermediate nodes than your provided RAM can physically store, Sylvan will throw a fatal `sylvan_unique_table_full` error and crash. To fix this, you must run the computation on a machine with more physical RAM and increase the `--ram` argument.
+If you request a computation that requires more intermediate nodes than your provided RAM can physically store, Sylvan will throw a fatal `sylvan_unique_table_full` error and crash. To fix this, you must run the computation on a machine with more physical RAM and increase the `--ram` argument. Alternatively, you can use partitioning (such as the `3-way` or `9-way` modes in `compute_board.py`) to reduce the peak RAM requirements by splitting the BDD state space into smaller, independent sub-problems.
 
 ## Partitioned BFS for Massive Boards (7x8 and 8x7)
 For boards larger than available memory space, we use a partitioned BFS scheme based on Negative-Constraint BDD Partitioning and the Inclusion-Exclusion Principle.
