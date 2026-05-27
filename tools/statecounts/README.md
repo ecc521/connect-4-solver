@@ -2,6 +2,8 @@
 
 This directory contains a specialized script to compute the exact number of legal game states for massive Connect-4 board sizes using the Sylvan BDD (Binary Decision Diagram) engine.
 
+For a table of the exact legal state counts computed so far, see [STATE_COUNTS.md](./STATE_COUNTS.md).
+
 ## Setup
 
 Because of the massive scale of the larger boards, this solver is written in C++ and utilizes the Sylvan multi-core BDD framework.
