@@ -60,9 +60,9 @@ namespace {
 /**
  * Reccursively score connect 4 position using negamax variant of alpha-beta algorithm.
  */
-template <int WIDTH, int HEIGHT, typename SlotType>
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
 template <bool HasBook, int W_CONST, int H_CONST>
-int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history) {
+int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::negamax(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history) {
   if (shouldAbort(abort_flag)) [[unlikely]] return 0;
 
   assert(alpha < beta);
@@ -81,7 +81,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
     if (shouldAbort(abort_flag)) return 0;
   }
 
-  using pos_t = typename GenericPosition<W_CONST, H_CONST>::position_t;
+  using pos_t = typename GenericPosition<W_CONST, H_CONST, ALIGN, WRAP>::position_t;
   pos_t possible = static_cast<pos_t>(P.possibleNonLosingMoves());
   if(possible == 0)     // if no possible non losing move, opponent wins next move
     return -((P.width() * P.height()) - P.nbMoves()) / 2;
@@ -90,7 +90,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
     return 0;
 
   if ((possible & (possible - 1)) == 0) {
-    GenericPosition<WIDTH, HEIGHT> P2(P);
+    GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
     P2.play(possible);
     if (solverTlNodeCount > 0) {
       solverTlNodeCount--;
@@ -137,7 +137,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
   constexpr int TT_PROBE_DEPTH = 15; // stop symmetry and child-probing at <= 15 plies from leaf
 
   bool is_reverse = false;
-  typename GenericPosition<WIDTH, HEIGHT>::position_t key;
+  typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t key;
   if ((w_val * h_val) - P.nbMoves() <= TT_PROBE_DEPTH) {
     key = P.key();
   } else {
@@ -176,7 +176,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
             col = this->COLUMN_ORDER[i];
         }
         if (pos_t move = possible & static_cast<pos_t>(P.column_mask(col))) {
-        GenericPosition<W_CONST, H_CONST> child(P);
+        GenericPosition<W_CONST, H_CONST, ALIGN, WRAP> child(P);
         child.play(move);
         pos_t child_key;
         if ((w_val * h_val) - child.nbMoves() <= TT_PROBE_DEPTH) {
@@ -205,7 +205,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
     }
   }
 
-    GenericMoveSorter<W_CONST, H_CONST> moves(w_val);
+    GenericMoveSorter<W_CONST, H_CONST, ALIGN, WRAP> moves(w_val);
 
     for(int i = w_val; i--;) {
       int col;
@@ -235,8 +235,8 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
         const pos_t child_possible = (possible & ~static_cast<pos_t>(P.column_mask(col)))
                                    | ((move << 1) & static_cast<pos_t>(P.get_board_mask()));
         const pos_t next_reachable = (child_possible << 1) & static_cast<pos_t>(P.get_board_mask());
-        score = GenericPosition<W_CONST, H_CONST>::popcount(all_threats) * 1000000
-              + GenericPosition<W_CONST, H_CONST>::popcount(all_threats & next_reachable) * 1000000;
+        score = GenericPosition<W_CONST, H_CONST, ALIGN, WRAP>::popcount(all_threats) * 1000000
+              + GenericPosition<W_CONST, H_CONST, ALIGN, WRAP>::popcount(all_threats & next_reachable) * 1000000;
       }
 #endif
 
@@ -246,9 +246,9 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
       moves.add(move, score);
 
       // Prefetch child TT entry (all strategies)
-      GenericPosition<W_CONST, H_CONST> child(P);
+      GenericPosition<W_CONST, H_CONST, ALIGN, WRAP> child(P);
       child.play(move);
-      typename GenericPosition<W_CONST, H_CONST>::position_t child_key;
+      typename GenericPosition<W_CONST, H_CONST, ALIGN, WRAP>::position_t child_key;
       if ((w_val * h_val) - child.nbMoves() <= TT_PROBE_DEPTH) {
         child_key = child.key();
       } else {
@@ -265,8 +265,8 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
   int best_score = -P.max_score();
   uint8_t best_move = w_val;
 
-  while(typename GenericPosition<WIDTH, HEIGHT>::position_t next = moves.getNext()) {
-    GenericPosition<WIDTH, HEIGHT> P2(P);
+  while(typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t next = moves.getNext()) {
+    GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
     P2.play(next);
     int score = -negamax<HasBook, W_CONST, H_CONST>(P2, -beta, -alpha, book, book_depth, abort_flag, thread_history);
 
@@ -274,7 +274,7 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
 
     if(score > best_score) {
       best_score = score;
-      best_move = GenericPosition<WIDTH, HEIGHT>::ctz_impl(next) / (P.height() + 1);
+      best_move = GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::ctz_impl(next) / (P.height() + 1);
     }
 
     if(best_score >= beta) {
@@ -293,9 +293,9 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::negamax(const GenericPosition<WIDTH, HE
   return best_score;
 }
 
-template <int WIDTH, int HEIGHT, typename SlotType>
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
 template <bool HasBook>
-int SolverImpl<WIDTH, HEIGHT, SlotType>::dispatch_solve_weak(const GenericPosition<WIDTH, HEIGHT>& P, int min, int max, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history) {
+int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int min, int max, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history) {
     if constexpr (WIDTH == -1 && HEIGHT == -1) {
         if (P.width() == 7 && P.height() == 6) {
             return negamax<HasBook, 7, 6>(P, min, max, book, book_depth, abort_flag, thread_history);
@@ -317,9 +317,9 @@ int SolverImpl<WIDTH, HEIGHT, SlotType>::dispatch_solve_weak(const GenericPositi
  * Serial solve implementation. Can be called with an abort_flag for Lazy SMP
  * and an optional private history table for search diversity.
  */
-template <int WIDTH, int HEIGHT, typename SlotType>
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
 template <bool HasBook>
-::GameSolver::Connect4::SolverResult SolverImpl<WIDTH, HEIGHT, SlotType>::solve_single(const GenericPosition<WIDTH, HEIGHT> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history) {
+::GameSolver::Connect4::SolverResult SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::solve_single(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history) {
   if(P.canWinNext()) {
     int score = ((P.width() * P.height()) + 1 - P.nbMoves()) / 2;
     for (int i = 0; i < P.width(); i++) {
@@ -406,7 +406,7 @@ flush:
       for (int i = 0; i < P.width(); i++) {
           int col = this->COLUMN_ORDER[i];
           if (P.canPlay(col)) {
-              GenericPosition<WIDTH, HEIGHT> P2(P);
+              GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
               P2.playCol(col);
               if (int val = book->get(P2)) {
                   int child_score = val + P.min_score() - 1;
@@ -422,7 +422,7 @@ flush:
 
   // PHASE 2: Fallback to hot-TT scan for best move
   if (bestMove == -1) {
-    typename GenericPosition<WIDTH, HEIGHT>::position_t possible = P.possibleNonLosingMoves();
+    typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t possible = P.possibleNonLosingMoves();
     if (possible == 0) {
       // If there are no non-losing moves, any playable move is equally bad.
       for (int i = 0; i < P.width(); i++) {
@@ -436,7 +436,7 @@ flush:
       for (int i = 0; i < P.width(); i++) {
           int col = this->COLUMN_ORDER[i];
           if (possible & P.column_mask(col)) {
-              GenericPosition<WIDTH, HEIGHT> P2(P);
+              GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
               P2.playCol(col);
               if (dispatch_solve_weak<HasBook>(P2, -score, -score + 1, book, book_depth, abort_flag, thread_history) == -score) {
                   bestMove = col;
@@ -456,8 +456,8 @@ flush:
  * sharing the transposition table but using private history tables.
  * First thread to complete determines the result; others are aborted.
  */
-template <int WIDTH, int HEIGHT, typename SlotType>
-::GameSolver::Connect4::SolverResult SolverImpl<WIDTH, HEIGHT, SlotType>::solve(const GenericPosition<WIDTH, HEIGHT> &P, bool weak, int threads, const OpeningBookBase<WIDTH, HEIGHT>* book, double timeout_ms) {
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
+::GameSolver::Connect4::SolverResult SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::solve(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, int threads, const OpeningBookBase<WIDTH, HEIGHT>* book, double timeout_ms) {
 #ifndef USE_PTHREADS
   threads = 1;
 #endif
@@ -545,8 +545,8 @@ template <int WIDTH, int HEIGHT, typename SlotType>
   return final_result;
 }
 
-template <int WIDTH, int HEIGHT, typename SlotType>
-std::vector<int> SolverImpl<WIDTH, HEIGHT, SlotType>::analyze(const GenericPosition<WIDTH, HEIGHT> &P, bool weak, int threads, const OpeningBookBase<WIDTH, HEIGHT>* book, double timeout_ms) {
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
+std::vector<int> SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::analyze(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, int threads, const OpeningBookBase<WIDTH, HEIGHT>* book, double timeout_ms) {
 #ifndef USE_PTHREADS
   threads = 1;
 #endif
@@ -574,7 +574,7 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, SlotType>::analyze(const GenericPosit
   // Track which columns are still being solved (for straggler acceleration)
   auto col_done = std::make_unique<std::atomic<bool>[]>(P.width());
   auto col_abort = std::make_unique<std::atomic<bool>[]>(P.width());
-  std::vector<GenericPosition<WIDTH, HEIGHT>> col_positions(P.width(), GenericPosition<WIDTH, HEIGHT>(P.width(), P.height()));
+  std::vector<GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>> col_positions(P.width(), GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>(P.width(), P.height()));
   std::vector<bool> col_valid(P.width());
 
   for (int c = 0; c < P.width(); c++) {
@@ -585,7 +585,7 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, SlotType>::analyze(const GenericPosit
         col_done[c].store(true, std::memory_order_relaxed);
         col_valid[c] = false;
       } else {
-        GenericPosition<WIDTH, HEIGHT> P2(P);
+        GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
         P2.playCol(c);
         col_positions[c] = P2;
         col_valid[c] = true;
@@ -682,7 +682,7 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, SlotType>::analyze(const GenericPosit
     if (P.canPlay(col)) {
       if(P.isWinningMove(col)) scores[col] = ((P.width() * P.height()) + 1 - P.nbMoves()) / 2;
       else {
-        GenericPosition<WIDTH, HEIGHT> P2(P);
+        GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
         P2.playCol(col);
         if (book) scores[col] = -solve_single<true>(P2, weak, book, book->getDepth()).score;
         else scores[col] = -solve_single<false>(P2, weak, book, 0).score;
@@ -696,15 +696,15 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, SlotType>::analyze(const GenericPosit
   return scores;
 }
 
-template <int WIDTH, int HEIGHT, typename SlotType>
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
 class TypedCache : public ::GameSolver::Connect4::Cache {
  public:
-  static constexpr int VALUE_BITS = WIDTH == -1 ? 8 : getRequiredValueBits<WIDTH, HEIGHT>();
+  static constexpr int VALUE_BITS = WIDTH == -1 ? 8 : getRequiredValueBits<WIDTH, HEIGHT, ALIGN, WRAP>();
   static constexpr int MOVE_BITS = WIDTH == -1 ? 4 : (WIDTH >= 16 ? 5 : (WIDTH >= 8 ? 4 : 3));
-  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, typename GenericPosition<WIDTH, HEIGHT>::position_t>> transTable;
+  std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t>> transTable;
 
   TypedCache(size_t table_bytes) {
-      auto* t = new (std::nothrow) TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, typename GenericPosition<WIDTH, HEIGHT>::position_t>(table_bytes);
+      auto* t = new (std::nothrow) TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t>(table_bytes);
       if (t && t->isValid()) {
           transTable.reset(t);
       } else {
@@ -741,16 +741,16 @@ class TypedCache : public ::GameSolver::Connect4::Cache {
   }
 };
 
-template <int WIDTH, int HEIGHT>
-std::unique_ptr<::GameSolver::Connect4::Cache> Solver<WIDTH, HEIGHT>::createCache(size_t table_bytes, int w, int h) {
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP>
+std::unique_ptr<::GameSolver::Connect4::Cache> Solver<WIDTH, HEIGHT, ALIGN, WRAP>::createCache(size_t table_bytes, int w, int h) {
   if (std::getenv("FORCE_128_BIT")) {
-      auto* c = new (std::nothrow) TypedCache<WIDTH, HEIGHT, WASM_U128_T>(table_bytes);
+      auto* c = new (std::nothrow) TypedCache<WIDTH, HEIGHT, ALIGN, WRAP, WASM_U128_T>(table_bytes);
       if (c && c->isValid()) return std::unique_ptr<::GameSolver::Connect4::Cache>(c);
       delete c;
       return nullptr;
   }
 
-  constexpr int VALUE_BITS = getRequiredValueBits<WIDTH, HEIGHT>();
+  constexpr int VALUE_BITS = getRequiredValueBits<WIDTH, HEIGHT, ALIGN, WRAP>();
   constexpr int shift_amount = VALUE_BITS + 7 + 4;
   constexpr int available_bits_64 = 64 - shift_amount;
   constexpr int board_bits = WIDTH * (HEIGHT + 1);
@@ -763,43 +763,43 @@ std::unique_ptr<::GameSolver::Connect4::Cache> Solver<WIDTH, HEIGHT>::createCach
 
           if (required_buckets_64 > table_bytes / bucket_size) {
               // Upgrade to 128-bit slot since memory is too small for 64-bit CRT
-              auto* c = new (std::nothrow) TypedCache<WIDTH, HEIGHT, WASM_U128_T>(table_bytes);
+              auto* c = new (std::nothrow) TypedCache<WIDTH, HEIGHT, ALIGN, WRAP, WASM_U128_T>(table_bytes);
               if (c && c->isValid()) return std::unique_ptr<::GameSolver::Connect4::Cache>(c);
               delete c;
               return nullptr;
           }
       } else {
           // If 64-bit slot mathematically requires > 2^64 buckets, it's impossible. Must use 128-bit.
-          auto* c = new (std::nothrow) TypedCache<WIDTH, HEIGHT, WASM_U128_T>(table_bytes);
+          auto* c = new (std::nothrow) TypedCache<WIDTH, HEIGHT, ALIGN, WRAP, WASM_U128_T>(table_bytes);
           if (c && c->isValid()) return std::unique_ptr<::GameSolver::Connect4::Cache>(c);
           delete c;
           return nullptr;
       }
   }
 
-  auto* c = new (std::nothrow) TypedCache<WIDTH, HEIGHT, uint64_t>(table_bytes);
+  auto* c = new (std::nothrow) TypedCache<WIDTH, HEIGHT, ALIGN, WRAP, uint64_t>(table_bytes);
   if (c && c->isValid()) return std::unique_ptr<::GameSolver::Connect4::Cache>(c);
   delete c;
   return nullptr;
 }
 
-template <int WIDTH, int HEIGHT>
-std::unique_ptr<Solver<WIDTH, HEIGHT>> Solver<WIDTH, HEIGHT>::createWithCache(::GameSolver::Connect4::Cache* cache, int w, int h) {
-  if (auto c64 = dynamic_cast<TypedCache<WIDTH, HEIGHT, uint64_t>*>(cache)) {
-    auto* s = new (std::nothrow) SolverImpl<WIDTH, HEIGHT, uint64_t>(c64->transTable, w, h);
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP>
+std::unique_ptr<Solver<WIDTH, HEIGHT, ALIGN, WRAP>> Solver<WIDTH, HEIGHT, ALIGN, WRAP>::createWithCache(::GameSolver::Connect4::Cache* cache, int w, int h) {
+  if (auto c64 = dynamic_cast<TypedCache<WIDTH, HEIGHT, ALIGN, WRAP, uint64_t>*>(cache)) {
+    auto* s = new (std::nothrow) SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, uint64_t>(c64->transTable, w, h);
     if (!s) return nullptr;
-    return std::unique_ptr<Solver<WIDTH, HEIGHT>>(s);
-  } else if (auto c128 = dynamic_cast<TypedCache<WIDTH, HEIGHT, WASM_U128_T>*>(cache)) {
-    auto* s = new (std::nothrow) SolverImpl<WIDTH, HEIGHT, WASM_U128_T>(c128->transTable, w, h);
+    return std::unique_ptr<Solver<WIDTH, HEIGHT, ALIGN, WRAP>>(s);
+  } else if (auto c128 = dynamic_cast<TypedCache<WIDTH, HEIGHT, ALIGN, WRAP, WASM_U128_T>*>(cache)) {
+    auto* s = new (std::nothrow) SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, WASM_U128_T>(c128->transTable, w, h);
     if (!s) return nullptr;
-    return std::unique_ptr<Solver<WIDTH, HEIGHT>>(s);
+    return std::unique_ptr<Solver<WIDTH, HEIGHT, ALIGN, WRAP>>(s);
   } else {
     return nullptr;
   }
 }
 
-template <int WIDTH, int HEIGHT>
-std::unique_ptr<Solver<WIDTH, HEIGHT>> Solver<WIDTH, HEIGHT>::create(size_t table_bytes) {
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP>
+std::unique_ptr<Solver<WIDTH, HEIGHT, ALIGN, WRAP>> Solver<WIDTH, HEIGHT, ALIGN, WRAP>::create(size_t table_bytes) {
   auto cache = createCache(table_bytes, WIDTH, HEIGHT);
   return createWithCache(cache.get());
 }

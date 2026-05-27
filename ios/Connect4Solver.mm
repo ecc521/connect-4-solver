@@ -31,17 +31,17 @@ T* stringToPtr(NSString* str) {
 
 RCT_EXPORT_MODULE()
 
-RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(createCache:(int)w height:(int)h sizeBytes:(double)sizeBytes isHeuristic:(BOOL)is_heuristic)
+RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(createCache:(int)w height:(int)h sizeBytes:(double)sizeBytes isHeuristic:(BOOL)is_heuristic align:(int)align wrap:(BOOL)wrap)
 {
     size_t bytes = static_cast<size_t>(sizeBytes);
     void* ptr = nullptr;
     if (is_heuristic) {
-        ptr = dispatch<void*>(w, h, [&](auto tag) {
+        ptr = dispatch<void*>(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             return Size::HeuristicSolver::createCache(bytes).release();
         });
     } else {
-        ptr = dispatch<void*>(w, h, [&](auto tag) {
+        ptr = dispatch<void*>(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             return Size::Solver::createCache(bytes).release();
         });
@@ -56,7 +56,8 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(createBookFromBuffer:(int)w height:(int)h
     const uint8_t *bytes = (const uint8_t *)[data bytes];
     size_t length = [data length];
     
-    void* ptr = dispatch<void*>(w, h, [&](auto tag) {
+    int align = 4; bool wrap = false;
+    void* ptr = dispatch<void*>(w, h, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
         return GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>::load_from_memory(bytes, length, Size::w, Size::h).release();
     });
@@ -69,7 +70,8 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(destroyBook:(int)w height:(int)h bookPtrS
     void* bookPtr = stringToPtr<void>(bookPtrStr);
     if (!bookPtr) return @(NO);
     
-    dispatch_void(w, h, [&](auto tag) {
+    int align = 4; bool wrap = false;
+    dispatch_void(w, h, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
         delete static_cast<GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>*>(bookPtr);
     });
@@ -84,17 +86,17 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(destroyCache:(NSString *)cachePtrStr)
     return @(YES);
 }
 
-RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(createSolver:(int)w height:(int)h cachePtrStr:(NSString *)cachePtrStr isHeuristic:(BOOL)is_heuristic)
+RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(createSolver:(int)w height:(int)h cachePtrStr:(NSString *)cachePtrStr isHeuristic:(BOOL)is_heuristic align:(int)align wrap:(BOOL)wrap)
 {
     auto cache = stringToPtr<GameSolver::Connect4::Cache>(cachePtrStr);
     void* ptr = nullptr;
     if (is_heuristic) {
-        ptr = dispatch<void*>(w, h, [&](auto tag) {
+        ptr = dispatch<void*>(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             return Size::HeuristicSolver::createWithCache(cache).release();
         });
     } else {
-        ptr = dispatch<void*>(w, h, [&](auto tag) {
+        ptr = dispatch<void*>(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             return Size::Solver::createWithCache(cache).release();
         });
@@ -103,18 +105,18 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(createSolver:(int)w height:(int)h cachePt
 }
 
 
-RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(destroySolver:(NSString *)solverPtrStr width:(int)w height:(int)h isHeuristic:(BOOL)is_heuristic)
+RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(destroySolver:(NSString *)solverPtrStr width:(int)w height:(int)h isHeuristic:(BOOL)is_heuristic align:(int)align wrap:(BOOL)wrap)
 {
     void* solver = stringToPtr<void>(solverPtrStr);
     if (!solver) return @(NO);
     
     if (is_heuristic) {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             delete static_cast<typename Size::HeuristicSolver*>(solver);
         });
     } else {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             delete static_cast<typename Size::Solver*>(solver);
         });
@@ -123,18 +125,18 @@ RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(destroySolver:(NSString *)solverPtrStr wi
 }
 
 
-RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(stop:(NSString *)solverPtrStr width:(int)w height:(int)h isHeuristic:(BOOL)is_heuristic)
+RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(stop:(NSString *)solverPtrStr width:(int)w height:(int)h isHeuristic:(BOOL)is_heuristic align:(int)align wrap:(BOOL)wrap)
 {
     void* solver = stringToPtr<void>(solverPtrStr);
     if (!solver) return @(NO);
     
     if (is_heuristic) {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             static_cast<typename Size::HeuristicSolver*>(solver)->stop();
         });
     } else {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             static_cast<typename Size::Solver*>(solver)->stop();
         });
@@ -258,6 +260,8 @@ RCT_REMAP_METHOD(analyze,
                  height:(int)height
                  weak:(BOOL)weak
                  bookPtrStr:(NSString *)bookPtrStr
+                 align:(int)align
+                 wrap:(BOOL)wrap
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -265,9 +269,9 @@ RCT_REMAP_METHOD(analyze,
     void* solver = stringToPtr<void>(solverPtrStr);
     void* bookPtr = stringToPtr<void>(bookPtrStr);
     
-    NSArray* resultArray = dispatch<NSArray*>(width, height, [&](auto tag) {
+    NSArray* resultArray = dispatch<NSArray*>(width, height, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
-        return runNativeAnalysis<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+        return runNativeAnalysis<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h, Size::align, Size::wrap>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
             width, height, *static_cast<typename Size::Solver*>(solver), positionStr, threads, bookPtr, 0
         );
     });
@@ -289,6 +293,8 @@ RCT_REMAP_METHOD(solve,
                  height:(int)height
                  weak:(BOOL)weak
                  bookPtrStr:(NSString *)bookPtrStr
+                 align:(int)align
+                 wrap:(BOOL)wrap
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -296,9 +302,9 @@ RCT_REMAP_METHOD(solve,
     void* solver = stringToPtr<void>(solverPtrStr);
     void* bookPtr = stringToPtr<void>(bookPtrStr);
     
-    NSArray* resultArray = dispatch<NSArray*>(width, height, [&](auto tag) {
+    NSArray* resultArray = dispatch<NSArray*>(width, height, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
-        return runNativeSolve<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+        return runNativeSolve<typename Size::Solver, GameSolver::Connect4::GenericPosition<Size::w, Size::h, Size::align, Size::wrap>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
             width, height, *static_cast<typename Size::Solver*>(solver), positionStr, threads, bookPtr, 0
         );
     });
@@ -321,6 +327,8 @@ RCT_REMAP_METHOD(analyzeHeuristic,
                  width:(int)width
                  height:(int)height
                  bookPtrStr:(NSString *)bookPtrStr
+                 align:(int)align
+                 wrap:(BOOL)wrap
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -328,9 +336,9 @@ RCT_REMAP_METHOD(analyzeHeuristic,
     void* solver = stringToPtr<void>(solverPtrStr);
     void* bookPtr = stringToPtr<void>(bookPtrStr);
     
-    NSArray* resultArray = dispatch<NSArray*>(width, height, [&](auto tag) {
+    NSArray* resultArray = dispatch<NSArray*>(width, height, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
-        return runNativeHeuristicAnalysis<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+        return runNativeHeuristicAnalysis<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h, Size::align, Size::wrap>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
             width, height, *static_cast<typename Size::HeuristicSolver*>(solver), positionStr, maxDepth, threads, timeoutMs, bookPtr
         );
     });
@@ -353,6 +361,8 @@ RCT_REMAP_METHOD(solveHeuristic,
                  width:(int)width
                  height:(int)height
                  bookPtrStr:(NSString *)bookPtrStr
+                 align:(int)align
+                 wrap:(BOOL)wrap
                  withResolver:(RCTPromiseResolveBlock)resolve
                  withRejecter:(RCTPromiseRejectBlock)reject)
 {
@@ -360,9 +370,9 @@ RCT_REMAP_METHOD(solveHeuristic,
     void* solver = stringToPtr<void>(solverPtrStr);
     void* bookPtr = stringToPtr<void>(bookPtrStr);
     
-    NSArray* resultArray = dispatch<NSArray*>(width, height, [&](auto tag) {
+    NSArray* resultArray = dispatch<NSArray*>(width, height, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
-        return runNativeHeuristicSolve<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
+        return runNativeHeuristicSolve<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h, Size::align, Size::wrap>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
             width, height, *static_cast<typename Size::HeuristicSolver*>(solver), positionStr, maxDepth, threads, timeoutMs, bookPtr
         );
     });

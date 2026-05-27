@@ -25,6 +25,18 @@ export interface Connect4SolverOptions {
   height?: number;
   cacheSizeMb?: number;
   heuristic?: boolean;
+  /**
+   * Number of pieces in a row required to win.
+   * Defaults to 4 (standard Connect 4).
+   * Currently supported: 4 (any size), 5 (8x8 board only).
+   */
+  align?: number;
+  /**
+   * Whether the board wraps horizontally (cylindrical Connect 4).
+   * Defaults to false.
+   * Currently supported: true only on 7x6 boards (align=4) and 8x8 boards (align=5).
+   */
+  wrap?: boolean;
 }
 
 export interface AnalyzeOptions {
@@ -69,6 +81,8 @@ export interface SolverModule {
     h: number,
     bytes: number,
     is_heuristic: boolean,
+    align: number,
+    wrap: boolean,
   ) => number;
   _destroyCache: (ptr: number) => void;
   _createSolver: (
@@ -76,12 +90,16 @@ export interface SolverModule {
     h: number,
     cachePtr: number,
     is_heuristic: boolean,
+    align: number,
+    wrap: boolean,
   ) => number;
   _destroySolver: (
     w: number,
     h: number,
     ptr: number,
     is_heuristic: boolean,
+    align: number,
+    wrap: boolean,
   ) => void;
   _createBook: (w: number, h: number, pathPtr: number) => number;
   _createBookFromBuffer: (
@@ -104,6 +122,8 @@ export interface SolverModule {
     threads: number,
     bookPtr: number,
     timeout: number,
+    align: number,
+    wrap: boolean,
   ) => number;
   _analyzeHeuristic: (
     w: number,
@@ -123,6 +143,8 @@ export interface SolverModule {
     threads: number,
     bookPtr: number,
     timeout: number,
+    align: number,
+    wrap: boolean,
   ) => number;
   _solveHeuristic: (
     w: number,
@@ -139,12 +161,16 @@ export interface SolverModule {
     h: number,
     solverPtr: number,
     is_heuristic: boolean,
+    align: number,
+    wrap: boolean,
   ) => void;
   _getNodeCount: (
     w: number,
     h: number,
     solverPtr: number,
     is_heuristic: boolean,
+    align: number,
+    wrap: boolean,
   ) => number;
   UTF8ToString(pointer: number): string;
   _malloc(size: number): number;
@@ -163,6 +189,10 @@ export interface SolverModule {
 export abstract class BaseConnect4Solver {
   public width: number;
   public height: number;
+  /** Number of pieces in a row to win (default 4). */
+  public align: number;
+  /** Whether the board wraps horizontally (default false). */
+  public wrap: boolean;
   /** The cache size actually allocated after init(). May be less than requested if memory is tight. */
   public allocatedCacheSizeMb = 0;
   protected initialized = false;
@@ -174,6 +204,8 @@ export abstract class BaseConnect4Solver {
   ) {
     let width = 7;
     let height = 6;
+    let align = 4;
+    let wrap = false;
 
     if (typeof widthOrOpts === "number") {
       width = widthOrOpts;
@@ -181,6 +213,8 @@ export abstract class BaseConnect4Solver {
     } else if (widthOrOpts && typeof widthOrOpts === "object") {
       if (widthOrOpts.width !== undefined) width = widthOrOpts.width;
       if (widthOrOpts.height !== undefined) height = widthOrOpts.height;
+      if (widthOrOpts.align !== undefined) align = widthOrOpts.align;
+      if (widthOrOpts.wrap !== undefined) wrap = widthOrOpts.wrap;
     }
 
     if (width < 4 || width > 16 || height < 4 || height > 16) {
@@ -193,8 +227,23 @@ export abstract class BaseConnect4Solver {
         `Board size ${width}x${height} exceeds the maximum supported 127-bit position mask.`,
       );
     }
+
+    // Variant validation — must match C++ validateVariant allowlist
+    const isStandardC4 = align === 4 && !wrap;
+    const isC5_8x8 = align === 5 && !wrap && width === 8 && height === 8;
+    const isC4Wrap_7x6 = align === 4 && wrap && width === 7 && height === 6;
+    const isC5Wrap_8x8 = align === 5 && wrap && width === 8 && height === 8;
+    if (!isStandardC4 && !isC5_8x8 && !isC4Wrap_7x6 && !isC5Wrap_8x8) {
+      throw new Error(
+        `Unsupported game variant: align=${align}, wrap=${wrap} for board ${width}x${height}. ` +
+          `Supported variants: C4 (any size), C5 (8x8), C4-Wrap (7x6), C5-Wrap (8x8).`,
+      );
+    }
+
     this.width = width;
     this.height = height;
+    this.align = align;
+    this.wrap = wrap;
   }
 
   /**

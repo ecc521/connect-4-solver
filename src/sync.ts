@@ -46,6 +46,8 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
         this.height,
         sizeMb * 1024 * 1024,
         this.isHeuristic,
+        this.align,
+        this.wrap,
       );
       if (ptr !== 0) break;
       sizeMb = Math.floor(sizeMb / 2);
@@ -60,6 +62,8 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
       this.height,
       this._cachePtr,
       this.isHeuristic,
+      this.align,
+      this.wrap,
     );
     if (this._solverPtr === 0) {
       throw new Error(
@@ -122,6 +126,8 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
         this.height,
         this._solverPtr,
         this.isHeuristic,
+        this.align,
+        this.wrap,
       );
     if (this._cachePtr !== 0) mod._destroyCache(this._cachePtr);
     if (this._bookPtr) {
@@ -151,7 +157,7 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     // sits in the queue until WASM returns. Use timeoutMs instead for WASM.
     if (!this.initialized) return;
     const mod = getNoSABModule();
-    mod._stopSolver(this.width, this.height, this._solverPtr, this.isHeuristic);
+    mod._stopSolver(this.width, this.height, this._solverPtr, this.isHeuristic, this.align, this.wrap);
   }
 
   getNodeCount(): Promise<number> {
@@ -163,6 +169,8 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
         this.height,
         this._solverPtr,
         this.isHeuristic,
+        this.align,
+        this.wrap,
       ),
     );
   }

@@ -20,6 +20,8 @@ interface NativeSolverType {
     h: number,
     sizeBytes: number,
     heuristic: boolean,
+    align: number,
+    wrap: boolean,
   ): string;
   destroyCache(cachePtr: string): void;
   createSolver(
@@ -27,16 +29,20 @@ interface NativeSolverType {
     h: number,
     cachePtr: string,
     heuristic: boolean,
+    align: number,
+    wrap: boolean,
   ): string;
   destroySolver(
     solverPtr: string,
     w: number,
     h: number,
     heuristic: boolean,
+    align: number,
+    wrap: boolean,
   ): void;
   createBookFromBuffer(w: number, h: number, base64: string): string;
   destroyBook(w: number, h: number, bookPtr: string): void;
-  stop(solverPtr: string, w: number, h: number, heuristic: boolean): void;
+  stop(solverPtr: string, w: number, h: number, heuristic: boolean, align: number, wrap: boolean): void;
   // Exact analysis — returns [status, nbMoves, col0..colN-1, aborted]
   analyze(
     solverPtr: string,
@@ -47,6 +53,8 @@ interface NativeSolverType {
     h: number,
     weak: boolean,
     bookPtr: string,
+    align: number,
+    wrap: boolean,
   ): Promise<number[]>;
   // Heuristic analysis — returns [status, nbMoves, col0..colN-1, depthReached]
   analyzeHeuristic(
@@ -58,6 +66,8 @@ interface NativeSolverType {
     w: number,
     h: number,
     bookPtr: string,
+    align: number,
+    wrap: boolean,
   ): Promise<number[]>;
   // Exact solve — returns [status, nbMoves, score, bestMove, depthReached, nodes_low, nodes_high, aborted]
   solve(
@@ -69,6 +79,8 @@ interface NativeSolverType {
     h: number,
     weak: boolean,
     bookPtr: string,
+    align: number,
+    wrap: boolean,
   ): Promise<number[]>;
   // Heuristic solve
   solveHeuristic(
@@ -80,6 +92,8 @@ interface NativeSolverType {
     w: number,
     h: number,
     bookPtr: string,
+    align: number,
+    wrap: boolean,
   ): Promise<number[]>;
 }
 
@@ -148,6 +162,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         this.height,
         sizeMb * 1024 * 1024,
         this._isHeuristic,
+        this.align,
+        this.wrap,
       );
       if (ptrStr !== "0") break;
       if (sizeMb <= 4) break;
@@ -162,6 +178,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       this.height,
       this._cachePtrStr,
       this._isHeuristic,
+      this.align,
+      this.wrap,
     );
     this.initialized = true;
     return Promise.resolve();
@@ -277,6 +295,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           this.width,
           this.height,
           bookPtr as string,
+          this.align,
+          this.wrap,
         );
       } else {
         nativeResArr = await this._nativeModule.analyze(
@@ -288,6 +308,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           this.height,
           weak,
           bookPtr as string,
+          this.align,
+          this.wrap,
         );
       }
 
@@ -389,6 +411,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           this.width,
           this.height,
           bookPtr as string,
+          this.align,
+          this.wrap,
         );
       } else {
         nativeResArr = await this._nativeModule.solve(
@@ -400,6 +424,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           this.height,
           weak,
           bookPtr as string,
+          this.align,
+          this.wrap,
         );
       }
 
@@ -466,6 +492,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         this.width,
         this.height,
         this._isHeuristic,
+        this.align,
+        this.wrap,
       );
     }
   }
@@ -483,6 +511,8 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         this.width,
         this.height,
         this._isHeuristic,
+        this.align,
+        this.wrap,
       );
       this._solverPtrStr = "0";
     }

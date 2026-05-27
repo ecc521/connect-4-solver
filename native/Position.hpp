@@ -167,7 +167,7 @@ struct wasm_uint128_t {
 };
 #endif
 
-template <int W, int H>
+template <int W, int H, int ALIGN = 4, bool WRAP = false>
 class GenericPosition {
  public:
 
@@ -177,6 +177,9 @@ class GenericPosition {
 #else
   using position_t = typename std::conditional<W == -1, unsigned __int128, typename std::conditional < W * (H + 1) <= 64, uint64_t, unsigned __int128>::type>::type;
 #endif
+
+  static constexpr int ALIGN_N = ALIGN;
+  static constexpr bool IS_WRAP = WRAP;
 
   uint8_t dynamic_w = 0;
   uint8_t dynamic_h = 0;
@@ -210,6 +213,19 @@ class GenericPosition {
       playCol(col);
     }
     return seq.size();
+  }
+
+  // ─── Wrap helpers (no-ops when WRAP=false) ─────────────────────────────
+  static constexpr int W_SHIFT = (W == -1 ? 0 : W * (H + 1));
+
+  static position_t wrap_left(position_t pos, int s) {
+      if constexpr (WRAP && W != -1) return (pos << s) | (pos >> (W_SHIFT - s));
+      else return pos << s;
+  }
+
+  static position_t wrap_right(position_t pos, int s) {
+      if constexpr (WRAP && W != -1) return (pos >> s) | (pos << (W_SHIFT - s));
+      else return pos >> s;
   }
 
   bool canWinNext() const {
@@ -266,14 +282,35 @@ class GenericPosition {
   }
 
   position_t symmetric_key(bool &is_reverse) const {
-      position_t k_forward = key();
-      position_t k_reverse = mirror_key(k_forward);
-      if (k_forward < k_reverse) {
-          is_reverse = false;
-          return k_forward;
+      position_t base_k = key();
+      if constexpr (WRAP && W != -1) {
+          // Wraparound: consider all W cyclic rotations × mirror
+          position_t best_key = ~position_t(0);
+          bool best_reverse = false;
+          int w_bits = W * (H + 1);
+          position_t wrap_mask = (position_t(1) << w_bits) - 1;
+          for (int c = 0; c < W; c++) {
+              position_t k_shift = base_k;
+              if (c > 0) {
+                  int shift_bits = c * (H + 1);
+                  k_shift = ((base_k << shift_bits) | (base_k >> (w_bits - shift_bits))) & wrap_mask;
+              }
+              position_t k_rev = mirror_key(k_shift);
+              if (k_shift < best_key) { best_key = k_shift; best_reverse = false; }
+              if (k_rev   < best_key) { best_key = k_rev;   best_reverse = true;  }
+          }
+          is_reverse = best_reverse;
+          return best_key;
       } else {
-          is_reverse = true;
-          return k_reverse;
+          position_t k_forward = base_k;
+          position_t k_reverse = mirror_key(k_forward);
+          if (k_forward < k_reverse) {
+              is_reverse = false;
+              return k_forward;
+          } else {
+              is_reverse = true;
+              return k_reverse;
+          }
       }
   }
 
@@ -283,18 +320,54 @@ class GenericPosition {
   }
 
   position_t key3(bool &is_reverse) const {
-    position_t key_forward = 0;
-    for(int i = 0; i < width(); i++) partialKey3(key_forward, i);
-
-    position_t key_reverse = 0;
-    for(int i = width(); i--;) partialKey3(key_reverse, i);
-
-    if (key_forward < key_reverse) {
-        is_reverse = false;
-        return key_forward / 3;
+    if constexpr (WRAP && W != -1) {
+        // Wraparound: find canonical form across all W rotations × mirror
+        position_t base_k = key();
+        int w_bits = W * (H + 1);
+        position_t wrap_mask = (position_t(1) << w_bits) - 1;
+        position_t best_k3 = ~position_t(0);
+        bool best_reverse = false;
+        int best_c = 0;
+        for (int c = 0; c < W; c++) {
+            position_t k_shift = base_k;
+            if (c > 0) {
+                int shift_bits = c * (H + 1);
+                k_shift = ((base_k << shift_bits) | (base_k >> (w_bits - shift_bits))) & wrap_mask;
+            }
+            position_t k_rev = mirror_key(k_shift);
+            // Compute k3 for forward rotation
+            GenericPosition tmp_f = *this;
+            if (c > 0) {
+                int shift_bits = c * (H + 1);
+                tmp_f.current_position = ((current_position << shift_bits) | (current_position >> (w_bits - shift_bits))) & wrap_mask;
+                tmp_f.mask = ((mask << shift_bits) | (mask >> (w_bits - shift_bits))) & wrap_mask;
+            }
+            position_t fwd = 0;
+            for (int i = 0; i < W; i++) tmp_f.partialKey3(fwd, i);
+            fwd /= 3;
+            position_t rev = 0;
+            for (int i = W; i--;) tmp_f.partialKey3(rev, i);
+            rev /= 3;
+            if (fwd < best_k3) { best_k3 = fwd; best_c = c; best_reverse = false; }
+            if (rev < best_k3) { best_k3 = rev; best_c = c; best_reverse = true; }
+        }
+        (void)best_c;
+        is_reverse = best_reverse;
+        return best_k3;
     } else {
-        is_reverse = true;
-        return key_reverse / 3;
+        position_t key_forward = 0;
+        for(int i = 0; i < width(); i++) partialKey3(key_forward, i);
+
+        position_t key_reverse = 0;
+        for(int i = width(); i--;) partialKey3(key_reverse, i);
+
+        if (key_forward < key_reverse) {
+            is_reverse = false;
+            return key_forward / 3;
+        } else {
+            is_reverse = true;
+            return key_reverse / 3;
+        }
     }
   }
 
@@ -388,8 +461,8 @@ class GenericPosition {
 
   GenericPosition(uint8_t w = W == -1 ? 7 : W, uint8_t h = W == -1 ? 6 : H) : dynamic_w(w), dynamic_h(h), current_position{0}, mask{0}, moves{0} {}
 
-  template <int OW, int OH>
-  GenericPosition(const GenericPosition<OW, OH>& o) : dynamic_w(o.width()), dynamic_h(o.height()), current_position(static_cast<position_t>(o.getCurrentPosition())), mask(static_cast<position_t>(o.getMask())), moves(o.nbMoves()) {}
+  template <int OW, int OH, int OA = 4, bool OWR = false>
+  GenericPosition(const GenericPosition<OW, OH, OA, OWR>& o) : dynamic_w(o.width()), dynamic_h(o.height()), current_position(static_cast<position_t>(o.getCurrentPosition())), mask(static_cast<position_t>(o.getMask())), moves(o.nbMoves()) {}
 
   bool canPlay(int col) const {
     return (mask & top_mask_col(col)) == 0;
@@ -534,29 +607,60 @@ private:
 
   template <int W_CONST, int H_CONST>
   inline __attribute__((always_inline)) position_t compute_winning_position_impl(position_t position, position_t mask) const {
-    position_t r = (position << 1) & (position << 2) & (position << 3);
-    position_t p = (position << (H_CONST + 1)) & (position << 2 * (H_CONST + 1));
-    r |= p & (position << 3 * (H_CONST + 1));
-    r |= p & (position >> (H_CONST + 1));
-    p = (position >> (H_CONST + 1)) & (position >> 2 * (H_CONST + 1));
-    r |= p & (position << (H_CONST + 1));
-    r |= p & (position >> 3 * (H_CONST + 1));
-    p = (position << H_CONST) & (position << 2 * H_CONST);
-    r |= p & (position << 3 * H_CONST);
-    r |= p & (position >> H_CONST);
-    p = (position >> H_CONST) & (position >> 2 * H_CONST);
-    r |= p & (position << H_CONST);
-    r |= p & (position >> 3 * H_CONST);
-    p = (position << (H_CONST + 2)) & (position << 2 * (H_CONST + 2));
-    r |= p & (position << 3 * (H_CONST + 2));
-    r |= p & (position >> (H_CONST + 2));
-    p = (position >> (H_CONST + 2)) & (position >> 2 * (H_CONST + 2));
-    r |= p & (position << (H_CONST + 2));
-    r |= p & (position >> 3 * (H_CONST + 2));
-    return r & (PositionConstants<W_CONST, H_CONST>::board_mask() ^ mask);
+    if constexpr (ALIGN == 4) {
+      position_t r = (position << 1) & (position << 2) & (position << 3);
+      position_t p = wrap_left(position, H_CONST + 1) & wrap_left(position, 2 * (H_CONST + 1));
+      r |= p & wrap_left(position, 3 * (H_CONST + 1));
+      r |= p & wrap_right(position, H_CONST + 1);
+      p = wrap_right(position, H_CONST + 1) & wrap_right(position, 2 * (H_CONST + 1));
+      r |= p & wrap_left(position, H_CONST + 1);
+      r |= p & wrap_right(position, 3 * (H_CONST + 1));
+      p = wrap_left(position, H_CONST) & wrap_left(position, 2 * H_CONST);
+      r |= p & wrap_left(position, 3 * H_CONST);
+      r |= p & wrap_right(position, H_CONST);
+      p = wrap_right(position, H_CONST) & wrap_right(position, 2 * H_CONST);
+      r |= p & wrap_left(position, H_CONST);
+      r |= p & wrap_right(position, 3 * H_CONST);
+      p = wrap_left(position, H_CONST + 2) & wrap_left(position, 2 * (H_CONST + 2));
+      r |= p & wrap_left(position, 3 * (H_CONST + 2));
+      r |= p & wrap_right(position, H_CONST + 2);
+      p = wrap_right(position, H_CONST + 2) & wrap_right(position, 2 * (H_CONST + 2));
+      r |= p & wrap_left(position, H_CONST + 2);
+      r |= p & wrap_right(position, 3 * (H_CONST + 2));
+      return r & (PositionConstants<W_CONST, H_CONST>::board_mask() ^ mask);
+    } else { // ALIGN == 5
+      // Vertical (4-in-column already excluded above since we need 5)
+      position_t r = (position << 1) & (position << 2) & (position << 3) & (position << 4);
+      // Horizontal
+      position_t l1 = wrap_left(position, H_CONST + 1);
+      position_t l2 = l1 & wrap_left(position, 2 * (H_CONST + 1));
+      position_t l3 = l2 & wrap_left(position, 3 * (H_CONST + 1));
+      position_t r1 = wrap_right(position, H_CONST + 1);
+      position_t r2 = r1 & wrap_right(position, 2 * (H_CONST + 1));
+      position_t r3 = r2 & wrap_right(position, 3 * (H_CONST + 1));
+      r |= l3 & wrap_left(position, 4 * (H_CONST + 1));
+      r |= l3 & r1;
+      r |= l2 & r2;
+      r |= l1 & r3;
+      r |= r3 & wrap_right(position, 4 * (H_CONST + 1));
+      // Diagonal 1
+      l1 = wrap_left(position, H_CONST); l2 = l1 & wrap_left(position, 2 * H_CONST);
+      l3 = l2 & wrap_left(position, 3 * H_CONST); r1 = wrap_right(position, H_CONST);
+      r2 = r1 & wrap_right(position, 2 * H_CONST); r3 = r2 & wrap_right(position, 3 * H_CONST);
+      r |= l3 & wrap_left(position, 4 * H_CONST); r |= l3 & r1; r |= l2 & r2;
+      r |= l1 & r3; r |= r3 & wrap_right(position, 4 * H_CONST);
+      // Diagonal 2
+      l1 = wrap_left(position, H_CONST + 2); l2 = l1 & wrap_left(position, 2 * (H_CONST + 2));
+      l3 = l2 & wrap_left(position, 3 * (H_CONST + 2)); r1 = wrap_right(position, H_CONST + 2);
+      r2 = r1 & wrap_right(position, 2 * (H_CONST + 2)); r3 = r2 & wrap_right(position, 3 * (H_CONST + 2));
+      r |= l3 & wrap_left(position, 4 * (H_CONST + 2)); r |= l3 & r1; r |= l2 & r2;
+      r |= l1 & r3; r |= r3 & wrap_right(position, 4 * (H_CONST + 2));
+      return r & (PositionConstants<W_CONST, H_CONST>::board_mask() ^ mask);
+    }
   }
 
   inline __attribute__((always_inline)) position_t compute_winning_position_dynamic(position_t position, position_t mask, int h) const {
+    // Dynamic (W=-1) path always uses ALIGN=4, no WRAP
     position_t r = (position << 1) & (position << 2) & (position << 3);
     position_t p = (position << (h + 1)) & (position << 2 * (h + 1));
     r |= p & (position << 3 * (h + 1));
@@ -583,6 +687,7 @@ private:
       if constexpr (W != -1) {
           return compute_winning_position_impl<W, H>(position, mask);
       } else {
+          // Dynamic solver: always standard 4-in-a-row, no wrap
           if (width() == 7 && height() == 6) return compute_winning_position_impl<7, 6>(position, mask);
           if (width() == 8 && height() == 6) return compute_winning_position_impl<8, 6>(position, mask);
           if (width() == 8 && height() == 8) return compute_winning_position_impl<8, 8>(position, mask);
@@ -683,6 +788,8 @@ private:
   }
 
   int computeEvensStrategy() const {
+    // Evens strategy does not apply to wraparound boards or non-standard alignment
+    if constexpr (WRAP || ALIGN != 4) return 0;
     if constexpr (W != -1) {
         return computeEvensStrategy_impl<W, H>();
     } else {

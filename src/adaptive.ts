@@ -35,7 +35,8 @@ export { getSolverCapability };
 // EMBEDDED_BOOK_SIZES is imported from capabilities.ts — single source of truth.
 // Used to pre-determine solver type before init(), avoiding the
 // "create as heuristic → detect book → recreate as exact" anti-pattern.
-function hasEmbeddedBook(width: number, height: number): boolean {
+function hasEmbeddedBook(width: number, height: number, align = 4, wrap = false): boolean {
+  if (align !== 4 || wrap !== false) return false;
   return EMBEDDED_BOOK_SIZES.has(`${width}x${height}`);
 }
 
@@ -64,6 +65,8 @@ export interface AdaptiveSolverOptions {
   bookLoader?: (
     width: number,
     height: number,
+    align?: number,
+    wrap?: boolean,
   ) => Promise<Uint8Array | null | undefined>;
 
   /**
@@ -84,6 +87,8 @@ export class AdaptiveSolver {
 
   private _width = 0;
   private _height = 0;
+  private _align = 4;
+  private _wrap = false;
   private _capability: SolverCapability = "tactical";
   private _hasBook = false;
   private _isReady = false;
@@ -96,6 +101,12 @@ export class AdaptiveSolver {
   }
   get height(): number {
     return this._height;
+  }
+  get align(): number {
+    return this._align;
+  }
+  get wrap(): boolean {
+    return this._wrap;
   }
 
   /**
@@ -145,7 +156,7 @@ export class AdaptiveSolver {
    * 5. Loads embedded book if available (zero network cost).
    * 6. Calls bookLoader (if provided); non-null result replaces embedded book.
    */
-  async setBoard(width: number, height: number): Promise<void> {
+  async setBoard(width: number, height: number, align = 4, wrap = false): Promise<void> {
     this._isSwitching = true;
     this._isReady = false;
 
@@ -158,18 +169,22 @@ export class AdaptiveSolver {
 
     this._width = width;
     this._height = height;
+    this._align = align;
+    this._wrap = wrap;
     this._hasBook = false;
 
     // 2. Determine solver type upfront — no solver recreation needed.
     //    Small boards and embedded-book boards always get an exact solver.
     //    Everything else gets a heuristic solver.
-    const willHaveEmbeddedBook = hasEmbeddedBook(width, height);
+    const willHaveEmbeddedBook = hasEmbeddedBook(width, height, align, wrap);
     const useHeuristic = !(width < 7 && height < 7) && !willHaveEmbeddedBook;
 
     // 3. Create and init solver
     const solverOpts: Connect4SolverOptions = {
       width,
       height,
+      align,
+      wrap,
       cacheSizeMb: this._opts.cacheSizeMb ?? 128,
       heuristic: useHeuristic,
     };
@@ -185,7 +200,7 @@ export class AdaptiveSolver {
     // 5. Call user's bookLoader — overrides embedded book if non-null
     if (this._opts.bookLoader) {
       try {
-        const custom = await this._opts.bookLoader(width, height);
+        const custom = await this._opts.bookLoader(width, height, align, wrap);
         if (custom && custom.byteLength > 0) {
           await this._solver.loadBook(custom);
           this._hasBook = true;
@@ -199,7 +214,7 @@ export class AdaptiveSolver {
     }
 
     // 6. Finalize capability (book state is now settled)
-    this._capability = getSolverCapability(width, height, this._hasBook);
+    this._capability = getSolverCapability(width, height, this._hasBook, align, wrap);
 
     this._isReady = true;
     this._isSwitching = false;
@@ -249,7 +264,7 @@ export class AdaptiveSolver {
     if (!this._solver) throw new Error("Call setBoard() before loadBook().");
     await this._solver.loadBook(data);
     this._hasBook = true;
-    this._capability = getSolverCapability(this._width, this._height, true);
+    this._capability = getSolverCapability(this._width, this._height, true, this._align, this._wrap);
   }
 
   /**

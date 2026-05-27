@@ -27,8 +27,8 @@ namespace {
 }
 
 
-template <int WIDTH, int HEIGHT>
-int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc, uint32_t& localCount) {
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP>
+int HeuristicSolver<WIDTH, HEIGHT, ALIGN, WRAP>::negamax_heuristic(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc, uint32_t& localCount) {
   if (P.canWinNext()) {
       return SCORE_FORCED_WIN_BASE + (P.width() * P.height() + 1 - P.nbMoves()) / 2;
   }
@@ -70,9 +70,9 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   // Forced move fast-path: only one legal move, skip TT write to avoid cache pollution.
   if ((moves & (moves - 1)) == 0) {
     if (localCount > 0) localCount--;
-    GenericPosition<WIDTH, HEIGHT> P2(P);
+    GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
     P2.play(moves);
-    unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(moves);
+    unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t>(moves);
     int col = bit_idx / (P.height() + 1);
     int row = bit_idx % (P.height() + 1);
     int player = P.nbMoves() % 2;
@@ -84,7 +84,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   }
 
   struct Move {
-    typename GenericPosition<WIDTH, HEIGHT>::position_t move;
+    typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t move;
     int score;
   };
   std::vector<Move> sorted_moves(P.width());
@@ -96,7 +96,7 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
     if (m) {
       sorted_moves[n_moves++] = {m, (int)history[col]};
 
-      GenericPosition<WIDTH, HEIGHT> child(P);
+      GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> child(P);
       child.play(m);
       this->transTable->prefetch(child.symmetric_key());
     }
@@ -110,10 +110,10 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   uint8_t flags = 3; // Upper bound
 
   for (int i = 0; i < n_moves; i++) {
-    GenericPosition<WIDTH, HEIGHT> P2(P);
+    GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
     P2.play(sorted_moves[i].move);
     
-    unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(sorted_moves[i].move);
+    unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t>(sorted_moves[i].move);
     int col = bit_idx / (P.height() + 1);
     int row = bit_idx % (P.height() + 1);
     int player = P.nbMoves() % 2;
@@ -143,8 +143,8 @@ int HeuristicSolver<WIDTH, HEIGHT>::negamax_heuristic(const GenericPosition<WIDT
   return best_score;
 }
 
-template <int WIDTH, int HEIGHT>
-SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms, bool /*reset_tt*/, NNUEAccumulator<WIDTH, HEIGHT>* acc, int threads) {
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP>
+SolverResult HeuristicSolver<WIDTH, HEIGHT, ALIGN, WRAP>::solve_heuristic(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, int max_depth, double end_time_ms, bool /*reset_tt*/, NNUEAccumulator<WIDTH, HEIGHT>* acc, int threads) {
 #ifndef USE_PTHREADS
   threads = 1;
 #endif
@@ -222,7 +222,7 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
         if (P.isWinningMove(col)) {
           score = SCORE_FORCED_WIN_BASE + (P.width() * P.height() + 1 - P.nbMoves()) / 2;
         } else {
-          GenericPosition<WIDTH, HEIGHT> P2(P);
+          GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
           P2.playCol(col);
 
           bool book_hit = false;
@@ -238,8 +238,8 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
 
         if (!book_hit) {
             NNUEAccumulator<WIDTH, HEIGHT> local_acc = root_acc;
-            typename GenericPosition<WIDTH, HEIGHT>::position_t move = (P.getMask() + P.bottom_mask_col(col)) & P.column_mask(col);
-            unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(move);
+            typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t move = (P.getMask() + P.bottom_mask_col(col)) & P.column_mask(col);
+            unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t>(move);
             local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (P.height() + 1));
             score = -negamax_heuristic(P2, -SCORE_INFINITY, SCORE_INFINITY, d - 1, end_time_ms, local_acc, localCount);
         }
@@ -301,8 +301,8 @@ SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve_heuristic(const GenericPositi
   return {best_score, best_move, depth_reached, getNodeCount(), this->stopSearch.load(std::memory_order_relaxed)};
 }
 
-template <int WIDTH, int HEIGHT>
-std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads, double end_time_ms) {
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP>
+std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT, ALIGN, WRAP>::analyze_heuristic(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, int max_depth, int threads, double end_time_ms) {
 #ifndef USE_PTHREADS
   threads = 1;
 #endif
@@ -343,7 +343,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
           if (P.isWinningMove(col)) {
             current_scores[col] = SCORE_FORCED_WIN_BASE + (P.width() * P.height() + 1 - P.nbMoves()) / 2;
           } else {
-            GenericPosition<WIDTH, HEIGHT> P2(P);
+            GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
             P2.playCol(col);
 
             bool book_hit = false;
@@ -359,8 +359,8 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 
             if (!book_hit) {
                 NNUEAccumulator<WIDTH, HEIGHT> local_acc = root_acc;
-                typename GenericPosition<WIDTH, HEIGHT>::position_t move = (P.getMask() + P.bottom_mask_col(col)) & P.column_mask(col);
-                unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(move);
+                typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t move = (P.getMask() + P.bottom_mask_col(col)) & P.column_mask(col);
+                unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t>(move);
                 local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (P.height() + 1));
                 int score = -negamax_heuristic(P2, -SCORE_INFINITY, SCORE_INFINITY, d - 1, end_time_ms, local_acc, localCount);
                 if (score >= SCORE_INFINITY || score <= -SCORE_INFINITY) break;
@@ -398,7 +398,7 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
         if (P.canPlay(col)) {
             if(P.isWinningMove(col)) current_scores[col] = SCORE_FORCED_WIN_BASE + (P.width() * P.height() + 1 - P.nbMoves()) / 2;
             else {
-                GenericPosition<WIDTH, HEIGHT> P2(P);
+                GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
                 P2.playCol(col);
 
                 bool book_hit = false;
@@ -414,8 +414,8 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 
                 if (!book_hit) {
                     NNUEAccumulator<WIDTH, HEIGHT> local_acc = root_acc;
-                    typename GenericPosition<WIDTH, HEIGHT>::position_t move = (P.getMask() + P.bottom_mask_col(col)) & P.column_mask(col);
-                    unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT>::position_t>(move);
+                    typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t move = (P.getMask() + P.bottom_mask_col(col)) & P.column_mask(col);
+                    unsigned int bit_idx = GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::template ctz_impl<typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t>(move);
                     local_acc.addPiece(P.nbMoves() % 2, col, bit_idx % (P.height() + 1));
                     int score = -negamax_heuristic(P2, -SCORE_INFINITY, SCORE_INFINITY, d - 1, end_time_ms, local_acc, localCount);
                     if (score >= SCORE_INFINITY || score <= -SCORE_INFINITY) break;
@@ -442,14 +442,14 @@ std::pair<std::vector<int>, int> HeuristicSolver<WIDTH, HEIGHT>::analyze_heurist
 }
 
 
-template <int WIDTH, int HEIGHT>
-::GameSolver::Connect4::SolverResult HeuristicSolver<WIDTH, HEIGHT>::solve(const GenericPosition<WIDTH, HEIGHT> &P, bool /*weak*/, int threads, const OpeningBookBase<WIDTH, HEIGHT>* book, double timeout_ms) {
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP>
+::GameSolver::Connect4::SolverResult HeuristicSolver<WIDTH, HEIGHT, ALIGN, WRAP>::solve(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool /*weak*/, int threads, const OpeningBookBase<WIDTH, HEIGHT>* book, double timeout_ms) {
   if (book) loadBook(book);
   return solve_heuristic(P, 100, timeout_ms, true, nullptr, threads);
 }
 
-template <int WIDTH, int HEIGHT>
-std::vector<int> HeuristicSolver<WIDTH, HEIGHT>::analyze(const GenericPosition<WIDTH, HEIGHT> &P, bool /*weak*/, int threads, const OpeningBookBase<WIDTH, HEIGHT>* book, double timeout_ms) {
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP>
+std::vector<int> HeuristicSolver<WIDTH, HEIGHT, ALIGN, WRAP>::analyze(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool /*weak*/, int threads, const OpeningBookBase<WIDTH, HEIGHT>* book, double timeout_ms) {
   if (book) loadBook(book);
   return analyze_heuristic(P, 100, threads, timeout_ms).first;
 }

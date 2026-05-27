@@ -56,12 +56,16 @@ export function getSolverCapability(
   width: number,
   height: number,
   hasBook: boolean,
+  align = 4,
+  wrap = false,
 ): SolverCapability {
   // A loaded book makes any board tractable for exact
   if (hasBook) return "exact";
 
   // Small boards: exact is always fast enough (≤6x6, low branching factor)
   if (width < 7 && height < 7) return "exact";
+  
+  if (align !== 4 || wrap !== false) return "tactical";
 
   // Boards with an embedded opening book compiled into the binary
   if (EMBEDDED_BOOK_SIZES.has(`${width}x${height}`)) return "exact";

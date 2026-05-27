@@ -64,6 +64,25 @@ await solver.init();
 const result = await solver.analyze("44445223");
 ```
 
+### Game Variants
+
+The solver supports varying win-conditions (e.g. Connect 5) and cylindrical boards (wraparound).
+
+```typescript
+import { createSolver } from "connect-4-solver";
+
+// Play Connect 5 on an 8x8 wraparound board
+const solver = await createSolver({ 
+  width: 8, 
+  height: 8, 
+  align: 5,        // Connect-5 win condition
+  wrap: true       // Cylindrical board (left edge connects to right edge)
+});
+await solver.init();
+
+const result = await solver.analyze("44445223");
+```
+
 ## Usage & Documentation
 
 Comprehensive docs covering API usage, WebWorkers, Solution Books, and Memory Management:

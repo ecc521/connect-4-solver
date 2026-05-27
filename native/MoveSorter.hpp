@@ -35,9 +35,9 @@ namespace Connect4 {
  * and also efficient if the move are pushed in approximately increasing
  * order which can be achieved by using a simpler column ordering heuristic.
  */
-template <int WIDTH, int HEIGHT>
+template <int WIDTH, int HEIGHT, int ALIGN = 4, bool WRAP = false>
 class GenericMoveSorter {
-  using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
+  using position_t = typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t;
  public:
 
   /**

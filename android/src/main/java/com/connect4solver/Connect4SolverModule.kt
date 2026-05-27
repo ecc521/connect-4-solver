@@ -16,21 +16,21 @@ class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContext
         return "Connect4Solver"
     }
 
-    external fun nativeCreateCache(width: Int, height: Int, sizeBytes: Double, isHeuristic: Boolean): String
+    external fun nativeCreateCache(width: Int, height: Int, sizeBytes: Double, isHeuristic: Boolean, align: Int, wrap: Boolean): String
     external fun nativeDestroyCache(cachePtrStr: String)
-    external fun nativeCreateSolver(width: Int, height: Int, cachePtrStr: String, isHeuristic: Boolean): String
-    external fun nativeDestroySolver(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean)
-    external fun nativeStop(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean)
+    external fun nativeCreateSolver(width: Int, height: Int, cachePtrStr: String, isHeuristic: Boolean, align: Int, wrap: Boolean): String
+    external fun nativeDestroySolver(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean, align: Int, wrap: Boolean)
+    external fun nativeStop(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean, align: Int, wrap: Boolean)
     external fun nativeCreateBookFromBuffer(width: Int, height: Int, base64: ByteArray): String
     external fun nativeDestroyBook(width: Int, height: Int, bookPtrStr: String)
-    external fun nativeAnalyze(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, bookPtrStr: String): IntArray?
-    external fun nativeAnalyzeHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String): IntArray?
-    external fun nativeSolve(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, bookPtrStr: String): IntArray?
-    external fun nativeSolveHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String): IntArray?
+    external fun nativeAnalyze(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, bookPtrStr: String, align: Int, wrap: Boolean): IntArray?
+    external fun nativeAnalyzeHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String, align: Int, wrap: Boolean): IntArray?
+    external fun nativeSolve(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, bookPtrStr: String, align: Int, wrap: Boolean): IntArray?
+    external fun nativeSolveHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String, align: Int, wrap: Boolean): IntArray?
 
     @ReactMethod(isBlockingSynchronousMethod = true)
-    fun createCache(width: Int, height: Int, sizeBytes: Double, isHeuristic: Boolean): String {
-        return nativeCreateCache(width, height, sizeBytes, isHeuristic)
+    fun createCache(width: Int, height: Int, sizeBytes: Double, isHeuristic: Boolean, align: Int, wrap: Boolean): String {
+        return nativeCreateCache(width, height, sizeBytes, isHeuristic, align, wrap)
     }
 
     @ReactMethod(isBlockingSynchronousMethod = true)
@@ -39,18 +39,18 @@ class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContext
     }
 
     @ReactMethod(isBlockingSynchronousMethod = true)
-    fun createSolver(width: Int, height: Int, cachePtrStr: String, isHeuristic: Boolean): String {
-        return nativeCreateSolver(width, height, cachePtrStr, isHeuristic)
+    fun createSolver(width: Int, height: Int, cachePtrStr: String, isHeuristic: Boolean, align: Int, wrap: Boolean): String {
+        return nativeCreateSolver(width, height, cachePtrStr, isHeuristic, align, wrap)
     }
 
     @ReactMethod(isBlockingSynchronousMethod = true)
-    fun destroySolver(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean) {
-        nativeDestroySolver(solverPtrStr, width, height, isHeuristic)
+    fun destroySolver(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean, align: Int, wrap: Boolean) {
+        nativeDestroySolver(solverPtrStr, width, height, isHeuristic, align, wrap)
     }
 
     @ReactMethod(isBlockingSynchronousMethod = true)
-    fun stop(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean) {
-        nativeStop(solverPtrStr, width, height, isHeuristic)
+    fun stop(solverPtrStr: String, width: Int, height: Int, isHeuristic: Boolean, align: Int, wrap: Boolean) {
+        nativeStop(solverPtrStr, width, height, isHeuristic, align, wrap)
     }
 
     @ReactMethod(isBlockingSynchronousMethod = true)
@@ -65,10 +65,10 @@ class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContext
     }
 
     @ReactMethod
-    fun analyze(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, weak: Boolean, bookPtrStr: String, promise: Promise) {
+    fun analyze(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, weak: Boolean, bookPtrStr: String, align: Int, wrap: Boolean, promise: Promise) {
         executor.execute {
             try {
-                val result = nativeAnalyze(solverPtrStr, position, threads, width, height, bookPtrStr)
+                val result = nativeAnalyze(solverPtrStr, position, threads, width, height, bookPtrStr, align, wrap)
                 if (result != null) {
                     val writableArray = Arguments.createArray()
                     for (i in result) {
@@ -85,10 +85,10 @@ class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContext
     }
 
     @ReactMethod
-    fun analyzeHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String, promise: Promise) {
+    fun analyzeHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String, align: Int, wrap: Boolean, promise: Promise) {
         executor.execute {
             try {
-                val result = nativeAnalyzeHeuristic(solverPtrStr, position, maxDepth, threads, timeoutMs, width, height, bookPtrStr)
+                val result = nativeAnalyzeHeuristic(solverPtrStr, position, maxDepth, threads, timeoutMs, width, height, bookPtrStr, align, wrap)
                 if (result != null) {
                     val writableArray = Arguments.createArray()
                     for (i in result) {
@@ -105,10 +105,10 @@ class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContext
     }
 
     @ReactMethod
-    fun solve(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, weak: Boolean, bookPtrStr: String, promise: Promise) {
+    fun solve(solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, weak: Boolean, bookPtrStr: String, align: Int, wrap: Boolean, promise: Promise) {
         executor.execute {
             try {
-                val result = nativeSolve(solverPtrStr, position, threads, width, height, bookPtrStr)
+                val result = nativeSolve(solverPtrStr, position, threads, width, height, bookPtrStr, align, wrap)
                 if (result != null) {
                     val writableArray = Arguments.createArray()
                     for (i in result) {
@@ -125,10 +125,10 @@ class Connect4SolverModule(reactContext: ReactApplicationContext) : ReactContext
     }
 
     @ReactMethod
-    fun solveHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String, promise: Promise) {
+    fun solveHeuristic(solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String, align: Int, wrap: Boolean, promise: Promise) {
         executor.execute {
             try {
-                val result = nativeSolveHeuristic(solverPtrStr, position, maxDepth, threads, timeoutMs, width, height, bookPtrStr)
+                val result = nativeSolveHeuristic(solverPtrStr, position, maxDepth, threads, timeoutMs, width, height, bookPtrStr, align, wrap)
                 if (result != null) {
                     val writableArray = Arguments.createArray()
                     for (i in result) {

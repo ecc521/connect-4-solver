@@ -304,6 +304,8 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         threads,
         bookPtr as number,
         timeoutMs,
+        this.align,
+        this.wrap,
       );
 
     const dataLength = 8;
@@ -348,6 +350,8 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         threads,
         bookPtr as number,
         timeoutMs,
+        this.align,
+        this.wrap,
       );
 
     const dataLength = 6 + this.width;

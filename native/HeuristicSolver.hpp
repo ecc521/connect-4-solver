@@ -24,10 +24,10 @@
 namespace GameSolver {
 namespace Connect4 {
 
-template <int WIDTH, int HEIGHT>
+template <int WIDTH, int HEIGHT, int ALIGN = 4, bool WRAP = false>
 class HeuristicCache : public Cache {
  public:
-  using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
+  using position_t = typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t;
   using TransTable = TranspositionTable<position_t, int16_t, 16, 7, 2, 5, position_t>;
   std::shared_ptr<TransTable> transTable;
   
@@ -65,10 +65,10 @@ class HeuristicCache : public Cache {
 #define HEURISTIC_TABLE_SIZE 22
 #endif
 
-template <int WIDTH, int HEIGHT>
-class HeuristicSolver : public ::GameSolver::Connect4::Solver<WIDTH, HEIGHT> {
+template <int WIDTH, int HEIGHT, int ALIGN = 4, bool WRAP = false>
+class HeuristicSolver : public ::GameSolver::Connect4::Solver<WIDTH, HEIGHT, ALIGN, WRAP> {
  private:
-  using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
+  using position_t = typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t;
   
   using TransTable = TranspositionTable<position_t, int16_t, 16, 7, 2, 5, position_t>;
   std::shared_ptr<TransTable> transTable;
@@ -127,7 +127,7 @@ class HeuristicSolver : public ::GameSolver::Connect4::Solver<WIDTH, HEIGHT> {
   /**
    * Heuristic negamax with depth limit.
    */
-  int negamax_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc, uint32_t& localCount);
+  int negamax_heuristic(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, int alpha, int beta, int depth, double end_time_ms, NNUEAccumulator<WIDTH, HEIGHT>& acc, uint32_t& localCount);
 
  public:
   static const int INVALID_MOVE = -1000000;
@@ -137,17 +137,17 @@ class HeuristicSolver : public ::GameSolver::Connect4::Solver<WIDTH, HEIGHT> {
   bool isAborted() const override { return stopSearch.load(std::memory_order_relaxed); }
 
   // Returns the heuristic score of a position via iterative deepening
-  ::GameSolver::Connect4::SolverResult solve(const GenericPosition<WIDTH, HEIGHT> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) override;
+  ::GameSolver::Connect4::SolverResult solve(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) override;
 
   // Evaluate possible heuristic moves for current player
-  std::vector<int> analyze(const GenericPosition<WIDTH, HEIGHT> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) override;
+  std::vector<int> analyze(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) override;
 
   // Legacy alias for compatibility (calling the new solve)
-  ::GameSolver::Connect4::SolverResult solve_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, double end_time_ms = 0.0, bool reset_tt = true, NNUEAccumulator<WIDTH, HEIGHT>* acc = nullptr, int threads = 1);
+  ::GameSolver::Connect4::SolverResult solve_heuristic(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, int max_depth, double end_time_ms = 0.0, bool reset_tt = true, NNUEAccumulator<WIDTH, HEIGHT>* acc = nullptr, int threads = 1);
 
 
   // Legacy alias for compatibility
-  std::pair<std::vector<int>, int> analyze_heuristic(const GenericPosition<WIDTH, HEIGHT> &P, int max_depth, int threads = 1, double end_time_ms = 0.0);
+  std::pair<std::vector<int>, int> analyze_heuristic(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, int max_depth, int threads = 1, double end_time_ms = 0.0);
 
   unsigned long long getNodeCount() const override {
     return nodeCount;
@@ -175,17 +175,17 @@ class HeuristicSolver : public ::GameSolver::Connect4::Solver<WIDTH, HEIGHT> {
   HeuristicSolver() : HeuristicSolver(std::make_shared<TransTable>((1ULL << HEURISTIC_TABLE_SIZE) * 16ULL)) {}
 
   static std::unique_ptr<::GameSolver::Connect4::Cache> createCache(size_t table_bytes, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT) {
-    auto* c = new (std::nothrow) HeuristicCache<WIDTH, HEIGHT>(table_bytes);
+    auto* c = new (std::nothrow) HeuristicCache<WIDTH, HEIGHT, ALIGN, WRAP>(table_bytes);
     if (c && c->isValid()) return std::unique_ptr<::GameSolver::Connect4::Cache>(c);
     delete c;
     return nullptr;
   }
 
-  static std::unique_ptr<HeuristicSolver<WIDTH, HEIGHT>> createWithCache(::GameSolver::Connect4::Cache* cache, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT) {
-    if (auto c = dynamic_cast<HeuristicCache<WIDTH, HEIGHT>*>(cache)) {
-      auto* s = new (std::nothrow) HeuristicSolver<WIDTH, HEIGHT>(c->transTable, w, h);
+  static std::unique_ptr<HeuristicSolver<WIDTH, HEIGHT, ALIGN, WRAP>> createWithCache(::GameSolver::Connect4::Cache* cache, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT) {
+    if (auto c = dynamic_cast<HeuristicCache<WIDTH, HEIGHT, ALIGN, WRAP>*>(cache)) {
+      auto* s = new (std::nothrow) HeuristicSolver<WIDTH, HEIGHT, ALIGN, WRAP>(c->transTable, w, h);
       if (!s) return nullptr;
-      return std::unique_ptr<HeuristicSolver<WIDTH, HEIGHT>>(s);
+      return std::unique_ptr<HeuristicSolver<WIDTH, HEIGHT, ALIGN, WRAP>>(s);
     }
     return nullptr;
   }

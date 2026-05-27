@@ -14,14 +14,25 @@ export interface NativeModuleType {
     h: number,
     cache: unknown,
     heuristic: boolean,
+    align: number,
+    wrap: boolean,
   ): unknown;
   _destroySolver(
     w: number,
     h: number,
     solver: unknown,
     heuristic: boolean,
+    align: number,
+    wrap: boolean,
   ): void;
-  _createCache(w: number, h: number, size: number, heuristic: boolean): unknown;
+  _createCache(
+    w: number,
+    h: number,
+    size: number,
+    heuristic: boolean,
+    align: number,
+    wrap: boolean,
+  ): unknown;
   _destroyCache(cache: unknown): void;
   _analyzeExact(
     w: number,
@@ -32,6 +43,8 @@ export interface NativeModuleType {
     threads: number,
     book: unknown,
     timeout: number,
+    align: number,
+    wrap: boolean,
   ): Promise<Int32Array>;
   _analyzeHeuristic(
     w: number,
@@ -52,6 +65,8 @@ export interface NativeModuleType {
     threads: number,
     book: unknown,
     timeout: number,
+    align: number,
+    wrap: boolean,
   ): Promise<Int32Array>;
   _solveHeuristic(
     w: number,
@@ -68,6 +83,8 @@ export interface NativeModuleType {
     h: number,
     solver: unknown,
     isHeuristic: boolean,
+    align: number,
+    wrap: boolean,
   ): void;
   _createBook(w: number, h: number, path: string): unknown;
   _createBookFromBuffer(w: number, h: number, data: Uint8Array): unknown;
@@ -99,6 +116,8 @@ export interface NativeModuleType {
     h: number,
     solver: unknown,
     heuristic: boolean,
+    align: number,
+    wrap: boolean,
   ): number;
   _generatePositions(
     w: number,
@@ -155,6 +174,8 @@ export class NativeCache {
     public height: number,
     public cacheSizeMb: number,
     public isHeuristic: boolean,
+    public align = 4,
+    public wrap = false,
   ) {
     const native = getNativeModule();
     if (!native) throw new Error("Native module not loaded");
@@ -167,6 +188,8 @@ export class NativeCache {
         height,
         sizeMb * 1024 * 1024,
         isHeuristic,
+        align,
+        wrap,
       );
       if (ptr) break;
       if (sizeMb <= 4) break;
@@ -228,6 +251,8 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
           this.height,
           sizeMb * 1024 * 1024,
           this.isHeuristic,
+          this.align,
+          this.wrap,
         );
         if (ptr) break;
         if (sizeMb <= 4) break;
@@ -243,6 +268,8 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       this.height,
       this._cachePtr,
       this.isHeuristic,
+      this.align,
+      this.wrap,
     ) as number;
     if (!this._solverPtr) {
       throw new Error(
@@ -315,6 +342,8 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
           threads,
           bookPtr === 0 ? null : bookPtr,
           timeoutMs,
+          this.align,
+          this.wrap,
         );
       }
       return this.parseResArr(resArr, positionStr);
@@ -358,6 +387,8 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
           threads,
           bookPtr === 0 ? null : bookPtr,
           timeoutMs,
+          this.align,
+          this.wrap,
         );
       }
       return this.parseSolveResArr(resArr, positionStr);
@@ -373,6 +404,8 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         this.height,
         this._solverPtr,
         this.isHeuristic,
+        this.align,
+        this.wrap,
       );
     }
   }
@@ -386,6 +419,8 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         this.height,
         this._solverPtr,
         this.isHeuristic,
+        this.align,
+        this.wrap,
       );
       if (!this._sharedCache) {
         native._destroyCache(this._cachePtr);
@@ -409,6 +444,8 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
             this.height,
             this._solverPtr,
             this.isHeuristic,
+            this.align,
+            this.wrap,
           ),
         ),
       );

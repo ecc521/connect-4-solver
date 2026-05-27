@@ -33,14 +33,16 @@ Value CreateCache(const CallbackInfo& info) {
     size_t bytes = info[2].As<Number>().Int64Value();
     bool is_heuristic = info[3].As<Boolean>().Value();
 
+    int align = info[4].As<Number>().Int32Value();
+    bool wrap = info[5].As<Boolean>().Value();
     void* ptr = nullptr;
     if (is_heuristic) {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             ptr = Size::HeuristicSolver::createCache(bytes, w, h).release();
         });
     } else {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             ptr = Size::Solver::createCache(bytes, w, h).release();
         });
@@ -62,14 +64,16 @@ Value CreateSolver(const CallbackInfo& info) {
     void* cache_ptr = UnwrapPointer<void>(info[2]);
     bool is_heuristic = info[3].As<Boolean>().Value();
 
+    int align = info[4].As<Number>().Int32Value();
+    bool wrap = info[5].As<Boolean>().Value();
     void* ptr = nullptr;
     if (is_heuristic) {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             ptr = Size::HeuristicSolver::createWithCache(static_cast<::GameSolver::Connect4::Cache*>(cache_ptr), w, h).release();
         });
     } else {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             ptr = Size::Solver::createWithCache(static_cast<::GameSolver::Connect4::Cache*>(cache_ptr), w, h).release();
         });
@@ -83,13 +87,15 @@ Value DestroySolver(const CallbackInfo& info) {
     void* solver = UnwrapPointer<void>(info[2]);
     bool is_heuristic = info[3].As<Boolean>().Value();
 
+    int align = info[4].As<Number>().Int32Value();
+    bool wrap = info[5].As<Boolean>().Value();
     if (is_heuristic) {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             delete static_cast<typename Size::HeuristicSolver*>(solver);
         });
     } else {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             delete static_cast<typename Size::Solver*>(solver);
         });
@@ -102,8 +108,9 @@ Value CreateBook(const CallbackInfo& info) {
     int h = info[1].As<Number>().Int32Value();
     std::string path = info[2].As<String>().Utf8Value();
     
+    int align = 4; bool wrap = false;
     void* ptr = nullptr;
-    dispatch_void(w, h, [&](auto tag) {
+    dispatch_void(w, h, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
         ptr = GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>::load(path, w, h).release();
     });
@@ -296,14 +303,15 @@ std::vector<int> runSolveHeuristicRaw(int w, int h, CoreSolver& solver, const st
 
 class AnalyzeExactWorker : public Napi::AsyncWorker {
 public:
-    AnalyzeExactWorker(Napi::Env& env, Napi::Promise::Deferred deferred, int w, int h, void* solver, const std::string& pos, bool is_weak, int threads, void* book_ptr, double timeout_ms)
-        : Napi::AsyncWorker(env), deferred(deferred), w(w), h(h), solver(solver), pos(pos), is_weak(is_weak), threads(threads), book_ptr(book_ptr), timeout_ms(timeout_ms) {}
+    AnalyzeExactWorker(Napi::Env& env, Napi::Promise::Deferred deferred, int w, int h, void* solver, const std::string& pos, bool is_weak, int threads, void* book_ptr, double timeout_ms, int align, bool wrap)
+        : Napi::AsyncWorker(env), deferred(deferred), w(w), h(h), solver(solver), pos(pos), is_weak(is_weak), threads(threads), book_ptr(book_ptr), timeout_ms(timeout_ms), align(align), wrap(wrap) {}
     
     void Execute() override {
+        int align = this->align; bool wrap = this->wrap;
         try {
-            dispatch_void(w, h, [&](auto tag) {
+            dispatch_void(w, h, align, wrap, [&](auto tag) {
                 using Size = typename decltype(tag)::type;
-                result_data = runAnalysisRaw<typename Size::Solver, typename ::GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, ::GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(w, h, *static_cast<typename Size::Solver*>(solver), pos, is_weak, threads, book_ptr, timeout_ms);
+                result_data = runAnalysisRaw<typename Size::Solver, typename ::GameSolver::Connect4::GenericPosition<Size::w, Size::h, Size::align, Size::wrap>, Size::w, Size::h, ::GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(w, h, *static_cast<typename Size::Solver*>(solver), pos, is_weak, threads, book_ptr, timeout_ms);
             });
         } catch (const std::exception& e) {
             SetError(e.what());
@@ -332,19 +340,22 @@ private:
     int threads;
     void* book_ptr;
     double timeout_ms;
+    int align;
+    bool wrap;
     std::vector<int> result_data;
 };
 
 class SolveExactWorker : public Napi::AsyncWorker {
 public:
-    SolveExactWorker(Napi::Env& env, Napi::Promise::Deferred deferred, int w, int h, void* solver, const std::string& pos, bool is_weak, int threads, void* book_ptr, double timeout_ms)
-        : Napi::AsyncWorker(env), deferred(deferred), w(w), h(h), solver(solver), pos(pos), is_weak(is_weak), threads(threads), book_ptr(book_ptr), timeout_ms(timeout_ms) {}
+    SolveExactWorker(Napi::Env& env, Napi::Promise::Deferred deferred, int w, int h, void* solver, const std::string& pos, bool is_weak, int threads, void* book_ptr, double timeout_ms, int align, bool wrap)
+        : Napi::AsyncWorker(env), deferred(deferred), w(w), h(h), solver(solver), pos(pos), is_weak(is_weak), threads(threads), book_ptr(book_ptr), timeout_ms(timeout_ms), align(align), wrap(wrap) {}
     
     void Execute() override {
+        int align = this->align; bool wrap = this->wrap;
         try {
-            dispatch_void(w, h, [&](auto tag) {
+            dispatch_void(w, h, align, wrap, [&](auto tag) {
                 using Size = typename decltype(tag)::type;
-                result_data = runSolveRaw<typename Size::Solver, typename ::GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, ::GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(w, h, *static_cast<typename Size::Solver*>(solver), pos, is_weak, threads, book_ptr, timeout_ms);
+                result_data = runSolveRaw<typename Size::Solver, typename ::GameSolver::Connect4::GenericPosition<Size::w, Size::h, Size::align, Size::wrap>, Size::w, Size::h, ::GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(w, h, *static_cast<typename Size::Solver*>(solver), pos, is_weak, threads, book_ptr, timeout_ms);
             });
         } catch (const std::exception& e) {
             SetError(e.what());
@@ -373,6 +384,8 @@ private:
     int threads;
     void* book_ptr;
     double timeout_ms;
+    int align;
+    bool wrap;
     std::vector<int> result_data;
 };
 
@@ -386,9 +399,11 @@ Value SolveExact(const CallbackInfo& info) {
     int threads = info[5].As<Number>().Int32Value();
     void* book_ptr = UnwrapPointer<void>(info[6]);
     double timeout_ms = info[7].As<Number>().DoubleValue();
+    int align = info[8].As<Number>().Int32Value();
+    bool wrap = info[9].As<Boolean>().Value();
 
     Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
-    SolveExactWorker* worker = new SolveExactWorker(env, deferred, w, h, solver, pos, weak, threads, book_ptr, timeout_ms);
+    SolveExactWorker* worker = new SolveExactWorker(env, deferred, w, h, solver, pos, weak, threads, book_ptr, timeout_ms, align, wrap);
     worker->Queue();
     return deferred.Promise();
 }
@@ -403,12 +418,12 @@ Value AnalyzeExact(const CallbackInfo& info) {
     int threads = info[5].As<Number>().Int32Value();
     void* book_ptr = UnwrapPointer<void>(info[6]);
 
-    
-    
-
     double timeout_ms = info[7].As<Number>().DoubleValue();
+    int align = info[8].As<Number>().Int32Value();
+    bool wrap = info[9].As<Boolean>().Value();
+
     Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
-    AnalyzeExactWorker* worker = new AnalyzeExactWorker(env, deferred, w, h, solver, pos, weak, threads, book_ptr, timeout_ms);
+    AnalyzeExactWorker* worker = new AnalyzeExactWorker(env, deferred, w, h, solver, pos, weak, threads, book_ptr, timeout_ms, align, wrap);
     worker->Queue();
     
     return deferred.Promise();
@@ -445,8 +460,9 @@ public:
         : Napi::AsyncWorker(env), deferred(deferred), w(w), h(h), solver(solver), pos(pos), threads(threads), max_depth(max_depth), timeout_ms(timeout_ms), book_ptr(book_ptr) {}
     
     void Execute() override { double timeout_ms = this->timeout_ms;
+        int align = 4; bool wrap = false;
         try {
-            dispatch_void(w, h, [&](auto tag) {
+            dispatch_void(w, h, align, wrap, [&](auto tag) {
                 using Size = typename decltype(tag)::type;
                 result_data = runHeuristicAnalysisRaw<typename Size::HeuristicSolver, typename ::GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, ::GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(w, h, *static_cast<typename Size::HeuristicSolver*>(solver), pos, max_depth, threads, timeout_ms, book_ptr);
             });
@@ -487,8 +503,9 @@ public:
         : Napi::AsyncWorker(env), deferred(deferred), w(w), h(h), solver(solver), pos(pos), threads(threads), max_depth(max_depth), timeout_ms(timeout_ms), book_ptr(book_ptr) {}
     
     void Execute() override { double timeout_ms = this->timeout_ms;
+        int align = 4; bool wrap = false;
         try {
-            dispatch_void(w, h, [&](auto tag) {
+            dispatch_void(w, h, align, wrap, [&](auto tag) {
                 using Size = typename decltype(tag)::type;
                 result_data = runSolveHeuristicRaw<typename Size::HeuristicSolver, typename ::GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, ::GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(w, h, *static_cast<typename Size::HeuristicSolver*>(solver), pos, max_depth, threads, timeout_ms, book_ptr);
             });
@@ -567,14 +584,15 @@ Value StopSolver(const CallbackInfo& info) {
     void* solver = UnwrapPointer<void>(info[2]);
     bool is_heuristic = info[3].As<Boolean>().Value();
 
-    
+    int align = info[4].As<Number>().Int32Value();
+    bool wrap = info[5].As<Boolean>().Value();
     if (is_heuristic) {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             static_cast<typename Size::HeuristicSolver*>(solver)->stop();
         });
     } else {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             static_cast<typename Size::Solver*>(solver)->stop();
         });
@@ -589,14 +607,16 @@ Value GetNodeCount(const CallbackInfo& info) {
     void* solver = UnwrapPointer<void>(info[2]);
     bool is_heuristic = info[3].As<Boolean>().Value();
 
+    int align = info[4].As<Number>().Int32Value();
+    bool wrap = info[5].As<Boolean>().Value();
     uint64_t count = 0;
     if (is_heuristic) {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             count = static_cast<typename Size::HeuristicSolver*>(solver)->getNodeCount();
         });
     } else {
-        dispatch_void(w, h, [&](auto tag) {
+        dispatch_void(w, h, align, wrap, [&](auto tag) {
             using Size = typename decltype(tag)::type;
             count = static_cast<typename Size::Solver*>(solver)->getNodeCount();
         });
@@ -604,13 +624,14 @@ Value GetNodeCount(const CallbackInfo& info) {
     return Number::New(info.Env(), (double)count);
 }
 
-// Helper macro for book operations
+// Helper macro for book operations (books are always standard C4, no ALIGN/WRAP variant)
 #define DISPATCH_BOOK(bw, bh, b, ACTION) \
-    dispatch_void(bw, bh, [&](auto tag) { \
+    { int _align = 4; bool _wrap = false; \
+    dispatch_void(bw, bh, _align, _wrap, [&](auto tag) { \
         using Size = typename decltype(tag)::type; \
         auto* book = static_cast<GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>*>(b); \
         ACTION(Size, Size::w, Size::h, book); \
-    });
+    }); }
 
 Value CreateBookFromBuffer(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();

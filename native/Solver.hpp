@@ -40,7 +40,7 @@
 namespace GameSolver {
 namespace Connect4 {
 
-template <int W, int H>
+template <int W, int H, int ALIGN = 4, bool WRAP = false>
 constexpr int getRequiredValueBits() {
     // Pascal Pons mapping requires ~1.5 * (W * H) values.
     // Score range: [-W*H/2, W*H/2]
@@ -51,15 +51,15 @@ constexpr int getRequiredValueBits() {
     return 8;
 }
 
-template <int WIDTH, int HEIGHT>
+template <int WIDTH, int HEIGHT, int ALIGN = 4, bool WRAP = false>
 class Solver {
  public:
   Solver() = default;
   virtual ~Solver() = default;
   static const int INVALID_MOVE = -1000;
 
-  virtual ::GameSolver::Connect4::SolverResult solve(const GenericPosition<WIDTH, HEIGHT> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) = 0;
-  virtual std::vector<int> analyze(const GenericPosition<WIDTH, HEIGHT> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) = 0;
+  virtual ::GameSolver::Connect4::SolverResult solve(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) = 0;
+  virtual std::vector<int> analyze(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) = 0;
   virtual unsigned long long getNodeCount() const = 0;
   virtual void reset() = 0;
   virtual void stop() = 0;
@@ -70,18 +70,18 @@ class Solver {
   virtual void setTimeout(double end_time_ms) = 0;
 
   static std::unique_ptr<::GameSolver::Connect4::Cache> createCache(size_t table_bytes, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT);
-  static std::unique_ptr<Solver<WIDTH, HEIGHT>> createWithCache(::GameSolver::Connect4::Cache* cache, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT);
-  static std::unique_ptr<Solver<WIDTH, HEIGHT>> create(size_t table_bytes);
+  static std::unique_ptr<Solver<WIDTH, HEIGHT, ALIGN, WRAP>> createWithCache(::GameSolver::Connect4::Cache* cache, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT);
+  static std::unique_ptr<Solver<WIDTH, HEIGHT, ALIGN, WRAP>> create(size_t table_bytes);
 };
 
 
 
-template <int WIDTH, int HEIGHT, typename SlotType>
-class SolverImpl : public Solver<WIDTH, HEIGHT> {
+template <int WIDTH, int HEIGHT, int ALIGN = 4, bool WRAP = false, typename SlotType = uint64_t>
+class SolverImpl : public Solver<WIDTH, HEIGHT, ALIGN, WRAP> {
  public:
-  static constexpr int VALUE_BITS = WIDTH == -1 ? 8 : getRequiredValueBits<WIDTH, HEIGHT>();
+  static constexpr int VALUE_BITS = WIDTH == -1 ? 8 : getRequiredValueBits<WIDTH, HEIGHT, ALIGN, WRAP>();
   static constexpr int MOVE_BITS = WIDTH == -1 ? 4 : (WIDTH >= 16 ? 5 : (WIDTH >= 8 ? 4 : 3));
-  using position_t = typename GenericPosition<WIDTH, HEIGHT>::position_t;
+  using position_t = typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t;
   std::shared_ptr<TranspositionTable<SlotType, uint8_t, VALUE_BITS, 7, 0, MOVE_BITS, position_t>> transTable;
   std::atomic<unsigned long long> nodeCount;
   std::atomic<bool> isSearching{false};
@@ -127,7 +127,7 @@ class SolverImpl : public Solver<WIDTH, HEIGHT> {
   }
 
   template <bool HasBook, int W_CONST = WIDTH, int H_CONST = HEIGHT>
-  int negamax(const GenericPosition<WIDTH, HEIGHT> &P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
+  int negamax(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
 
  public:
 
@@ -141,15 +141,15 @@ class SolverImpl : public Solver<WIDTH, HEIGHT> {
     init_tables(w, h);
   }
 
-  ::GameSolver::Connect4::SolverResult solve(const GenericPosition<WIDTH, HEIGHT> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) override;
-  std::vector<int> analyze(const GenericPosition<WIDTH, HEIGHT> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) override;
+  ::GameSolver::Connect4::SolverResult solve(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) override;
+  std::vector<int> analyze(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak = false, int threads = 1, const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr, double timeout_ms = 0) override;
 
  private:
   template <bool HasBook>
-  ::GameSolver::Connect4::SolverResult solve_single(const GenericPosition<WIDTH, HEIGHT> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
+  ::GameSolver::Connect4::SolverResult solve_single(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
 
   template <bool HasBook>
-  int dispatch_solve_weak(const GenericPosition<WIDTH, HEIGHT>& P, int min, int max, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history);
+  int dispatch_solve_weak(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int min, int max, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history);
 
  public:
 
