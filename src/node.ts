@@ -219,7 +219,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
   }
 
   constructor(opts?: NodeConnect4SolverOptions | number, heightOpt?: number) {
-    super(opts as NodeConnect4SolverOptions, heightOpt);
+    super(opts, heightOpt);
     if (
       opts &&
       typeof opts === "object" &&

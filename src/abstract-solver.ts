@@ -23,7 +23,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   protected _cachePtr = 0;
 
   constructor(opts?: Connect4SolverOptions | number, heightOpt?: number) {
-    super(opts as Connect4SolverOptions, heightOpt);
+    super(opts, heightOpt);
     let cacheSizeMb = 128;
     let heuristic = false;
 
