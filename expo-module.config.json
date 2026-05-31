@@ -1,0 +1,13 @@
+{
+  "name": "Connect4Solver",
+  "ios": {
+    "modules": [
+      "Connect4SolverModule"
+    ]
+  },
+  "android": {
+    "modules": [
+      "expo.modules.connect4solver.Connect4SolverModule"
+    ]
+  }
+}

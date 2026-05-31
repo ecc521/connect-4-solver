@@ -13,15 +13,15 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => "11.0", :tvos => "12.0" }
   s.source       = { :git => "https://github.com/ecc521/connect4.git", :tag => "#{s.version}" }
 
-  s.source_files = "ios/**/*.{h,m,mm,cpp}", "native/**/*.{h,hpp,cpp}"
+  s.source_files = "ios/**/*.{h,m,mm,cpp}", "native/**/*.{h,hpp}"
   
-  # Exclude the Emscripten/WASM bindings entirely from the iOS compiled framework
-  s.exclude_files = "native/analyze.cpp"
+  # Exclude the Emscripten/WASM bindings and test files entirely from the iOS compiled framework
+  s.exclude_files = "native/analyze.cpp", "native/node_binding.cpp", "native/tt_slam_test.cpp"
 
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",
     "CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES" => "YES"
   }
 
-  s.dependency "React-Core"
+  s.dependency "ExpoModulesCore"
 end

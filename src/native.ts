@@ -126,7 +126,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
   private _cacheSizeMb: number;
   private _cachePtrStr = "0";
   private _solverPtrStr = "0";
-  private _nativeModule: NativeSolverType;
+  private _nativeModule!: NativeSolverType;
 
   constructor(
     widthOrOpts?: number | Connect4SolverOptions,
@@ -145,20 +145,41 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const rn = require("react-native") as {
-        NativeModules: { Connect4Solver?: NativeSolverType };
-      };
-      if (!rn.NativeModules.Connect4Solver) throw new Error();
-      this._nativeModule = rn.NativeModules.Connect4Solver;
+      const expoCore = require("expo-modules-core");
+      if (expoCore && expoCore.requireNativeModule) {
+        this._nativeModule = expoCore.requireNativeModule("Connect4Solver");
+      }
     } catch {
-      throw new Error(
-        "NativeModules.Connect4Solver is completely missing from the bridge. Ensure the native libraries were properly bundled.",
-      );
+      // Ignore constructor errors, we'll try again during async init
     }
   }
 
-  init(): Promise<void> {
-    if (this.initialized) return Promise.resolve();
+  async init(): Promise<void> {
+    if (this.initialized) return;
+
+    if (!this._nativeModule) {
+      let retries = 5;
+      while (retries > 0) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const expoCore = require("expo-modules-core");
+          if (expoCore && expoCore.requireNativeModule) {
+            this._nativeModule = expoCore.requireNativeModule("Connect4Solver");
+            break;
+          }
+        } catch {
+          // Ignore and wait
+        }
+        retries--;
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+
+    if (!this._nativeModule) {
+      throw new Error(
+        "Expo module Connect4Solver is missing. Ensure the native libraries were properly bundled and you have run prebuild.",
+      );
+    }
 
     // OOM retry: native.createCache returns "0" if allocation fails. Halve the request until it succeeds.
     let sizeMb = this._cacheSizeMb;
@@ -189,7 +210,6 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       this.wrap,
     );
     this.initialized = true;
-    return Promise.resolve();
   }
 
   loadBook(data: Uint8Array): Promise<void> {
@@ -289,6 +309,9 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       this.sanitizeOpts(opts);
 
     const isHeuristic = opts?.heuristic ?? this._isHeuristic;
+    if (isHeuristic !== this._isHeuristic) {
+      throw new Error(`Cannot run ${isHeuristic ? 'heuristic' : 'perfect'} analysis on a solver initialized as ${this._isHeuristic ? 'heuristic' : 'perfect'}. The native engine requires separate instances.`);
+    }
 
     return this.runTask(async () => {
       let nativeResArr: number[];
@@ -405,6 +428,9 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       this.sanitizeOpts(opts);
 
     const isHeuristic = opts?.heuristic ?? this._isHeuristic;
+    if (isHeuristic !== this._isHeuristic) {
+      throw new Error(`Cannot run ${isHeuristic ? 'heuristic' : 'perfect'} solve on a solver initialized as ${this._isHeuristic ? 'heuristic' : 'perfect'}. The native engine requires separate instances.`);
+    }
 
     return this.runTask(async () => {
       let nativeResArr: number[];

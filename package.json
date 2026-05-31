@@ -106,5 +106,8 @@
   "dependencies": {
     "bindings": "^1.5.0",
     "node-addon-api": "^8.7.0"
+  },
+  "peerDependencies": {
+    "expo-modules-core": "*"
   }
 }
