@@ -2,8 +2,8 @@
 #include <vector>
 #include <string>
 #include <sstream>
-#include "../../native/dispatch_table.hpp"
-#include "../../native/embedded_books.hpp"
+#include "../native/dispatch_table.hpp"
+#include "../native/embedded_books.hpp"
 
 // Pointer conversion helpers
 template <typename T>
