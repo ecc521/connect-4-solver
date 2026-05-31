@@ -18,8 +18,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from train_nnue import NNUE, ExactDataset
 
 
-def load_model(path, width, height, device):
-    model = NNUE(width, height).to(device)
+def load_model(path, width, height, hidden1, hidden2, device):
+    model = NNUE(width, height, hidden1=hidden1, hidden2=hidden2).to(device)
     model.load_state_dict(torch.load(path, map_location=device))
     model.eval()
     return model
@@ -32,9 +32,9 @@ def evaluate(model, loader, device, max_score):
     losses_correct = losses_total = 0
     draws_correct = draws_total = 0
 
-    # Normalized targets: draw=0.0, smallest win=+1/32=0.03125, smallest loss=-0.03125
-    # Threshold: half of 1/32 = 0.016
-    THRESH = 1.0 / (2 * 32)
+    # Normalized targets: draw=0.0, smallest win = +1/max_score, smallest loss = -1/max_score
+    # Threshold: half of 1/max_score
+    THRESH = 1.0 / (2 * max_score)
 
     with torch.no_grad():
         for feats, targets, _weights in loader:
@@ -75,17 +75,20 @@ def main():
                         help="Comma-separated .bin files")
     parser.add_argument("--width",  type=int, default=8)
     parser.add_argument("--height", type=int, default=8)
+    parser.add_argument("--hidden1", type=int, default=256, help="H1 hidden layer size")
+    parser.add_argument("--hidden2", type=int, default=32,  help="H2 hidden layer size")
     args = parser.parse_args()
 
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else
+                          "mps"  if torch.backends.mps.is_available() else "cpu")
     print(f"Device: {device}")
 
     files = [f.strip() for f in args.data.split(",")]
     dataset = ExactDataset(files, args.width, args.height)
     loader  = DataLoader(dataset, batch_size=4096, shuffle=False, num_workers=2)
 
-    max_score = (args.width * args.height) // 2
-    model = load_model(args.model, args.width, args.height, device)
+    max_score = (args.width * args.height + 1) // 2
+    model = load_model(args.model, args.width, args.height, args.hidden1, args.hidden2, device)
 
     print(f"\nModel: {args.model}")
     evaluate(model, loader, device, max_score)

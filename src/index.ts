@@ -19,10 +19,7 @@ export async function createSolver(
   opts?: Connect4SolverOptions,
 ): Promise<BaseConnect4Solver> {
   // 1. Check for React Native
-  if (
-    typeof navigator !== "undefined" &&
-    navigator.product === "ReactNative"
-  ) {
+  if (typeof navigator !== "undefined" && navigator.product === "ReactNative") {
     const { ReactNativeConnect4Solver } = await import("./native.js");
     return new ReactNativeConnect4Solver(opts);
   }

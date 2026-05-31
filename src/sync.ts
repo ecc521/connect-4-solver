@@ -12,9 +12,11 @@ let NoSABModule: SolverModule | null = null;
 let _noSABInitPromise: Promise<void> | null = null;
 
 export function getNoSABModuleInitPromise(): Promise<void> {
-  _noSABInitPromise ??= (createModule as unknown as CreateModule)().then((mod: SolverModule) => {
-    NoSABModule = mod;
-  });
+  _noSABInitPromise ??= (createModule as unknown as CreateModule)().then(
+    (mod: SolverModule) => {
+      NoSABModule = mod;
+    },
+  );
   return _noSABInitPromise;
 }
 
