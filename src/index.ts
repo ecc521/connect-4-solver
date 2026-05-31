@@ -18,13 +18,22 @@ import { Connect4SolverOptions, BaseConnect4Solver } from "./core.js";
 export async function createSolver(
   opts?: Connect4SolverOptions,
 ): Promise<BaseConnect4Solver> {
-  // 1. Check for Node.js Native
+  // 1. Check for React Native
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.product === "ReactNative"
+  ) {
+    const { ReactNativeConnect4Solver } = await import("./native.js");
+    return new ReactNativeConnect4Solver(opts);
+  }
+
+  // 2. Check for Node.js Native
   if (typeof process !== "undefined" && process?.versions?.node) {
     const { NodeConnect4Solver } = await import("./node.js");
     return new NodeConnect4Solver(opts);
   }
 
-  // 2. Check for Browser Threading (COOP/COEP)
+  // 3. Check for Browser Threading (COOP/COEP)
   // SharedArrayBuffer might be available or crossOriginIsolated might be true.
   if (
     typeof self !== "undefined" &&
@@ -36,7 +45,7 @@ export async function createSolver(
     return new SyncWasmConnect4Solver(opts);
   }
 
-  // 3. Fallback to Single-Threaded WASM
+  // 4. Fallback to Single-Threaded WASM
   const { SyncWasmNoSABConnect4Solver } = await import("./sync.js");
   return new SyncWasmNoSABConnect4Solver(opts);
 }

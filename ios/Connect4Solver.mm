@@ -20,7 +20,9 @@ NSString* ptrToString(T* ptr) {
 
 template <typename T>
 T* stringToPtr(NSString* str) {
+    if (!str || [str isEqual:[NSNull null]]) return nullptr;
     const char *chars = [str UTF8String];
+    if (!chars) return nullptr;
     uintptr_t addr = 0;
     std::istringstream iss(chars);
     iss >> addr;

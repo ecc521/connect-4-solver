@@ -4,20 +4,15 @@ import { AbstractSyncSolver } from "./abstract-solver.js";
 // @ts-ignore
 import createModule from "../build/analyze.js";
 
-type CreateModule = (options: {
-  locateFile: (path: string) => string;
+type CreateModule = (options?: {
+  locateFile?: (path: string) => string;
 }) => Promise<SolverModule>;
-
-const wasmUrl = new URL("../build/analyze.wasm", import.meta.url);
 
 let NoSABModule: SolverModule | null = null;
 let _noSABInitPromise: Promise<void> | null = null;
 
 export function getNoSABModuleInitPromise(): Promise<void> {
-  _noSABInitPromise ??= (createModule as unknown as CreateModule)({
-    locateFile: (path: string) =>
-      path.endsWith(".wasm") ? wasmUrl.href : path,
-  }).then((mod: SolverModule) => {
+  _noSABInitPromise ??= (createModule as unknown as CreateModule)().then((mod: SolverModule) => {
     NoSABModule = mod;
   });
   return _noSABInitPromise;

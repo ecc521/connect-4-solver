@@ -88,7 +88,7 @@ int32_t* runSolve(Solver<W, H, ALIGN, WRAP>& solver, const char* positionCharArr
   return result;
 }
 
-template <int W, int H>
+template <int W, int H, int ALIGN = 4, bool WRAP = false>
 void* runCreateBook(const uint8_t* data, size_t size) {
   return OpeningBookBase<W, H>::load_from_memory(data, size, W, H).release();
 }
@@ -251,6 +251,7 @@ int32_t* solveExact(int w, int h, void* solver, const char* position, bool weak,
 
 EMSCRIPTEN_KEEPALIVE
 int32_t* solveHeuristic(int w, int h, void* solver, const char* position, int max_depth, int threads, double timeout_ms, void* book_ptr) {
+    int align = 4; bool wrap = false;
     DISPATCH_HEURISTIC(runSolveHeuristic, position, max_depth, threads, book_ptr, timeout_ms);
 }
 
