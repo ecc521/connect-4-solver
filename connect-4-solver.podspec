@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
   s.source_files = "ios/**/*.{h,m,mm,cpp}", "native/**/*.{h,hpp}"
   
   # Exclude the Emscripten/WASM bindings and test files entirely from the iOS compiled framework
-  s.exclude_files = "native/analyze.cpp", "native/node_binding.cpp", "native/tt_slam_test.cpp"
+  s.exclude_files = "native/analyze.cpp", "native/node_binding.cpp"
 
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",
