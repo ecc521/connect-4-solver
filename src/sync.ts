@@ -80,7 +80,7 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     return this.runTask(() => {
       const mod = getNoSABModule();
       const resArr = this.executeWasmAnalyze(mod, positionStr, opts);
-      return this.parseResArr(resArr, positionStr, opts?.heuristic);
+      return this.parseResArr(resArr, positionStr);
     });
   }
 
@@ -144,7 +144,7 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     return this.runTask(() => {
       const mod = getNoSABModule();
       const resArr = this.executeWasmSolve(mod, positionStr, opts);
-      return this.parseSolveResArr(resArr, positionStr, opts?.heuristic);
+      return this.parseSolveResArr(resArr, positionStr);
     });
   }
 

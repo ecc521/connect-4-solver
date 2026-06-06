@@ -91,7 +91,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     return this.runTask(() => {
       const mod = getThreadedModule();
       const resArr = this.executeWasmAnalyze(mod, positionStr, opts);
-      return this.parseResArr(resArr, positionStr, opts?.heuristic);
+      return this.parseResArr(resArr, positionStr);
     });
   }
 
@@ -103,7 +103,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     return this.runTask(() => {
       const mod = getThreadedModule();
       const resArr = this.executeWasmSolve(mod, positionStr, opts);
-      return this.parseSolveResArr(resArr, positionStr, opts?.heuristic);
+      return this.parseSolveResArr(resArr, positionStr);
     });
   }
 

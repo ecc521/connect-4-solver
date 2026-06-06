@@ -44,7 +44,6 @@ export interface AnalyzeOptions {
   maxDepth?: number;
   timeoutMs?: number;
   book?: { ptr: number };
-  heuristic?: boolean;
   weak?: boolean;
 }
 
@@ -195,6 +194,8 @@ export abstract class BaseConnect4Solver {
   public wrap: boolean;
   /** The cache size actually allocated after init(). May be less than requested if memory is tight. */
   public allocatedCacheSizeMb = 0;
+  /** True if this solver uses a heuristic evaluation engine, false for perfect minimax. */
+  public readonly isHeuristic: boolean;
   protected initialized = false;
   protected _bookPtr: number | string | object = 0;
 
@@ -244,6 +245,16 @@ export abstract class BaseConnect4Solver {
     this.height = height;
     this.align = align;
     this.wrap = wrap;
+
+    let heuristic = false;
+    if (
+      widthOrOpts &&
+      typeof widthOrOpts === "object" &&
+      widthOrOpts.heuristic !== undefined
+    ) {
+      heuristic = widthOrOpts.heuristic;
+    }
+    this.isHeuristic = heuristic;
   }
 
   /**

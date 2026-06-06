@@ -65,21 +65,11 @@ export function setupWorkerHandler(): void {
         self.postMessage({ id, success: true });
       } else if (type === "analyze") {
         if (!solver) throw new Error("Solver not initialized");
-        const originalHeuristic = solver.isHeuristic;
-        if (payload.opts.heuristic !== undefined) {
-          solver.isHeuristic = payload.opts.heuristic;
-        }
         const result = await solver.analyze(payload.position, payload.opts);
-        solver.isHeuristic = originalHeuristic;
         self.postMessage({ id, success: true, result });
       } else if (type === "solve") {
         if (!solver) throw new Error("Solver not initialized");
-        const originalHeuristic = solver.isHeuristic;
-        if (payload.opts.heuristic !== undefined) {
-          solver.isHeuristic = payload.opts.heuristic;
-        }
         const result = await solver.solve(payload.position, payload.opts);
-        solver.isHeuristic = originalHeuristic;
         self.postMessage({ id, success: true, result });
       } else if (type === "stop") {
         if (solver) await solver.stop();
@@ -127,21 +117,11 @@ export function setupNoSABWorkerHandler(): void {
         self.postMessage({ id, success: true });
       } else if (type === "analyze") {
         if (!solver) throw new Error("Solver not initialized");
-        const originalHeuristic = solver.isHeuristic;
-        if (payload.opts.heuristic !== undefined) {
-          solver.isHeuristic = payload.opts.heuristic;
-        }
         const result = await solver.analyze(payload.position, payload.opts);
-        solver.isHeuristic = originalHeuristic;
         self.postMessage({ id, success: true, result });
       } else if (type === "solve") {
         if (!solver) throw new Error("Solver not initialized");
-        const originalHeuristic = solver.isHeuristic;
-        if (payload.opts.heuristic !== undefined) {
-          solver.isHeuristic = payload.opts.heuristic;
-        }
         const result = await solver.solve(payload.position, payload.opts);
-        solver.isHeuristic = originalHeuristic;
         self.postMessage({ id, success: true, result });
       } else if (type === "stop") {
         if (solver) await solver.stop();

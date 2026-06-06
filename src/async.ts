@@ -44,11 +44,9 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
     this.setupWorkerListener();
 
     let cacheSizeMb = 128;
-    let heuristic = false;
 
     if (opts && typeof opts === "object") {
       if (opts.cacheSizeMb !== undefined) cacheSizeMb = opts.cacheSizeMb;
-      if (opts.heuristic !== undefined) heuristic = opts.heuristic;
     }
 
     this.allocatedCacheSizeMb = cacheSizeMb; // updated after init resolves
@@ -56,7 +54,7 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
       width: this.width,
       height: this.height,
       cacheSizeMb,
-      heuristic,
+      heuristic: this.isHeuristic,
     };
 
     this.initPromise = this.sendMessage(
@@ -184,7 +182,7 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
           currentPlayer,
           evaluation: null,
           moveOptions: [],
-          isHeuristic: this.initPayload.heuristic,
+          isHeuristic: this.isHeuristic,
           aborted: true,
         } satisfies PositionAnalysis);
       } else {

@@ -122,7 +122,6 @@ function encodeBase64(data: Uint8Array): string {
 }
 
 export class ReactNativeConnect4Solver extends BaseConnect4Solver {
-  private _isHeuristic: boolean;
   private _cacheSizeMb: number;
   private _cachePtrStr = "0";
   private _solverPtrStr = "0";
@@ -133,20 +132,21 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     heightOpt?: number,
   ) {
     super(widthOrOpts, heightOpt);
-    this._isHeuristic = false;
     this._cacheSizeMb = 32;
 
     if (widthOrOpts && typeof widthOrOpts === "object") {
-      if (widthOrOpts.heuristic !== undefined)
-        this._isHeuristic = widthOrOpts.heuristic;
       if (widthOrOpts.cacheSizeMb !== undefined)
         this._cacheSizeMb = widthOrOpts.cacheSizeMb;
     }
 
+    this.allocatedCacheSizeMb = this._cacheSizeMb;
+
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
       const expoCore = require("expo-modules-core");
-      if (expoCore && expoCore.requireNativeModule) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      if (expoCore?.requireNativeModule) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         this._nativeModule = expoCore.requireNativeModule("Connect4Solver");
       }
     } catch {
@@ -161,9 +161,11 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       let retries = 5;
       while (retries > 0) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
           const expoCore = require("expo-modules-core");
-          if (expoCore && expoCore.requireNativeModule) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          if (expoCore?.requireNativeModule) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
             this._nativeModule = expoCore.requireNativeModule("Connect4Solver");
             break;
           }
@@ -189,7 +191,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         this.width,
         this.height,
         sizeMb * 1024 * 1024,
-        this._isHeuristic,
+        this.isHeuristic,
         this.align,
         this.wrap,
       );
@@ -205,7 +207,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       this.width,
       this.height,
       this._cachePtrStr,
-      this._isHeuristic,
+      this.isHeuristic,
       this.align,
       this.wrap,
     );
@@ -247,7 +249,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     const movesRemaining = this.width * this.height - nbMoves;
     const halfMovesRemaining = Math.ceil(movesRemaining / 2);
 
-    const isHeuristic = isHeuristicOverride ?? this._isHeuristic;
+    const isHeuristic = isHeuristicOverride ?? this.isHeuristic;
 
     if (isHeuristic) {
       if (score >= 31000) {
@@ -308,14 +310,9 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     const { threads, maxDepth, timeoutMs, bookPtr, weak } =
       this.sanitizeOpts(opts);
 
-    const isHeuristic = opts?.heuristic ?? this._isHeuristic;
-    if (isHeuristic !== this._isHeuristic) {
-      throw new Error(`Cannot run ${isHeuristic ? 'heuristic' : 'perfect'} analysis on a solver initialized as ${this._isHeuristic ? 'heuristic' : 'perfect'}. The native engine requires separate instances.`);
-    }
-
     return this.runTask(async () => {
       let nativeResArr: number[];
-      if (isHeuristic) {
+      if (this.isHeuristic) {
         nativeResArr = await this._nativeModule.analyzeHeuristic(
           this._solverPtrStr,
           positionStr,
@@ -369,7 +366,9 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           if (n === -1000) {
             moveOptions.push(null);
           } else {
-            moveOptions.push(this.createEvaluation(n, nbMoves, isHeuristic));
+            moveOptions.push(
+              this.createEvaluation(n, nbMoves, this.isHeuristic),
+            );
           }
         }
 
@@ -399,7 +398,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         }
       }
 
-      if (aborted && !isHeuristic) {
+      if (aborted && !this.isHeuristic) {
         evaluation = null;
         moveOptions.length = 0;
       }
@@ -413,7 +412,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         bestMove,
         nodes,
         depthReached,
-        isHeuristic: isHeuristic,
+        isHeuristic: this.isHeuristic,
         aborted,
       };
     });
@@ -427,14 +426,9 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     const { threads, maxDepth, timeoutMs, bookPtr, weak } =
       this.sanitizeOpts(opts);
 
-    const isHeuristic = opts?.heuristic ?? this._isHeuristic;
-    if (isHeuristic !== this._isHeuristic) {
-      throw new Error(`Cannot run ${isHeuristic ? 'heuristic' : 'perfect'} solve on a solver initialized as ${this._isHeuristic ? 'heuristic' : 'perfect'}. The native engine requires separate instances.`);
-    }
-
     return this.runTask(async () => {
       let nativeResArr: number[];
-      if (isHeuristic) {
+      if (this.isHeuristic) {
         nativeResArr = await this._nativeModule.solveHeuristic(
           this._solverPtrStr,
           positionStr,
@@ -485,7 +479,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
             score: Math.floor((this.width * this.height + 1 - nbMoves) / 2),
           },
           moveOptions: [],
-          isHeuristic: isHeuristic,
+          isHeuristic: this.isHeuristic,
         };
       }
 
@@ -497,7 +491,9 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       const aborted = nativeResArr[7] === 1;
 
       const evaluation =
-        aborted && !isHeuristic ? null : this.createEvaluation(score, nbMoves);
+        aborted && !this.isHeuristic
+          ? null
+          : this.createEvaluation(score, nbMoves);
 
       return {
         position: currentPosition,
@@ -509,7 +505,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         nodes,
         bestMove,
         aborted,
-        isHeuristic: isHeuristic,
+        isHeuristic: this.isHeuristic,
       };
     });
   }
@@ -524,7 +520,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         this._solverPtrStr,
         this.width,
         this.height,
-        this._isHeuristic,
+        this.isHeuristic,
         this.align,
         this.wrap,
       );
@@ -543,7 +539,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         this._solverPtrStr,
         this.width,
         this.height,
-        this._isHeuristic,
+        this.isHeuristic,
         this.align,
         this.wrap,
       );

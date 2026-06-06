@@ -49,9 +49,21 @@ describe("ReactNativeConnect4Solver Bridge Tests", () => {
       },
     };
 
+    const expoCoreMock = {
+      requireNativeModule: jest.fn((moduleName: string) => {
+        if (moduleName === "Connect4Solver") {
+          return rnMock.NativeModules.Connect4Solver;
+        }
+        return null;
+      }),
+    };
+
     (global as any).require = (moduleName: string) => {
       if (moduleName === "react-native") {
         return rnMock;
+      }
+      if (moduleName === "expo-modules-core") {
+        return expoCoreMock;
       }
       throw new Error(`Cannot find module '${moduleName}'`);
     };

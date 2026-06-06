@@ -16,7 +16,6 @@ export const UNPLAYABLE_COLUMN_SCORE = -1000;
 export const INT32_SIZE = 4;
 
 export abstract class AbstractSyncSolver extends BaseConnect4Solver {
-  public isHeuristic: boolean;
   protected cacheSizeMb: number;
 
   protected _solverPtr = 0;
@@ -25,11 +24,9 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   constructor(opts?: Connect4SolverOptions | number, heightOpt?: number) {
     super(opts, heightOpt);
     let cacheSizeMb = 128;
-    let heuristic = false;
 
     if (opts && typeof opts === "object") {
       if (opts.cacheSizeMb !== undefined) cacheSizeMb = opts.cacheSizeMb;
-      if (opts.heuristic !== undefined) heuristic = opts.heuristic;
     }
 
     if (cacheSizeMb < 8) {
@@ -40,7 +37,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
 
     this.cacheSizeMb = cacheSizeMb;
     this.allocatedCacheSizeMb = cacheSizeMb; // updated in init() after actual allocation
-    this.isHeuristic = heuristic;
   }
 
   protected getPlayerAt(nbMoves: number): Player {
@@ -51,7 +47,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     score: number,
     nbMoves: number,
     depthReached: number,
-    isHeuristicOverride?: boolean,
   ): Evaluation {
     const isPlayer1Turn = nbMoves % 2 === 0;
     const currentPlayer = isPlayer1Turn ? Player.P1 : Player.P2;
@@ -59,7 +54,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     const movesRemaining = this.width * this.height - nbMoves;
     const halfMovesRemaining = Math.ceil(movesRemaining / 2);
 
-    const isHeuristic = isHeuristicOverride ?? this.isHeuristic;
+    const isHeuristic = this.isHeuristic;
 
     if (isHeuristic) {
       if (score >= SCORE_FORCED_WIN_BASE) {
@@ -121,7 +116,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   protected parseResArr(
     resArr: Int32Array | number[],
     positionStr: string,
-    isHeuristicOverride?: boolean,
   ): PositionAnalysis {
     const originalPosition = positionStr;
     const status = resArr[0];
@@ -132,7 +126,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     const moveOptions: (Evaluation | null)[] = [];
 
     const depthReached = resArr[2 + this.width];
-    const isHeuristic = isHeuristicOverride ?? this.isHeuristic;
+    const isHeuristic = this.isHeuristic;
 
     // The heuristic engine uses -1000000 for unplayable columns.
     // However, some versions might return UNPLAYABLE_COLUMN_SCORE (-1000) as well.
@@ -156,10 +150,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       for (let i = 0; i < this.width; i++) {
         const n = resArr[2 + i];
         if (isUnplayable(n)) moveOptions.push(null);
-        else
-          moveOptions.push(
-            this.createEvaluation(n, nbMoves, depthReached, isHeuristic),
-          );
+        else moveOptions.push(this.createEvaluation(n, nbMoves, depthReached));
       }
 
       let bestEval: Evaluation | null = null;
@@ -209,7 +200,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
   protected parseSolveResArr(
     resArr: Int32Array | number[],
     positionStr: string,
-    isHeuristicOverride?: boolean,
   ): PositionAnalysis {
     const originalPosition = positionStr;
     const status = resArr[0];
@@ -245,15 +235,10 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       };
     } else {
       const score = resArr[2];
-      evaluation = this.createEvaluation(
-        score,
-        nbMoves,
-        depthReached,
-        isHeuristicOverride ?? this.isHeuristic,
-      );
+      evaluation = this.createEvaluation(score, nbMoves, depthReached);
     }
 
-    const isHeuristic = isHeuristicOverride ?? this.isHeuristic;
+    const isHeuristic = this.isHeuristic;
 
     if (aborted && !isHeuristic) {
       evaluation = null;
@@ -266,7 +251,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       evaluation,
       moveOptions: [],
       depthReached,
-      isHeuristic: isHeuristicOverride ?? this.isHeuristic,
+      isHeuristic: this.isHeuristic,
       bestMove,
       nodes,
       aborted,
@@ -281,7 +266,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
     const weak = opts?.weak ?? false;
 
-    const isHeuristic = opts?.heuristic ?? this.isHeuristic;
+    const isHeuristic = this.isHeuristic;
 
     const allocatedMemory = mod.stringToNewUTF8(positionStr);
     let outputPointer: number;
@@ -328,7 +313,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     const { threads, maxDepth, timeoutMs, bookPtr, weak } =
       this.sanitizeOpts(opts);
 
-    const isHeuristic = opts?.heuristic ?? this.isHeuristic;
+    const isHeuristic = this.isHeuristic;
 
     const allocatedMemory = mod.stringToNewUTF8(positionStr);
     let outputPointer: number;
