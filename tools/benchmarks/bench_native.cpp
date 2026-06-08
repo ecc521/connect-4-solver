@@ -65,6 +65,8 @@ std::vector<BenchPos> load_positions(const std::string &path) {
         pos = "";
       }
     }
+    if (score >= 31000) score -= 31000;
+    else if (score <= -31000) score += 31000;
     positions.push_back({pos, score});
   }
   return positions;
@@ -551,8 +553,10 @@ int main(int argc, char* argv[]) {
       } else {
         run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, true, budget_ms, timeout_ms);
         run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, true, budget_ms, timeout_ms);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 18, true, budget_ms, timeout_ms);
         run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 1, false, budget_ms, timeout_ms, &dummy);
         run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 4, false, budget_ms, timeout_ms, &dummy);
+        run_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(solve_hard, 18, false, budget_ms, timeout_ms, &dummy);
       }
     }
   }
@@ -561,6 +565,7 @@ int main(int argc, char* argv[]) {
     if (exact_subset.size() >= 2) {
       run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 1, budget_ms, timeout_ms);
       run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 4, budget_ms, timeout_ms);
+      run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 18, budget_ms, timeout_ms);
     }
   }
 
@@ -568,6 +573,7 @@ int main(int argc, char* argv[]) {
     if (!heuristic_subset.empty()) {
       run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 1, budget_ms, timeout_ms);
       run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 4, budget_ms, timeout_ms);
+      run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 18, budget_ms, timeout_ms);
     }
   }
 
@@ -575,6 +581,7 @@ int main(int argc, char* argv[]) {
     if (!heuristic_subset.empty()) {
       run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 1, budget_ms, timeout_ms);
       run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 4, budget_ms, timeout_ms);
+      run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 18, budget_ms, timeout_ms);
     }
   }
 
