@@ -154,12 +154,18 @@ class TranspositionTable {
     
     // --- SCENARIO 1: Match in Slot 0 ---
     if ((first >> (ValueBits + WorkBits + MoveBits + FlagBits)) == partial_key) {
-        // READ-BEFORE-WRITE FILTER:
-        if (first == new_data) return;
+        while (true) {
+            // READ-BEFORE-WRITE FILTER:
+            if (first == new_data) return;
 
-        // THE LOCKLESS BAIL:
-        Data[b].slots[0].data.compare_exchange_weak(first, new_data, std::memory_order_release, std::memory_order_relaxed);
-        return;
+            if (Data[b].slots[0].data.compare_exchange_weak(first, new_data, std::memory_order_release, std::memory_order_relaxed)) {
+                return;
+            }
+            // If failed, check if the partial key changed (meaning another thread replaced it)
+            if ((first >> (ValueBits + WorkBits + MoveBits + FlagBits)) != partial_key) {
+                break; // Fall through to Scenario 2/3
+            }
+        }
     }
     
     uint8_t first_work = static_cast<uint8_t>((first >> ValueBits) & work_mask);
