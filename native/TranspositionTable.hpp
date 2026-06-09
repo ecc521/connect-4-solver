@@ -154,10 +154,10 @@ class TranspositionTable {
     
     // --- SCENARIO 1: Match in Slot 0 ---
     if ((first >> (ValueBits + WorkBits + MoveBits + FlagBits)) == partial_key) {
-        // READ-BEFORE-WRITE FILTER:
+        // Fast-path: Avoid atomic write if the exact data is already stored
         if (first == new_data) return;
 
-        // THE LOCKLESS BAIL:
+        // Lockless bound update: If contention occurs, drop the update (saves spinlock overhead)
         Data[b].slots[0].data.compare_exchange_weak(first, new_data, std::memory_order_release, std::memory_order_relaxed);
         return;
     }
@@ -167,11 +167,13 @@ class TranspositionTable {
     
     // --- SCENARIO 2: Match in Slot 1 ---
     if ((second >> (ValueBits + WorkBits + MoveBits + FlagBits)) == partial_key) {
-        if (second == new_data) return; // Fabric saver
+        // Fast-path: Avoid atomic write if the exact data is already stored
+        if (second == new_data) return;
 
         while (true) {
             if (work >= first_work) {
-                // FIXING THE SHIFT RACE CONDITION:
+                // Promote new node to slots[0] and demote the old deep node to slots[1]. 
+                // Spin if slots[0] is modified during the swap.
                 if (Data[b].slots[0].data.compare_exchange_weak(first, new_data, std::memory_order_release, std::memory_order_relaxed)) {
                     Data[b].slots[1].data.compare_exchange_weak(second, first, std::memory_order_release, std::memory_order_relaxed);
                     break;
@@ -189,7 +191,8 @@ class TranspositionTable {
     // --- SCENARIO 3: No match found - TwoBig Replacement ---
     while (true) {
         if (first == 0 || work >= first_work) {
-            // Same protected shift logic
+            // Promote new node to slots[0] and demote the old deep node to slots[1]. 
+            // Spin if slots[0] is modified during the swap.
             if (Data[b].slots[0].data.compare_exchange_weak(first, new_data, std::memory_order_release, std::memory_order_relaxed)) {
                 if (first != 0) {
                     Data[b].slots[1].data.compare_exchange_weak(second, first, std::memory_order_release, std::memory_order_relaxed);
