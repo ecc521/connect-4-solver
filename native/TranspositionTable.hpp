@@ -169,27 +169,39 @@ class TranspositionTable {
     if ((second >> (ValueBits + WorkBits + MoveBits + FlagBits)) == partial_key) {
         if (second == new_data) return; // Fabric saver
 
-        if (work >= first_work) {
-            // FIXING THE SHIFT RACE CONDITION:
-            if (Data[b].slots[0].data.compare_exchange_weak(first, new_data, std::memory_order_release, std::memory_order_relaxed)) {
-                Data[b].slots[1].data.compare_exchange_weak(second, first, std::memory_order_release, std::memory_order_relaxed);
+        while (true) {
+            if (work >= first_work) {
+                // FIXING THE SHIFT RACE CONDITION:
+                if (Data[b].slots[0].data.compare_exchange_weak(first, new_data, std::memory_order_release, std::memory_order_relaxed)) {
+                    Data[b].slots[1].data.compare_exchange_weak(second, first, std::memory_order_release, std::memory_order_relaxed);
+                    break;
+                } else {
+                    first_work = static_cast<uint8_t>((first >> ValueBits) & work_mask);
+                }
+            } else {
+                Data[b].slots[1].data.compare_exchange_weak(second, new_data, std::memory_order_release, std::memory_order_relaxed);
+                break;
             }
-        } else {
-            Data[b].slots[1].data.compare_exchange_weak(second, new_data, std::memory_order_release, std::memory_order_relaxed);
         }
         return;
     }
     
     // --- SCENARIO 3: No match found - TwoBig Replacement ---
-    if (first == 0 || work >= first_work) {
-        // Same protected shift logic
-        if (Data[b].slots[0].data.compare_exchange_weak(first, new_data, std::memory_order_release, std::memory_order_relaxed)) {
-            if (first != 0) {
-                Data[b].slots[1].data.compare_exchange_weak(second, first, std::memory_order_release, std::memory_order_relaxed);
+    while (true) {
+        if (first == 0 || work >= first_work) {
+            // Same protected shift logic
+            if (Data[b].slots[0].data.compare_exchange_weak(first, new_data, std::memory_order_release, std::memory_order_relaxed)) {
+                if (first != 0) {
+                    Data[b].slots[1].data.compare_exchange_weak(second, first, std::memory_order_release, std::memory_order_relaxed);
+                }
+                break;
+            } else {
+                first_work = static_cast<uint8_t>((first >> ValueBits) & work_mask);
             }
+        } else {
+            Data[b].slots[1].data.compare_exchange_weak(second, new_data, std::memory_order_release, std::memory_order_relaxed);
+            break;
         }
-    } else {
-        Data[b].slots[1].data.compare_exchange_weak(second, new_data, std::memory_order_release, std::memory_order_relaxed);
     }
   }
 
