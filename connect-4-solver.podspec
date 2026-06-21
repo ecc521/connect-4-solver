@@ -13,10 +13,11 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => "11.0", :tvos => "12.0" }
   s.source       = { :git => "https://github.com/ecc521/connect4.git", :tag => "#{s.version}" }
 
-  s.source_files = "ios/**/*.{h,m,mm,cpp}", "native/**/*.{h,hpp}"
+  s.source_files = "ios/**/*.{h,m,mm,cpp,swift}", "native/**/*.{h,hpp}"
   
   # Exclude the Emscripten/WASM bindings and test files entirely from the iOS compiled framework
   s.exclude_files = "native/analyze.cpp", "native/node_binding.cpp"
+  s.public_header_files = "ios/**/*.h"
 
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++20",

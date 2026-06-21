@@ -15,6 +15,14 @@ buildscript {
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
+def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
+if (expoModulesCorePlugin.exists()) {
+    apply from: expoModulesCorePlugin
+    applyKotlinExpoModulesCorePlugin()
+    useCoreDependencies()
+    useDefaultAndroidSdkVersions()
+}
+
 android {
   namespace "com.connect4solver"
   compileSdkVersion safeExtGet('compileSdkVersion', 33)

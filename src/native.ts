@@ -51,57 +51,53 @@ interface NativeSolverType {
     wrap: boolean,
   ): void;
   // Exact analysis — returns [status, nbMoves, col0..colN-1, aborted]
-  analyze(
-    solverPtr: string,
-    pos: string,
-    threads: number,
-    timeoutMs: number,
-    w: number,
-    h: number,
-    weak: boolean,
-    bookPtr: string,
-    align: number,
-    wrap: boolean,
-  ): Promise<number[]>;
+  analyze(args: {
+    solverPtr: string;
+    pos: string;
+    threads: number;
+    w: number;
+    h: number;
+    bookPtr: string;
+    align: number;
+    wrap: boolean;
+  }): Promise<number[]>;
   // Heuristic analysis — returns [status, nbMoves, col0..colN-1, depthReached]
-  analyzeHeuristic(
-    solverPtr: string,
-    pos: string,
-    maxDepth: number,
-    threads: number,
-    timeoutMs: number,
-    w: number,
-    h: number,
-    bookPtr: string,
-    align: number,
-    wrap: boolean,
-  ): Promise<number[]>;
+  analyzeHeuristic(args: {
+    solverPtr: string;
+    pos: string;
+    maxDepth: number;
+    threads: number;
+    timeoutMs: number;
+    w: number;
+    h: number;
+    bookPtr: string;
+    align: number;
+    wrap: boolean;
+  }): Promise<number[]>;
   // Exact solve — returns [status, nbMoves, score, bestMove, depthReached, nodes_low, nodes_high, aborted]
-  solve(
-    solverPtr: string,
-    pos: string,
-    threads: number,
-    timeoutMs: number,
-    w: number,
-    h: number,
-    weak: boolean,
-    bookPtr: string,
-    align: number,
-    wrap: boolean,
-  ): Promise<number[]>;
+  solve(args: {
+    solverPtr: string;
+    pos: string;
+    threads: number;
+    w: number;
+    h: number;
+    bookPtr: string;
+    align: number;
+    wrap: boolean;
+  }): Promise<number[]>;
   // Heuristic solve
-  solveHeuristic(
-    solverPtr: string,
-    pos: string,
-    maxDepth: number,
-    threads: number,
-    timeoutMs: number,
-    w: number,
-    h: number,
-    bookPtr: string,
-    align: number,
-    wrap: boolean,
-  ): Promise<number[]>;
+  solveHeuristic(args: {
+    solverPtr: string;
+    pos: string;
+    maxDepth: number;
+    threads: number;
+    timeoutMs: number;
+    w: number;
+    h: number;
+    bookPtr: string;
+    align: number;
+    wrap: boolean;
+  }): Promise<number[]>;
 }
 
 function encodeBase64(data: Uint8Array): string {
@@ -313,31 +309,29 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     return this.runTask(async () => {
       let nativeResArr: number[];
       if (this.isHeuristic) {
-        nativeResArr = await this._nativeModule.analyzeHeuristic(
-          this._solverPtrStr,
-          positionStr,
+        nativeResArr = await this._nativeModule.analyzeHeuristic({
+          solverPtr: this._solverPtrStr,
+          pos: positionStr,
           maxDepth,
           threads,
           timeoutMs,
-          this.width,
-          this.height,
-          bookPtr as string,
-          this.align,
-          this.wrap,
-        );
+          w: this.width,
+          h: this.height,
+          bookPtr: bookPtr as string,
+          align: this.align,
+          wrap: this.wrap,
+        });
       } else {
-        nativeResArr = await this._nativeModule.analyze(
-          this._solverPtrStr,
-          positionStr,
+        nativeResArr = await this._nativeModule.analyze({
+          solverPtr: this._solverPtrStr,
+          pos: positionStr,
           threads,
-          timeoutMs,
-          this.width,
-          this.height,
-          weak,
-          bookPtr as string,
-          this.align,
-          this.wrap,
-        );
+          w: this.width,
+          h: this.height,
+          bookPtr: bookPtr as string,
+          align: this.align,
+          wrap: this.wrap,
+        });
       }
 
       const status = nativeResArr[0];
@@ -429,31 +423,29 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
     return this.runTask(async () => {
       let nativeResArr: number[];
       if (this.isHeuristic) {
-        nativeResArr = await this._nativeModule.solveHeuristic(
-          this._solverPtrStr,
-          positionStr,
+        nativeResArr = await this._nativeModule.solveHeuristic({
+          solverPtr: this._solverPtrStr,
+          pos: positionStr,
           maxDepth,
           threads,
           timeoutMs,
-          this.width,
-          this.height,
-          bookPtr as string,
-          this.align,
-          this.wrap,
-        );
+          w: this.width,
+          h: this.height,
+          bookPtr: bookPtr as string,
+          align: this.align,
+          wrap: this.wrap,
+        });
       } else {
-        nativeResArr = await this._nativeModule.solve(
-          this._solverPtrStr,
-          positionStr,
+        nativeResArr = await this._nativeModule.solve({
+          solverPtr: this._solverPtrStr,
+          pos: positionStr,
           threads,
-          timeoutMs,
-          this.width,
-          this.height,
-          weak,
-          bookPtr as string,
-          this.align,
-          this.wrap,
-        );
+          w: this.width,
+          h: this.height,
+          bookPtr: bookPtr as string,
+          align: this.align,
+          wrap: this.wrap,
+        });
       }
 
       const status = nativeResArr[0];

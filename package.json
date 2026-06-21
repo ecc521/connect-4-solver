@@ -3,8 +3,12 @@
   "version": "4.1.0",
   "description": "High-performance solver for a variety of board sizes using NNUE + alpha-beta pruning. Bindings for WASM, Node.js, and React Native.",
   "main": "dist/index.js",
+  "expo": {
+    "module": "expo-module.config.json"
+  },
   "type": "module",
   "exports": {
+    "./package.json": "./package.json",
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"

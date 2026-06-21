@@ -8,20 +8,29 @@ type CreateModule = (options: {
   locateFile: (path: string) => string;
 }) => Promise<SolverModule>;
 
-const wasmUrl = new URL("../build/analyze_threaded.wasm", import.meta.url);
-const workerUrl = new URL(
-  "../build/analyze_threaded.worker.js",
-  import.meta.url,
-);
+const baseUrl =
+  typeof import.meta !== "undefined" && import.meta && import.meta.url
+    ? import.meta.url
+    : typeof location !== "undefined"
+      ? location.href
+      : "http://localhost";
+
+let wasmUrl: URL | null = null;
+let workerUrl: URL | null = null;
 
 let ThreadedModule: SolverModule | null = null;
 let _threadedInitPromise: Promise<void> | null = null;
 
 export function getThreadedModuleInitPromise(): Promise<void> {
+  wasmUrl ??= new URL("../build/analyze_threaded.wasm", baseUrl);
+  workerUrl ??= new URL(
+    "../build/analyze_threaded.worker.js",
+    baseUrl,
+  );
   _threadedInitPromise ??= (createModule as unknown as CreateModule)({
     locateFile: (path: string) => {
-      if (path.endsWith(".wasm")) return wasmUrl.href;
-      if (path.endsWith(".worker.js")) return workerUrl.href;
+      if (path.endsWith(".wasm")) return wasmUrl!.href;
+      if (path.endsWith(".worker.js")) return workerUrl!.href;
       return path;
     },
   }).then((mod: SolverModule) => {
