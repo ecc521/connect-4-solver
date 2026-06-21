@@ -1,5 +1,29 @@
 import ExpoModulesCore
 
+struct AnalyzeArgs: Record {
+    @Field var solverPtr: String
+    @Field var pos: String
+    @Field var threads: Int
+    @Field var w: Int
+    @Field var h: Int
+    @Field var bookPtr: String
+    @Field var align: Int
+    @Field var wrap: Bool
+}
+
+struct AnalyzeHeuristicArgs: Record {
+    @Field var solverPtr: String
+    @Field var pos: String
+    @Field var maxDepth: Int
+    @Field var threads: Int
+    @Field var timeoutMs: Double
+    @Field var w: Int
+    @Field var h: Int
+    @Field var bookPtr: String
+    @Field var align: Int
+    @Field var wrap: Bool
+}
+
 public class Connect4SolverModule: Module {
     public func definition() -> ModuleDefinition {
         Name("Connect4Solver")
@@ -25,16 +49,16 @@ public class Connect4SolverModule: Module {
         }
 
         Function("createBookFromBuffer") { (width: Int, height: Int, base64Str: String) -> String in
-            return Connect4SolverWrapper.createBookFromBuffer(Int32(width), height: Int32(height), base64Str: base64Str)
+            return Connect4SolverWrapper.createBook(fromBuffer: Int32(width), height: Int32(height), base64Str: base64Str)
         }
 
         Function("destroyBook") { (width: Int, height: Int, bookPtrStr: String) in
             Connect4SolverWrapper.destroyBook(Int32(width), height: Int32(height), bookPtrStr: bookPtrStr)
         }
 
-        AsyncFunction("analyze") { (solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, weak: Bool, bookPtrStr: String, align: Int, wrap: Bool, promise: Promise) in
+        AsyncFunction("analyze") { (args: AnalyzeArgs, promise: Promise) in
             DispatchQueue.global(qos: .userInitiated).async {
-                if let result = Connect4SolverWrapper.analyze(solverPtrStr, position: position, threads: Int32(threads), width: Int32(width), height: Int32(height), bookPtrStr: bookPtrStr, align: Int32(align), wrap: wrap) {
+                if let result = Connect4SolverWrapper.analyze(args.solverPtr, position: args.pos, threads: Int32(args.threads), width: Int32(args.w), height: Int32(args.h), bookPtrStr: args.bookPtr, align: Int32(args.align), wrap: args.wrap) {
                     promise.resolve(result)
                 } else {
                     promise.reject("UNSUPPORTED_SIZE", "Unsupported board size")
@@ -42,9 +66,9 @@ public class Connect4SolverModule: Module {
             }
         }
 
-        AsyncFunction("analyzeHeuristic") { (solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String, align: Int, wrap: Bool, promise: Promise) in
+        AsyncFunction("analyzeHeuristic") { (args: AnalyzeHeuristicArgs, promise: Promise) in
             DispatchQueue.global(qos: .userInitiated).async {
-                if let result = Connect4SolverWrapper.analyzeHeuristic(solverPtrStr, position: position, maxDepth: Int32(maxDepth), threads: Int32(threads), timeoutMs: timeoutMs, width: Int32(width), height: Int32(height), bookPtrStr: bookPtrStr, align: Int32(align), wrap: wrap) {
+                if let result = Connect4SolverWrapper.analyzeHeuristic(args.solverPtr, position: args.pos, maxDepth: Int32(args.maxDepth), threads: Int32(args.threads), timeoutMs: args.timeoutMs, width: Int32(args.w), height: Int32(args.h), bookPtrStr: args.bookPtr, align: Int32(args.align), wrap: args.wrap) {
                     promise.resolve(result)
                 } else {
                     promise.reject("UNSUPPORTED_SIZE", "Unsupported board size")
@@ -52,9 +76,9 @@ public class Connect4SolverModule: Module {
             }
         }
 
-        AsyncFunction("solve") { (solverPtrStr: String, position: String, threads: Int, width: Int, height: Int, weak: Bool, bookPtrStr: String, align: Int, wrap: Bool, promise: Promise) in
+        AsyncFunction("solve") { (args: AnalyzeArgs, promise: Promise) in
             DispatchQueue.global(qos: .userInitiated).async {
-                if let result = Connect4SolverWrapper.solve(solverPtrStr, position: position, threads: Int32(threads), width: Int32(width), height: Int32(height), bookPtrStr: bookPtrStr, align: Int32(align), wrap: wrap) {
+                if let result = Connect4SolverWrapper.solve(args.solverPtr, position: args.pos, threads: Int32(args.threads), width: Int32(args.w), height: Int32(args.h), bookPtrStr: args.bookPtr, align: Int32(args.align), wrap: args.wrap) {
                     promise.resolve(result)
                 } else {
                     promise.reject("UNSUPPORTED_SIZE", "Unsupported board size")
@@ -62,9 +86,9 @@ public class Connect4SolverModule: Module {
             }
         }
 
-        AsyncFunction("solveHeuristic") { (solverPtrStr: String, position: String, maxDepth: Int, threads: Int, timeoutMs: Double, width: Int, height: Int, bookPtrStr: String, align: Int, wrap: Bool, promise: Promise) in
+        AsyncFunction("solveHeuristic") { (args: AnalyzeHeuristicArgs, promise: Promise) in
             DispatchQueue.global(qos: .userInitiated).async {
-                if let result = Connect4SolverWrapper.solveHeuristic(solverPtrStr, position: position, maxDepth: Int32(maxDepth), threads: Int32(threads), timeoutMs: timeoutMs, width: Int32(width), height: Int32(height), bookPtrStr: bookPtrStr, align: Int32(align), wrap: wrap) {
+                if let result = Connect4SolverWrapper.solveHeuristic(args.solverPtr, position: args.pos, maxDepth: Int32(args.maxDepth), threads: Int32(args.threads), timeoutMs: args.timeoutMs, width: Int32(args.w), height: Int32(args.h), bookPtrStr: args.bookPtr, align: Int32(args.align), wrap: args.wrap) {
                     promise.resolve(result)
                 } else {
                     promise.reject("UNSUPPORTED_SIZE", "Unsupported board size")

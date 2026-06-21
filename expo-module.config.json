@@ -1,9 +1,11 @@
 {
   "name": "Connect4Solver",
-  "ios": {
+  "platforms": ["apple", "android"],
+  "apple": {
     "modules": [
       "Connect4SolverModule"
-    ]
+    ],
+    "podspecPath": "connect-4-solver.podspec"
   },
   "android": {
     "modules": [
