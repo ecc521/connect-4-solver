@@ -142,6 +142,34 @@ Clean cut. The heuristic/NNUE code is well-isolated from the exact engine — th
 shared piece is `MoveSorter.hpp`, which the exact search needs and which contains **no**
 NNUE logic. So this is mostly deletion, not surgery.
 
+### 🚧 Status (2026-06-21) — native+core DONE on branch `v5` (`49073e3`)
+**Done & validated:** deleted all NNUE/HeuristicSolver/training files; stripped heuristic
+from `bindings_core.hpp`, `dispatch_table.hpp`, `node_binding.cpp`, `analyze.cpp`,
+`build.sh`; `isHeuristic` forced false and AdaptiveSolver no longer auto-selects
+heuristic. **Native addon builds & links cleanly, `tsc` passes, exact test suites pass
+(embedded-book/variants/abort 16/16).** (WASM + mobile not buildable in this env.)
+
+**Remaining to finish §2 (next session):**
+1. **TS API cleanup (overlaps §3.5):** remove the now-ignored `heuristic` option,
+   `maxDepth`, `isHeuristic`/`depthReached` fields, the dead `if (this.isHeuristic)`
+   branches and `_analyzeHeuristic`/`_solveHeuristic` interface decls in
+   `core.ts`/`abstract-solver.ts`/`node.ts`/`native.ts`/`async.ts`; drop `"nnue"` from
+   `capabilities.ts` + `SCORE_NNUE_MAX` (`constants.ts`). Also retire the legacy
+   `is_heuristic` native arg slots once both sides are updated together.
+2. **Mobile bridges (not compiled here):** remove `Size::HeuristicSolver` usage +
+   heuristic JNI/Obj-C funcs and the Kotlin/Swift `AnalyzeHeuristicArgs`/AsyncFunctions
+   in `android/cpp/react-native-connect-4-solver.cpp`, `ios/Connect4SolverWrapper.mm`,
+   `Connect4SolverModule.{kt,swift}`.
+3. **Tools:** `tools/Makefile` (drop `generate_nnue_data`), `tools/generate_node_bindings.py`
+   (stop emitting heuristic), `tools/bench.ts` + `tools/benchmarks/bench_native.cpp` NNUE refs.
+4. **Dead C++:** `Position.hpp::heuristic_evaluate` (no callers) and `Constants.hpp`
+   `SCORE_NNUE_MAX` (no callers).
+5. **Tests:** prune/rewrite heuristic-dependent cases. ⚠️ `__tests__/boundary.test.ts`
+   8×8 cases now force **exact** 8×8 (intractable) → **full `npm test` hangs** until these
+   are given a book/timeout or removed. `benchmark.test.ts` + heuristic cases in
+   `cache/book/adaptive/index` tests also need pruning.
+6. **Docs/README:** drop NNUE/heuristic sections + "Heuristic Mode" quick-start.
+
 ### 2.1 Delete entirely
 **Native:** `native/NNUE.hpp`, `NNUEAccumulator.hpp`, `NNUEAccumulatorOneLayer.hpp`,
 `nnue_weights_7x6.hpp` (87 KB), `nnue_weights_8x8.hpp` (158 KB), `HeuristicSolver.hpp`,
