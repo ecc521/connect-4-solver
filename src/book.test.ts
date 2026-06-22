@@ -18,36 +18,36 @@ describe("Opening Book Key Resizing", () => {
     b1.add(BigInt(1), 0);
     const buf1 = b1.getDenseBuffer();
 
-    // Header (6) + Key (4) + Value (1) = 11 bytes
-    expect(buf1.length).toBe(11);
+    // Header (18) + Key (1) + Value (1) = 20 bytes
+    expect(buf1.length).toBe(20);
 
     // 2. Create a book with a large key (needs 5 bytes)
     const b2 = new native.BookBuilder(7, 6, 10);
     b2.add(BigInt("0x1234567890"), 0); // 0x1234567890 > 0xFFFFFFFF
     const buf2 = b2.getDenseBuffer();
 
-    // Header (6) + Key (5) + Value (1) = 12 bytes
+    // Header (18) + Key (5) + Value (1) = 24 bytes
     expect(buf2.length).toBeGreaterThan(buf1.length);
-    expect(buf2.length).toBe(12);
+    expect(buf2.length).toBe(24);
 
     // 3. Verify even larger keys (8 bytes)
     const b3 = new native.BookBuilder(7, 6, 10);
     b3.add(BigInt("0x1234567890ABCDEF"), 0);
     const buf3 = b3.getDenseBuffer();
 
-    // Header (6) + Key (8) + Value (1) = 15 bytes
-    expect(buf3.length).toBe(15);
+    // Header (18) + Key (8) + Value (1) = 27 bytes
+    expect(buf3.length).toBe(27);
   });
 
   test("should handle multiple entries with varying key sizes", () => {
     const builder = new native.BookBuilder(7, 6, 10);
     builder.add(BigInt(1), 1);
-    builder.add(BigInt("0xFFFFFFFFFF"), 2); // 5 bytes
+    builder.add(BigInt("0xFFFFFFFFFF"), 2); // 0xFFFFFFFFFF = 2^40 - 1
 
     const buf = builder.getDenseBuffer();
-    // Two entries, largest is 5 bytes.
-    // Header (6) + 2 * (Key (5) + Value (1)) = 6 + 12 = 18 bytes
-    expect(buf.length).toBe(18);
+    // Two entries; 0xFFFFFFFFFF + 2 = 2^40 + 1, so key_bytes = ceil(log2/8) = 6.
+    // Header (18) + 2 * (Key (6) + Value (1)) = 18 + 14 = 32 bytes
+    expect(buf.length).toBe(32);
   });
 
   test("should clone and query books correctly", async () => {

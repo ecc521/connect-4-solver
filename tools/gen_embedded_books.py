@@ -27,9 +27,9 @@ TS_OUTPUT = os.path.join(REPO_ROOT, "src", "embedded-book-sizes.ts")
 
 # Books to embed: (width, height, path)
 BOOKS = [
-    (6, 6, "data/6x6_dense3.efbook"),
-    (6, 7, "data/6x7_dense6.efbook"),
-    (7, 6, "data/7x6_dense7.efbook"),
+    (6, 6, "data/6x6_dense3.book"),
+    (6, 7, "data/6x7_dense6.book"),
+    (7, 6, "data/7x6_dense7.book"),
 ]
 
 

@@ -78,13 +78,13 @@ describe("Polymorphic Dense Book Packing", () => {
     const stat = fs.statSync(d5Path);
     const bookData = new Uint8Array(fs.readFileSync(d5Path));
 
-    // Check header for 3 byte keys
-    expect(bookData[3]).toBe(3); // key_bytes
+    // Check header for 2 byte keys (key_bytes is at offset 8 in v2 header)
+    expect(bookData[8]).toBe(2); // key_bytes
 
     // Depth 5 should only pack the first 5 positions
     const expectedCount = 5;
-    // Header (6) + entries (3 bytes key + 1 byte value)
-    expect(stat.size).toBe(6 + expectedCount * 4);
+    // Header (18) + keys section (2 bytes each) + values section (1 byte each)
+    expect(stat.size).toBe(18 + expectedCount * 2 + expectedCount * 1);
 
     const solver = new NodeConnect4Solver();
     await solver.init();
@@ -99,13 +99,13 @@ describe("Polymorphic Dense Book Packing", () => {
     const stat = fs.statSync(d14Path);
     const bookData = new Uint8Array(fs.readFileSync(d14Path));
 
-    // Depth 14 7x7 fits in 31.7 bits => 4 bytes
-    expect(bookData[3]).toBe(4);
+    // Depth 14 7x6 fits in 31.7 bits => 4 bytes (key_bytes at offset 8 in v2 header)
+    expect(bookData[8]).toBe(4);
 
     // Depth 14 means the first 14 positions should be packed
     const expectedCount = 14;
-    // Header (6) + entries (4 bytes key + 1 byte value)
-    expect(stat.size).toBe(6 + expectedCount * 5);
+    // Header (18) + keys section (4 bytes each) + values section (1 byte each)
+    expect(stat.size).toBe(18 + expectedCount * 4 + expectedCount * 1);
 
     const solver = new NodeConnect4Solver();
     await solver.init();
@@ -118,13 +118,13 @@ describe("Polymorphic Dense Book Packing", () => {
     const stat = fs.statSync(d20Path);
     const bookData = new Uint8Array(fs.readFileSync(d20Path));
 
-    // Depth 20 7x7: 26 digits -> 41.2 bits => 6 bytes
-    expect(bookData[3]).toBe(6);
+    // Depth 20 7x6: max key ~41.2 bits => 6 bytes (key_bytes at offset 8 in v2 header)
+    expect(bookData[8]).toBe(6);
 
     // Depth 20 means all 20 positions
     const expectedCount = 20;
-    // Header (6) + entries (6 bytes key + 1 byte value)
-    expect(stat.size).toBe(6 + expectedCount * 7);
+    // Header (18) + keys section (6 bytes each) + values section (1 byte each)
+    expect(stat.size).toBe(18 + expectedCount * 6 + expectedCount * 1);
 
     const solver = new NodeConnect4Solver();
     await solver.init();
