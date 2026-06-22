@@ -3,6 +3,7 @@ import {
   Connect4SolverOptions,
   AnalyzeOptions,
   BaseConnect4Solver,
+  BookResult,
   SolverAbortedError,
   Player,
 } from "./core.js";
@@ -138,6 +139,13 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
           opts,
         }) as Promise<PositionAnalysis>,
     );
+  }
+
+  async queryBook(positionStr: string): Promise<BookResult | null> {
+    await this.init();
+    return this.sendMessage("queryBook", {
+      position: positionStr,
+    }) as Promise<BookResult | null>;
   }
 
   /**

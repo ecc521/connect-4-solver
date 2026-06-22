@@ -4,6 +4,7 @@ import {
   Outcome,
   Evaluation,
   AnalyzeOptions,
+  BookResult,
   PositionAnalysis,
   Connect4SolverOptions,
 } from "./core.js";
@@ -206,6 +207,13 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       b64,
     );
     return Promise.resolve();
+  }
+
+  // The React Native JSI bridge does not yet expose a book-score lookup, so book-only
+  // queries are unsupported here (returns null). Add a `getBookScore` method to the
+  // native bridge (Kotlin/Swift/JNI) to enable it — tracked alongside mobile `weak`.
+  queryBook(_positionStr: string): Promise<BookResult | null> {
+    return Promise.resolve(null);
   }
 
   private createEvaluation(score: number, nbMoves: number): Evaluation {

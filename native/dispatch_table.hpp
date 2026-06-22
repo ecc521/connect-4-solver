@@ -60,6 +60,22 @@ void dispatch_void(int w, int h, int align, bool wrap, F&& f) {
     dispatch_void_impl(w, h, align, wrap, std::forward<F>(f), AllSupportedSizes{});
 }
 
+// Returns true iff (w,h,align,wrap) matches a SPECIALIZED (compile-time) instantiation —
+// i.e. it would NOT fall back to the generic WIDTH==-1 runtime solver. Used by tooling
+// (e.g. the book generator) to warn when work would run on the ~50% generic path.
+template <typename... Ts>
+bool is_fast_path_impl(int w, int h, int align, bool wrap, std::tuple<Ts...>) {
+    bool found = false;
+    (void)(((Ts::w != -1 && w == Ts::w && h == Ts::h && align == Ts::align && wrap == Ts::wrap)
+                ? (found = true)
+                : false) || ...);
+    return found;
+}
+
+inline bool is_fast_path(int w, int h, int align, bool wrap) {
+    return is_fast_path_impl(w, h, align, wrap, AllSupportedSizes{});
+}
+
 // Macros provided to wrap the dispatch functions.
 // NOTE: 'align' and 'wrap' must be in scope when macros are invoked (provided by caller).
 

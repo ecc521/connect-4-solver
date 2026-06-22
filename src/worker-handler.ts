@@ -78,6 +78,9 @@ export function setupWorkerHandler(): void {
       } else if (type === "getNodeCount") {
         const count = solver ? await solver.getNodeCount() : 0;
         self.postMessage({ id, success: true, result: count });
+      } else if (type === "queryBook") {
+        const result = solver ? await solver.queryBook(payload.position) : null;
+        self.postMessage({ id, success: true, result });
       }
     } catch (err: unknown) {
       const error = err as Error;
@@ -129,6 +132,9 @@ export function setupNoSABWorkerHandler(): void {
       } else if (type === "getNodeCount") {
         const count = solver ? await solver.getNodeCount() : 0;
         self.postMessage({ id, success: true, result: count });
+      } else if (type === "queryBook") {
+        const result = solver ? await solver.queryBook(payload.position) : null;
+        self.postMessage({ id, success: true, result });
       }
     } catch (err: unknown) {
       const error = err as Error;

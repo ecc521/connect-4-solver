@@ -184,4 +184,34 @@ describe("Embedded book transparent fallback", () => {
       await solver.destroy();
     });
   });
+
+  describe("queryBook (book-only lookup, no search)", () => {
+    it("returns an exact result for booked positions and null for misses", async () => {
+      const solver = new AdaptiveSolver();
+      await solver.setBoard(7, 6); // auto-loads embedded 7x6 book
+      expect(solver.hasBook).toBe(true);
+
+      // At least one shallow position is covered by the embedded book → exact hit.
+      const probes = await Promise.all(
+        ["", "4", "44", "443"].map((p) => solver.queryBook(p)),
+      );
+      expect(
+        probes.some((r) => r !== null && typeof r.exact === "number"),
+      ).toBe(true);
+
+      // A position not resolved by the book (here an over-full column) → null.
+      const miss = await solver.queryBook("4444444444444");
+      expect(miss).toBeNull();
+
+      await solver.destroy();
+    });
+
+    it("returns null when no book is loaded (8x8 has no embedded book)", async () => {
+      const solver = new AdaptiveSolver();
+      await solver.setBoard(8, 8);
+      expect(solver.hasBook).toBe(false);
+      expect(await solver.queryBook("44")).toBeNull();
+      await solver.destroy();
+    });
+  });
 });

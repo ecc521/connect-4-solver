@@ -409,6 +409,16 @@ Value GetNodeCount(const CallbackInfo& info) {
     return Number::New(info.Env(), (double)count);
 }
 
+// Returns true if (w,h,align,wrap) is a compiled specialized instantiation (fast path),
+// false if it would fall back to the generic WIDTH==-1 runtime solver (~50% slower).
+Value IsFastPath(const CallbackInfo& info) {
+    int w = info[0].As<Number>().Int32Value();
+    int h = info[1].As<Number>().Int32Value();
+    int align = info.Length() > 2 ? info[2].As<Number>().Int32Value() : 4;
+    bool wrap = info.Length() > 3 ? info[3].As<Boolean>().Value() : false;
+    return Boolean::New(info.Env(), is_fast_path(w, h, align, wrap));
+}
+
 // Helper macro for book operations (books are always standard C4, no ALIGN/WRAP variant)
 #define DISPATCH_BOOK(bw, bh, b, ACTION) \
     { int _align = 4; bool _wrap = false; \
@@ -589,17 +599,20 @@ Value GetBookScore(const CallbackInfo& info) {
     std::string pos_str = info[3].As<String>().Utf8Value();
 
     int score = -32000;
-
-    #define GET_SCORE_ACTION(NS, W, H, b) \
-        { \
-            ::GameSolver::Connect4::GenericPosition<W, H> P; \
-            if (P.play(pos_str) == pos_str.length()) { \
-                int val = b->get(P); \
-                if (val != 0) score = val + (-(w * h + 1) / 2) - 1; \
-            } \
+    // ptr may be null — fall back to the compiled-in embedded book for this size
+    // (so queryBook works for embedded-book sizes like 7x6 that never call loadBook).
+    int align = 4; bool wrap = false;
+    dispatch_void(w, h, align, wrap, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        using CoreBook = ::GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>;
+        const CoreBook* book = getEffectiveBookNode<Size::w, Size::h, CoreBook>(ptr);
+        if (!book) return;
+        ::GameSolver::Connect4::GenericPosition<Size::w, Size::h> P(w, h);
+        if (P.play(pos_str) == pos_str.length()) {
+            int val = book->get(P);
+            if (val != 0) score = val + (-(w * h + 1) / 2) - 1;
         }
-    
-    DISPATCH_BOOK(w, h, ptr, GET_SCORE_ACTION);
+    });
 
     if (score <= -32000 || score >= 32000) {
         return info.Env().Undefined();
@@ -1237,6 +1250,7 @@ Object Init(Env env, Object exports) {
     exports.Set(String::New(env, "_destroyBook"), Function::New(env, DestroyBook));
     exports.Set(String::New(env, "_stopSolver"), Function::New(env, StopSolver));
     exports.Set(String::New(env, "_getNodeCount"), Function::New(env, GetNodeCount));
+    exports.Set(String::New(env, "_isFastPath"), Function::New(env, IsFastPath));
     exports.Set(String::New(env, "_generatePositions"), Function::New(env, GeneratePositions));
     exports.Set(String::New(env, "_dumpBook"), Function::New(env, DumpBook));
     

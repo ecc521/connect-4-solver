@@ -5,6 +5,7 @@ import {
   Evaluation,
   PositionAnalysis,
   AnalyzeOptions,
+  BookResult,
   Connect4SolverOptions,
   SolverModule,
 } from "./core.js";
@@ -236,6 +237,31 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
     mod._free(allocatedMemory);
     mod._free(outputPointer);
     return finalData;
+  }
+
+  /**
+   * Shared book-only lookup for WASM backends. Returns null on miss / no book.
+   * Passes _bookPtr (0 if none) — the native side falls back to the embedded book
+   * for this size, so this works for embedded-book sizes that never call loadBook.
+   */
+  protected queryBookWithModule(
+    mod: SolverModule,
+    positionStr: string,
+  ): BookResult | null {
+    const posPtr = mod.stringToNewUTF8(positionStr);
+    try {
+      const score = mod._getBookScore(
+        this.width,
+        this.height,
+        (this._bookPtr as number) || 0,
+        posPtr,
+      );
+      // WASM returns a ±32000 sentinel on miss.
+      if (score <= -32000 || score >= 32000) return null;
+      return { exact: score };
+    } finally {
+      mod._free(posPtr);
+    }
   }
 
   protected executeWasmAnalyze(

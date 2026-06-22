@@ -52,6 +52,22 @@ export interface Evaluation {
   score: number; // raw exact score (positive = current player winning, 0 = draw)
 }
 
+/**
+ * Result of a book-only lookup (`queryBook`). No search is performed.
+ *
+ * The shape is forward-compatible with weak/bounds books: a strong (exact) book
+ * populates `exact`; a future bounds book will populate `lower`/`upper`. All fields
+ * are optional and a miss returns `null` (not an empty object).
+ *
+ * NOTE: until the book-format `kind` byte lands, every hit is reported as `exact`
+ * (for a weak book that value is the Win/Draw/Loss sign, not a true distance).
+ */
+export interface BookResult {
+  exact?: number; // exact score (positive = player-to-move winning, 0 = draw)
+  lower?: number; // lower bound on the score (bounds/weak books)
+  upper?: number; // upper bound on the score (bounds/weak books)
+}
+
 export interface PositionAnalysis {
   position: string; // Validated position (may differ if input was invalid)
   originalPosition: string; // Raw input string
@@ -333,6 +349,14 @@ export abstract class BaseConnect4Solver {
     opts?: AnalyzeOptions,
   ): Promise<PositionAnalysis>;
   abstract loadBook(data: Uint8Array): Promise<void>;
+
+  /**
+   * Book-only lookup of the currently-loaded opening book — no search is performed.
+   * Returns the booked result, or `null` if the position is not in the book (or no
+   * book is loaded). Use this for an instant "is this resolved?" check before deciding
+   * whether to run a (possibly slow) timed solve.
+   */
+  abstract queryBook(positionStr: string): Promise<BookResult | null>;
 
   /**
    * Sends the platform-specific abort signal to the engine.

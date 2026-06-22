@@ -20,6 +20,7 @@
 
 import {
   BaseConnect4Solver,
+  BookResult,
   PositionAnalysis,
   AnalyzeOptions,
   Connect4SolverOptions,
@@ -241,6 +242,19 @@ export class AdaptiveSolver {
         "AdaptiveSolver: solver unexpectedly null after assertReady.",
       );
     return this._solver.solve(position, this._withDefaults(opts));
+  }
+
+  /**
+   * Book-only lookup — no search. Returns the booked result or `null` on a miss.
+   * Useful for showing an instant result before deciding whether to run a timed solve.
+   */
+  async queryBook(position: string): Promise<BookResult | null> {
+    this._assertReady();
+    if (!this._solver)
+      throw new Error(
+        "AdaptiveSolver: solver unexpectedly null after assertReady.",
+      );
+    return this._solver.queryBook(position);
   }
 
   /**

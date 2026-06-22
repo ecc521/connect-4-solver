@@ -173,4 +173,25 @@ double getNodeCount(int w, int h, void* solver, bool /*is_heuristic (legacy slot
     DISPATCH_EXACT_RETURN(w, h, align, wrap, getNodeCount, solver);
 }
 
+// Book-only lookup: returns the decoded exact score, or a -32000 sentinel on miss
+// (the JS layer treats |score| >= 32000 as "not in book"). Books are standard C4.
+EMSCRIPTEN_KEEPALIVE
+int getBookScore(int w, int h, void* book, const char* position) {
+    std::string pos_str(position);
+    int score = -32000;
+    int align = 4; bool wrap = false;
+    dispatch_void(w, h, align, wrap, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        // book may be null — fall back to the embedded book for this size.
+        const auto* eff = getEffectiveBook<Size::w, Size::h>(book);
+        if (!eff) return;
+        GenericPosition<Size::w, Size::h> P(w, h);
+        if (P.play(pos_str) == pos_str.length()) {
+            int val = eff->get(P);
+            if (val != 0) score = val + (-(w * h + 1) / 2) - 1;
+        }
+    });
+    return score;
+}
+
 }

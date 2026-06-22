@@ -1,4 +1,9 @@
-import { PositionAnalysis, AnalyzeOptions, SolverModule } from "./core.js";
+import {
+  PositionAnalysis,
+  AnalyzeOptions,
+  BookResult,
+  SolverModule,
+} from "./core.js";
 import { AbstractSyncSolver } from "./abstract-solver.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
@@ -112,6 +117,12 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
       );
     }
     return Promise.resolve();
+  }
+
+  queryBook(positionStr: string): Promise<BookResult | null> {
+    return Promise.resolve(
+      this.queryBookWithModule(getNoSABModule(), positionStr),
+    );
   }
 
   release(): void {

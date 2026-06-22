@@ -1,4 +1,4 @@
-import { PositionAnalysis, AnalyzeOptions } from "./core.js";
+import { PositionAnalysis, AnalyzeOptions, BookResult } from "./core.js";
 import { AbstractSyncSolver } from "./abstract-solver.js";
 import { createRequire } from "module";
 import { fileURLToPath } from "url";
@@ -99,6 +99,7 @@ export interface NativeModuleType {
     align: number,
     wrap: boolean,
   ): number;
+  _isFastPath(w: number, h: number, align?: number, wrap?: boolean): boolean;
   _generatePositions(
     w: number,
     h: number,
@@ -143,6 +144,24 @@ export function getNativeModule(): NativeModuleType | null {
     }
   }
   return NativeModule;
+}
+
+/**
+ * Returns true if the native addon has a compiled, specialized solver for this
+ * board geometry (the fast path). Returns false if a solve would fall back to the
+ * generic runtime-width solver (~50% slower), or if the native addon isn't loaded.
+ *
+ * Intended for tooling (e.g. the book generator) to warn before doing heavy work on
+ * the generic path. Node-only.
+ */
+export function isFastPath(
+  width: number,
+  height: number,
+  align = 4,
+  wrap = false,
+): boolean {
+  const native = getNativeModule();
+  return native ? native._isFastPath(width, height, align, wrap) : false;
 }
 
 export class NativeCache {
@@ -285,6 +304,22 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       }
     }
     return Promise.resolve();
+  }
+
+  queryBook(positionStr: string): Promise<BookResult | null> {
+    const native = getNativeModule();
+    if (!native) return Promise.resolve(null);
+    // Pass _bookPtr (0 if none) — the native side falls back to the embedded book
+    // for this size, so this works for embedded-book sizes that never call loadBook.
+    // null (not 0) when no explicit book — the native UnwrapPointer maps null →
+    // nullptr and then falls back to the embedded book for this size.
+    const score = native._getBookScore(
+      this.width,
+      this.height,
+      this._bookPtr || null,
+      positionStr,
+    );
+    return Promise.resolve(score === undefined ? null : { exact: score });
   }
 
   async analyze(

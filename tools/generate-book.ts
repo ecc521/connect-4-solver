@@ -91,7 +91,7 @@ async function run() {
   );
   console.log("=========================================================");
 
-  const { NodeConnect4Solver, NativeCache, getNativeModule } =
+  const { NodeConnect4Solver, NativeCache, getNativeModule, isFastPath } =
     await import("../src/node.js");
   const { OpeningBook } = await import("../src/index.js");
 
@@ -101,6 +101,32 @@ async function run() {
       "Native module 'connect4.node' is required for generating books natively.",
     );
     process.exit(1);
+  }
+
+  // Fast-path guard: book generation runs millions of solves. If this size isn't a
+  // compiled specialized instantiation, every solve uses the generic ~50% runtime path.
+  if (!isFastPath(width, height, 4, false)) {
+    console.warn(
+      `\n⚠️  ${width}x${height} is NOT in the compiled fast-path list — book generation will\n` +
+        `   run on the generic runtime-width solver (~2x slower). Add X(${width}, ${height}, ...) to\n` +
+        `   SUPPORTED_SIZES_X_MACRO in native/bindings_core.hpp and run 'npm run build:native'\n` +
+        `   for full-speed generation.\n`,
+    );
+  }
+
+  // Staleness guard: warn if the engine source changed since the addon was built.
+  try {
+    const srcMtime = fs.statSync("native/bindings_core.hpp").mtimeMs;
+    const builtMtime = fs.statSync("build/Release/connect4.node").mtimeMs;
+    if (srcMtime > builtMtime) {
+      console.warn(
+        `\n⚠️  native/bindings_core.hpp is newer than build/Release/connect4.node —\n` +
+          `   you may be running a stale addon. Run 'npm run build:native' to pick up\n` +
+          `   any size-list or engine changes.\n`,
+      );
+    }
+  } catch {
+    // stat failure (unusual cwd, etc.) — skip the staleness check silently.
   }
 
   let bootstrapBook: OpeningBook | null = null;
