@@ -246,15 +246,10 @@ export abstract class BaseConnect4Solver {
     this.align = align;
     this.wrap = wrap;
 
-    let heuristic = false;
-    if (
-      widthOrOpts &&
-      typeof widthOrOpts === "object" &&
-      widthOrOpts.heuristic !== undefined
-    ) {
-      heuristic = widthOrOpts.heuristic;
-    }
-    this.isHeuristic = heuristic;
+    // v5 (Scopehammer): the heuristic/NNUE engine has been removed. The solver is
+    // always exact. The `heuristic` option is retained on the type but ignored;
+    // it will be removed entirely in the API-cleanup pass (SCOPEHAMMER.md §3.5).
+    this.isHeuristic = false;
   }
 
   /**

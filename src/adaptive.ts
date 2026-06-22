@@ -189,11 +189,10 @@ export class AdaptiveSolver {
     this._wrap = wrap;
     this._hasBook = false;
 
-    // 2. Determine solver type upfront — no solver recreation needed.
-    //    Small boards and embedded-book boards always get an exact solver.
-    //    Everything else gets a heuristic solver.
+    // 2. v5 (Scopehammer): the solver is always exact — the heuristic/NNUE engine
+    //    has been removed. Larger boards without a book are simply slower; there is
+    //    no approximate fallback anymore.
     const willHaveEmbeddedBook = hasEmbeddedBook(width, height, align, wrap);
-    const useHeuristic = !(width < 7 && height < 7) && !willHaveEmbeddedBook;
 
     // 3. Create and init solver
     const solverOpts: Connect4SolverOptions = {
@@ -202,7 +201,6 @@ export class AdaptiveSolver {
       align,
       wrap,
       cacheSizeMb: this._opts.cacheSizeMb ?? 128,
-      heuristic: useHeuristic,
     };
     this._solver = await this._createSolver(solverOpts);
     await this._solver.init();

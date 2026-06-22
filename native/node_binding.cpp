@@ -6,7 +6,6 @@
 #include <iostream>
 #include <unordered_set>
 
-#include "HeuristicSolver.hpp"
 #include "OpeningBook.hpp"
 #include "embedded_books.hpp"
 #include "bindings_core.hpp"
@@ -31,22 +30,14 @@ Value CreateCache(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     size_t bytes = info[2].As<Number>().Int64Value();
-    bool is_heuristic = info[3].As<Boolean>().Value();
-
+    // info[3] = legacy is_heuristic slot (ignored; exact-only since v5)
     int align = info[4].As<Number>().Int32Value();
     bool wrap = info[5].As<Boolean>().Value();
     void* ptr = nullptr;
-    if (is_heuristic) {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            ptr = Size::HeuristicSolver::createCache(bytes, w, h).release();
-        });
-    } else {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            ptr = Size::Solver::createCache(bytes, w, h).release();
-        });
-    }
+    dispatch_void(w, h, align, wrap, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        ptr = Size::Solver::createCache(bytes, w, h).release();
+    });
     return WrapPointer(info, ptr);
 }
 
@@ -62,22 +53,14 @@ Value CreateSolver(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     void* cache_ptr = UnwrapPointer<void>(info[2]);
-    bool is_heuristic = info[3].As<Boolean>().Value();
-
+    // info[3] = legacy is_heuristic slot (ignored; exact-only since v5)
     int align = info[4].As<Number>().Int32Value();
     bool wrap = info[5].As<Boolean>().Value();
     void* ptr = nullptr;
-    if (is_heuristic) {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            ptr = Size::HeuristicSolver::createWithCache(static_cast<::GameSolver::Connect4::Cache*>(cache_ptr), w, h).release();
-        });
-    } else {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            ptr = Size::Solver::createWithCache(static_cast<::GameSolver::Connect4::Cache*>(cache_ptr), w, h).release();
-        });
-    }
+    dispatch_void(w, h, align, wrap, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        ptr = Size::Solver::createWithCache(static_cast<::GameSolver::Connect4::Cache*>(cache_ptr), w, h).release();
+    });
     return WrapPointer(info, ptr);
 }
 
@@ -85,21 +68,13 @@ Value DestroySolver(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     void* solver = UnwrapPointer<void>(info[2]);
-    bool is_heuristic = info[3].As<Boolean>().Value();
-
+    // info[3] = legacy is_heuristic slot (ignored; exact-only since v5)
     int align = info[4].As<Number>().Int32Value();
     bool wrap = info[5].As<Boolean>().Value();
-    if (is_heuristic) {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            delete static_cast<typename Size::HeuristicSolver*>(solver);
-        });
-    } else {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            delete static_cast<typename Size::Solver*>(solver);
-        });
-    }
+    dispatch_void(w, h, align, wrap, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        delete static_cast<typename Size::Solver*>(solver);
+    });
     return info.Env().Undefined();
 }
 
@@ -276,31 +251,6 @@ std::vector<int> runSolveRaw(int w, int h, CoreSolver& solver, const std::string
     return result;
 }
 
-template <typename CoreSolver, typename CorePosition, int W, int H, typename BookType>
-std::vector<int> runSolveHeuristicRaw(int w, int h, CoreSolver& solver, const std::string& pos, int max_depth, int threads, double timeout_ms, void* book_ptr) {
-    const BookType* resolved = getEffectiveBookNode<W, H, BookType>(book_ptr);
-    solver.loadBook(const_cast<BookType*>(resolved));
-    CorePosition P(w, h);
-    std::vector<int> result(8, 0);
-    if(P.play(pos) != pos.size()) {
-        int lastColPlayed = pos[P.nbMoves()] - '1';
-        result[0] = P.isWinningMove(lastColPlayed) ? 1 : 2;
-        result[1] = P.nbMoves();
-    } else {
-        result[0] = 0;
-        result[1] = P.nbMoves();
-        double end_time_ms = timeout_ms > 0 ? (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() + timeout_ms) : 0;
-        auto res = solver.solve_heuristic(P, max_depth, end_time_ms, false, nullptr, threads);
-        result[2] = res.score;
-        result[3] = res.bestMove;
-        result[4] = res.depth;
-        result[5] = (int)(res.nodes & 0xFFFFFFFF);
-        result[6] = (int)(res.nodes >> 32);
-        result[7] = res.aborted ? 1 : 0;
-    }
-    return result;
-}
-
 class AnalyzeExactWorker : public Napi::AsyncWorker {
 public:
     AnalyzeExactWorker(Napi::Env& env, Napi::Promise::Deferred deferred, int w, int h, void* solver, const std::string& pos, bool is_weak, int threads, void* book_ptr, double timeout_ms, int align, bool wrap)
@@ -429,174 +379,17 @@ Value AnalyzeExact(const CallbackInfo& info) {
     return deferred.Promise();
 }
 
-template <typename CoreSolver, typename CorePosition, int W, int H, typename BookType>
-std::vector<int> runHeuristicAnalysisRaw(int w, int h, CoreSolver& solver, const std::string& pos, int max_depth, int threads, double timeout_ms, void* book_ptr) {
-    if (book_ptr) solver.loadBook(static_cast<BookType*>(book_ptr));
-    else solver.loadBook(nullptr);
-    CorePosition P(w, h);
-    int active_w = W == -1 ? w : W;
-    std::vector<int> result(4 + active_w, 0);
-    
-    if(P.play(pos) != pos.size()) {
-        int lastColPlayed = pos[P.nbMoves()] - '1';
-        result[0] = P.isWinningMove(lastColPlayed) ? 1 : 2;
-        result[1] = P.nbMoves();
-    } else {
-        result[0] = 0;
-        result[1] = P.nbMoves();
-        double end_time_ms = timeout_ms > 0 ? (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count() + timeout_ms) : 0;
-        auto res = solver.analyze_heuristic(P, max_depth, threads, end_time_ms);
-        std::vector<int> scores = res.first;
-        for(int i = 0; i < active_w; i++) result[2 + i] = scores[i];
-        result[2 + active_w] = res.second;
-        result[3 + active_w] = solver.isAborted() ? 1 : 0;
-    }
-    return result;
-}
-
-class AnalyzeHeuristicWorker : public Napi::AsyncWorker {
-public:
-    AnalyzeHeuristicWorker(Napi::Env& env, Napi::Promise::Deferred deferred, int w, int h, void* solver, const std::string& pos, int threads, int max_depth, double timeout_ms, void* book_ptr)
-        : Napi::AsyncWorker(env), deferred(deferred), w(w), h(h), solver(solver), pos(pos), threads(threads), max_depth(max_depth), timeout_ms(timeout_ms), book_ptr(book_ptr) {}
-    
-    void Execute() override { double timeout_ms = this->timeout_ms;
-        int align = 4; bool wrap = false;
-        try {
-            dispatch_void(w, h, align, wrap, [&](auto tag) {
-                using Size = typename decltype(tag)::type;
-                result_data = runHeuristicAnalysisRaw<typename Size::HeuristicSolver, typename ::GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, ::GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(w, h, *static_cast<typename Size::HeuristicSolver*>(solver), pos, max_depth, threads, timeout_ms, book_ptr);
-            });
-        } catch (const std::exception& e) {
-            SetError(e.what());
-        }
-
-    }
-
-    void OnOK() override {
-        Napi::Env env = Env();
-        
-        Napi::Int32Array js_result = Napi::Int32Array::New(env, result_data.size());
-        for (size_t i = 0; i < result_data.size(); ++i) js_result[i] = result_data[i];
-        deferred.Resolve(js_result);
-    }
-
-    void OnError(const Napi::Error& e) override {
-        deferred.Reject(e.Value());
-        
-    }
-
-private:
-    Napi::Promise::Deferred deferred;
-    int w, h;
-    void* solver;
-    std::string pos;
-    int threads;
-    int max_depth;
-    double timeout_ms;
-    void* book_ptr;
-    std::vector<int> result_data;
-};
-
-class SolveHeuristicWorker : public Napi::AsyncWorker {
-public:
-    SolveHeuristicWorker(Napi::Env& env, Napi::Promise::Deferred deferred, int w, int h, void* solver, const std::string& pos, int threads, int max_depth, double timeout_ms, void* book_ptr)
-        : Napi::AsyncWorker(env), deferred(deferred), w(w), h(h), solver(solver), pos(pos), threads(threads), max_depth(max_depth), timeout_ms(timeout_ms), book_ptr(book_ptr) {}
-    
-    void Execute() override { double timeout_ms = this->timeout_ms;
-        int align = 4; bool wrap = false;
-        try {
-            dispatch_void(w, h, align, wrap, [&](auto tag) {
-                using Size = typename decltype(tag)::type;
-                result_data = runSolveHeuristicRaw<typename Size::HeuristicSolver, typename ::GameSolver::Connect4::GenericPosition<Size::w, Size::h>, Size::w, Size::h, ::GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(w, h, *static_cast<typename Size::HeuristicSolver*>(solver), pos, max_depth, threads, timeout_ms, book_ptr);
-            });
-        } catch (const std::exception& e) {
-            SetError(e.what());
-        }
-    }
-
-    void OnOK() override {
-        Napi::Env env = Env();
-        
-        Napi::Int32Array js_result = Napi::Int32Array::New(env, result_data.size());
-        for (size_t i = 0; i < result_data.size(); ++i) js_result[i] = result_data[i];
-        deferred.Resolve(js_result);
-    }
-
-    void OnError(const Napi::Error& e) override {
-        
-        deferred.Reject(e.Value());
-    }
-
-private:
-    Napi::Promise::Deferred deferred;
-    int w, h;
-    void* solver;
-    std::string pos;
-    int threads;
-    int max_depth;
-    double timeout_ms;
-    void* book_ptr;
-    std::vector<int> result_data;
-};
-
-Value SolveHeuristic(const CallbackInfo& info) {
-    Env env = info.Env();
-    int w = info[0].As<Number>().Int32Value();
-    int h = info[1].As<Number>().Int32Value();
-    void* solver = UnwrapPointer<void>(info[2]);
-    std::string pos = info[3].As<String>().Utf8Value();
-    int threads = info[4].As<Number>().Int32Value();
-    int max_depth = info[5].As<Number>().Int32Value();
-    double timeout_ms = info[6].As<Number>().DoubleValue();
-    void* book_ptr = UnwrapPointer<void>(info[7]);
-
-    Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
-    SolveHeuristicWorker* worker = new SolveHeuristicWorker(env, deferred, w, h, solver, pos, threads, max_depth, timeout_ms, book_ptr);
-    worker->Queue();
-    return deferred.Promise();
-}
-
-Value AnalyzeHeuristic(const CallbackInfo& info) {
-    Env env = info.Env();
-    int w = info[0].As<Number>().Int32Value();
-    int h = info[1].As<Number>().Int32Value();
-    void* solver = UnwrapPointer<void>(info[2]);
-    std::string pos = info[3].As<String>().Utf8Value();
-    int threads = info[4].As<Number>().Int32Value();
-    int max_depth = info[5].As<Number>().Int32Value();
-    double timeout_ms = info[6].As<Number>().DoubleValue();
-    void* book_ptr = UnwrapPointer<void>(info[7]);
-
-    
-    
-
-    Napi::Promise::Deferred deferred = Napi::Promise::Deferred::New(env);
-    AnalyzeHeuristicWorker* worker = new AnalyzeHeuristicWorker(env, deferred, w, h, solver, pos, threads, max_depth, timeout_ms, book_ptr);
-    worker->Queue();
-    
-    return deferred.Promise();
-}
-
-
 Value StopSolver(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     void* solver = UnwrapPointer<void>(info[2]);
-    bool is_heuristic = info[3].As<Boolean>().Value();
-
+    // info[3] = legacy is_heuristic slot (ignored; exact-only since v5)
     int align = info[4].As<Number>().Int32Value();
     bool wrap = info[5].As<Boolean>().Value();
-    if (is_heuristic) {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            static_cast<typename Size::HeuristicSolver*>(solver)->stop();
-        });
-    } else {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            static_cast<typename Size::Solver*>(solver)->stop();
-        });
-    }
+    dispatch_void(w, h, align, wrap, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        static_cast<typename Size::Solver*>(solver)->stop();
+    });
     return info.Env().Undefined();
 }
 
@@ -605,22 +398,14 @@ Value GetNodeCount(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     void* solver = UnwrapPointer<void>(info[2]);
-    bool is_heuristic = info[3].As<Boolean>().Value();
-
+    // info[3] = legacy is_heuristic slot (ignored; exact-only since v5)
     int align = info[4].As<Number>().Int32Value();
     bool wrap = info[5].As<Boolean>().Value();
     uint64_t count = 0;
-    if (is_heuristic) {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            count = static_cast<typename Size::HeuristicSolver*>(solver)->getNodeCount();
-        });
-    } else {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            count = static_cast<typename Size::Solver*>(solver)->getNodeCount();
-        });
-    }
+    dispatch_void(w, h, align, wrap, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        count = static_cast<typename Size::Solver*>(solver)->getNodeCount();
+    });
     return Number::New(info.Env(), (double)count);
 }
 
@@ -1440,9 +1225,7 @@ Object Init(Env env, Object exports) {
     exports.Set(String::New(env, "_createCache"), Function::New(env, CreateCache));
     exports.Set(String::New(env, "_destroyCache"), Function::New(env, DestroyCache));
     exports.Set(String::New(env, "_analyzeExact"), Function::New(env, AnalyzeExact));
-    exports.Set(String::New(env, "_analyzeHeuristic"), Function::New(env, AnalyzeHeuristic));
     exports.Set(String::New(env, "_solveExact"), Function::New(env, SolveExact));
-    exports.Set(String::New(env, "_solveHeuristic"), Function::New(env, SolveHeuristic));
     exports.Set(String::New(env, "_createBook"), Function::New(env, CreateBook));
     exports.Set(String::New(env, "_createBookFromBuffer"), Function::New(env, CreateBookFromBuffer));
     exports.Set(String::New(env, "_convertBookToDense"), Function::New(env, ConvertBookToDense));
