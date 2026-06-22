@@ -11,7 +11,6 @@
  * Usage:
  *   const solver = new AdaptiveSolver({ cacheSizeMb: 256 });
  *   await solver.setBoard(7, 6);
- *   console.log(solver.capability); // 'exact'
  *   console.log(solver.hasBook);    // true  (embedded book auto-loaded)
  *
  *   const result = await solver.analyze('443322');
@@ -25,18 +24,11 @@ import {
   AnalyzeOptions,
   Connect4SolverOptions,
 } from "./core.js";
-import {
-  getSolverCapability,
-  SolverCapability,
-  EMBEDDED_BOOK_SIZES,
-} from "./capabilities.js";
-
-export type { SolverCapability };
-export { getSolverCapability };
+import { EMBEDDED_BOOK_SIZES } from "./embedded-book-sizes.js";
 
 // ─── Embedded book registry ───────────────────────────────────────────────────
 
-// EMBEDDED_BOOK_SIZES is imported from capabilities.ts — single source of truth.
+// EMBEDDED_BOOK_SIZES is the single source of truth (auto-generated).
 // Used to pre-determine solver type before init(), avoiding the
 // "create as heuristic → detect book → recreate as exact" anti-pattern.
 function hasEmbeddedBook(
@@ -98,7 +90,6 @@ export class AdaptiveSolver {
   private _height = 0;
   private _align = 4;
   private _wrap = false;
-  private _capability: SolverCapability = "exact";
   private _hasBook = false;
   private _isReady = false;
   private _isSwitching = false;
@@ -116,17 +107,6 @@ export class AdaptiveSolver {
   }
   get wrap(): boolean {
     return this._wrap;
-  }
-
-  /**
-   * Analysis quality for the current board size.
-   *
-   * - `'exact'` Perfect minimax. As of v5 the engine is exact-only, so this is
-   *             always `'exact'`. Pass a `timeoutMs` to bound long searches on
-   *             large boards without an opening book.
-   */
-  get capability(): SolverCapability {
-    return this._capability;
   }
 
   /** True if an opening book is active (embedded or custom). */
@@ -224,15 +204,6 @@ export class AdaptiveSolver {
       }
     }
 
-    // 6. Finalize capability (book state is now settled)
-    this._capability = getSolverCapability(
-      width,
-      height,
-      this._hasBook,
-      align,
-      wrap,
-    );
-
     this._isReady = true;
     this._isSwitching = false;
   }
@@ -280,13 +251,6 @@ export class AdaptiveSolver {
     if (!this._solver) throw new Error("Call setBoard() before loadBook().");
     await this._solver.loadBook(data);
     this._hasBook = true;
-    this._capability = getSolverCapability(
-      this._width,
-      this._height,
-      true,
-      this._align,
-      this._wrap,
-    );
   }
 
   /**

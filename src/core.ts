@@ -46,13 +46,10 @@ export interface AnalyzeOptions {
 }
 
 export interface Evaluation {
-  eval: {
-    value: number; // Normalized float (+Infinity/-Infinity for exact wins)
-  };
-  outcome?: Outcome; // Only present on exact solutions
-  winner?: Player | null; // null when Draw, only present on exact solutions
-  movesToEnd?: number | null; // null when Draw, only present on exact solutions
-  score: number; // raw score (positive = current player winning)
+  outcome?: Outcome; // Win / Loss / Draw
+  winner?: Player | null; // null when Draw
+  movesToEnd?: number | null; // half-moves until the forced result; null when Draw
+  score: number; // raw exact score (positive = current player winning, 0 = draw)
 }
 
 export interface PositionAnalysis {

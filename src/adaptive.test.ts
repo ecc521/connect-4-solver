@@ -1,29 +1,7 @@
-import { AdaptiveSolver, getSolverCapability } from "./index.js";
+import { AdaptiveSolver } from "./index.js";
 import { Outcome, Player } from "./core.js";
 
-describe("AdaptiveSolver & Capability Logic", () => {
-  describe("getSolverCapability()", () => {
-    it("should resolve small boards (w < 7 && h < 7) as 'exact'", () => {
-      expect(getSolverCapability(6, 6, false)).toBe("exact");
-      expect(getSolverCapability(5, 5, false)).toBe("exact");
-    });
-
-    it("should resolve boards with embedded books as 'exact'", () => {
-      expect(getSolverCapability(7, 6, false)).toBe("exact");
-      expect(getSolverCapability(6, 7, false)).toBe("exact");
-    });
-
-    it("should resolve boards with custom loaded books as 'exact'", () => {
-      expect(getSolverCapability(8, 8, true)).toBe("exact");
-    });
-
-    it("should resolve large boards as 'exact' (v5 is exact-only)", () => {
-      expect(getSolverCapability(8, 8, false)).toBe("exact");
-      expect(getSolverCapability(6, 8, false)).toBe("exact");
-      expect(getSolverCapability(8, 7, false)).toBe("exact");
-    });
-  });
-
+describe("AdaptiveSolver", () => {
   describe("AdaptiveSolver Lifecycle", () => {
     let solver: AdaptiveSolver;
 
@@ -39,7 +17,6 @@ describe("AdaptiveSolver & Capability Logic", () => {
       await solver.setBoard(7, 6);
       expect(solver.width).toBe(7);
       expect(solver.height).toBe(6);
-      expect(solver.capability).toBe("exact");
       expect(solver.hasBook).toBe(true);
       expect(solver.isReady).toBe(true);
 
@@ -49,11 +26,10 @@ describe("AdaptiveSolver & Capability Logic", () => {
       expect(res.evaluation?.winner).toBe(Player.P1);
     });
 
-    it("should switch to 8x8 board with exact capability (no book)", async () => {
+    it("should switch to 8x8 board (no book)", async () => {
       await solver.setBoard(8, 8);
       expect(solver.width).toBe(8);
       expect(solver.height).toBe(8);
-      expect(solver.capability).toBe("exact");
       expect(solver.hasBook).toBe(false);
 
       // Exact 8x8 from near-empty is intractable; bound it with a timeout so the
@@ -66,7 +42,6 @@ describe("AdaptiveSolver & Capability Logic", () => {
 
     it("should return a bounded result on large boards when timeoutMs is provided", async () => {
       await solver.setBoard(6, 8);
-      expect(solver.capability).toBe("exact");
 
       const res = await solver.solve("123", { timeoutMs: 500 });
       // Either it solved quickly or it aborted — in both cases it must return.

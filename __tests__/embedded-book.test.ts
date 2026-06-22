@@ -16,7 +16,7 @@
 
 import { NodeConnect4Solver } from "../src/node.js";
 import { AdaptiveSolver } from "../src/adaptive.js";
-import { EMBEDDED_BOOK_SIZES } from "../src/capabilities.js";
+import { EMBEDDED_BOOK_SIZES } from "../src/embedded-book-sizes.js";
 import { getNativeModule } from "../src/node.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -149,7 +149,6 @@ describe("Embedded book transparent fallback", () => {
       const solver = new AdaptiveSolver();
       await solver.setBoard(7, 6);
       expect(solver.hasBook).toBe(true);
-      expect(solver.capability).toBe("exact");
       await solver.destroy();
     });
 
@@ -157,8 +156,6 @@ describe("Embedded book transparent fallback", () => {
       const solver = new AdaptiveSolver();
       await solver.setBoard(8, 8);
       expect(solver.hasBook).toBe(false);
-      // v5 is exact-only: capability is always "exact" regardless of book state.
-      expect(solver.capability).toBe("exact");
       await solver.destroy();
     });
 
@@ -184,7 +181,6 @@ describe("Embedded book transparent fallback", () => {
       // Use 7x6 — it has an embedded book already, but the bookLoader overrides it
       await solver.setBoard(7, 6);
       expect(solver.hasBook).toBe(true);
-      expect(solver.capability).toBe("exact");
       await solver.destroy();
     });
   });

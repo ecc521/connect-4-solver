@@ -52,7 +52,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
 
     if (score === 0) {
       return {
-        eval: { value: 0 },
         outcome: Outcome.Draw,
         winner: null,
         movesToEnd: null,
@@ -60,7 +59,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       };
     } else if (score > 0) {
       return {
-        eval: { value: Number.POSITIVE_INFINITY },
         outcome: Outcome.Win,
         winner: currentPlayer,
         movesToEnd: halfMovesRemaining - score + 1,
@@ -71,7 +69,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       };
     } else {
       return {
-        eval: { value: Number.NEGATIVE_INFINITY },
         outcome: Outcome.Loss,
         winner: opponent,
         movesToEnd: halfMovesRemaining + score + 1,
@@ -105,7 +102,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
       const baseScore = Math.floor((this.width * this.height - nbMoves) / 2);
       evaluation = {
-        eval: { value: Number.POSITIVE_INFINITY },
         outcome: Outcome.Win,
         winner,
         movesToEnd: 0,
@@ -184,12 +180,6 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       const baseScore = Math.floor((this.width * this.height - nbMoves) / 2);
       const adjustedScore = SCORE_FORCED_WIN_BASE + baseScore;
       evaluation = {
-        eval: {
-          value:
-            winner === Player.P1
-              ? Number.POSITIVE_INFINITY
-              : Number.NEGATIVE_INFINITY,
-        },
         outcome: winner === currentPlayer ? Outcome.Win : Outcome.Loss,
         winner,
         movesToEnd: positionStr.length - (nbMoves + 1),

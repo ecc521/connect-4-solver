@@ -217,7 +217,6 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
 
     if (score === 0) {
       return {
-        eval: { value: 0 },
         outcome: Outcome.Draw,
         winner: null,
         movesToEnd: null,
@@ -225,7 +224,6 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       };
     } else if (score > 0) {
       return {
-        eval: { value: Number.POSITIVE_INFINITY },
         outcome: Outcome.Win,
         winner: currentPlayer,
         movesToEnd: halfMovesRemaining - score + 1,
@@ -233,7 +231,6 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       };
     } else {
       return {
-        eval: { value: Number.NEGATIVE_INFINITY },
         outcome: Outcome.Loss,
         winner: opponent,
         movesToEnd: halfMovesRemaining + score + 1,
@@ -275,7 +272,6 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         currentPosition = positionStr.slice(0, nbMoves + 1);
         const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
         evaluation = {
-          eval: { value: Number.POSITIVE_INFINITY },
           outcome: Outcome.Win,
           winner,
           movesToEnd: 0,
@@ -369,7 +365,6 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
           originalPosition: positionStr,
           currentPlayer,
           evaluation: {
-            eval: { value: Number.POSITIVE_INFINITY },
             outcome: Outcome.Win,
             winner,
             movesToEnd: 0,
