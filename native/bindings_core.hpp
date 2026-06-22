@@ -15,10 +15,16 @@
 // ─── Standard Connect-4 pre-compiled sizes ───────────────────────────────────
 // X-Macro for standard C4 (align=4, wrap=false) supported sizes
 #define SUPPORTED_SIZES_X_MACRO \
+    X(6, 7, uint64_t) \
     X(6, 8, uint64_t) \
     X(7, 6, uint64_t) \
     X(7, 7, uint64_t) \
-    X(8, 6, uint64_t)
+    X(7, 8, uint64_t) \
+    X(7, 9, WASM_U128_T) \
+    X(8, 6, uint64_t) \
+    X(8, 7, uint64_t) \
+    X(8, 8, WASM_U128_T) \
+    X(9, 7, WASM_U128_T)
 
 // Define the namespaces using the X-Macro
 #define X(w, h, slottype) \
@@ -62,10 +68,16 @@ struct SupportedSize {
 // ─── Dispatch tuple ───────────────────────────────────────────────────────────
 // Standard C4 pre-compiled sizes (matched first)
 using AllSupportedSizes = std::tuple<
+    SupportedSize<6, 7, 4, false, C4_6x7::Solver>,
     SupportedSize<6, 8, 4, false, C4_6x8::Solver>,
     SupportedSize<7, 6, 4, false, C4_7x6::Solver>,
     SupportedSize<7, 7, 4, false, C4_7x7::Solver>,
+    SupportedSize<7, 8, 4, false, C4_7x8::Solver>,
+    SupportedSize<7, 9, 4, false, C4_7x9::Solver>,
     SupportedSize<8, 6, 4, false, C4_8x6::Solver>,
+    SupportedSize<8, 7, 4, false, C4_8x7::Solver>,
+    SupportedSize<8, 8, 4, false, C4_8x8::Solver>,
+    SupportedSize<9, 7, 4, false, C4_9x7::Solver>,
     // Variant specializations
     SupportedSize<8, 8, 5, false, C5_8x8::Solver>,
     SupportedSize<7, 6, 4, true,  C4W_7x6::Solver>,
