@@ -8,7 +8,6 @@ describe("Extended Game Variants (Connect 5 & Wraparound)", () => {
       height: 8,
       align: 5,
       wrap: false,
-      heuristic: false,
     });
     await solver.init();
 
@@ -32,7 +31,6 @@ describe("Extended Game Variants (Connect 5 & Wraparound)", () => {
       height: 6,
       align: 4,
       wrap: true,
-      heuristic: false,
     });
     await solver.init();
 
@@ -58,7 +56,6 @@ describe("Extended Game Variants (Connect 5 & Wraparound)", () => {
       height: 8,
       align: 5,
       wrap: true,
-      heuristic: false,
     });
     await solver.init();
 

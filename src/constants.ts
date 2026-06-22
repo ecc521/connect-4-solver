@@ -4,4 +4,3 @@
  */
 
 export const SCORE_FORCED_WIN_BASE = 31000;
-export const SCORE_NNUE_MAX = 30000;

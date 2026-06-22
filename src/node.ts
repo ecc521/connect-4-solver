@@ -46,16 +46,6 @@ export interface NativeModuleType {
     align: number,
     wrap: boolean,
   ): Promise<Int32Array>;
-  _analyzeHeuristic(
-    w: number,
-    h: number,
-    solver: unknown,
-    pos: string,
-    threads: number,
-    depth: number,
-    timeout: number,
-    book: unknown,
-  ): Promise<Int32Array>;
   _solveExact(
     w: number,
     h: number,
@@ -67,16 +57,6 @@ export interface NativeModuleType {
     timeout: number,
     align: number,
     wrap: boolean,
-  ): Promise<Int32Array>;
-  _solveHeuristic(
-    w: number,
-    h: number,
-    solver: unknown,
-    pos: string,
-    threads: number,
-    depth: number,
-    timeout: number,
-    book: unknown,
   ): Promise<Int32Array>;
   _stopSolver(
     w: number,
@@ -173,7 +153,6 @@ export class NativeCache {
     public width: number,
     public height: number,
     public cacheSizeMb: number,
-    public isHeuristic: boolean,
     public align = 4,
     public wrap = false,
   ) {
@@ -187,7 +166,7 @@ export class NativeCache {
         width,
         height,
         sizeMb * 1024 * 1024,
-        isHeuristic,
+        false, // legacy is_heuristic slot (removed in v5)
         align,
         wrap,
       );
@@ -250,7 +229,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
           this.width,
           this.height,
           sizeMb * 1024 * 1024,
-          this.isHeuristic,
+          false, // legacy is_heuristic slot (removed in v5)
           this.align,
           this.wrap,
         );
@@ -267,13 +246,13 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       this.width,
       this.height,
       this._cachePtr,
-      this.isHeuristic,
+      false, // legacy is_heuristic slot (removed in v5)
       this.align,
       this.wrap,
     ) as number;
     if (!this._solverPtr) {
       throw new Error(
-        `Failed to create ${this.isHeuristic ? "heuristic" : "exact"} solver for ` +
+        `Failed to create exact solver for ` +
           `${this.width}x${this.height}. This board size may not be supported by the current native addon build.`,
       );
     }
@@ -317,35 +296,20 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     return this.runTask(async () => {
       const native = getNativeModule();
       if (!native) throw new Error("Native module not loaded");
-      const { threads, maxDepth, timeoutMs, bookPtr, weak } =
-        this.sanitizeOpts(opts);
+      const { threads, timeoutMs, bookPtr, weak } = this.sanitizeOpts(opts);
 
-      let resArr: Int32Array | number[];
-      if (this.isHeuristic) {
-        resArr = await native._analyzeHeuristic(
-          this.width,
-          this.height,
-          this._solverPtr,
-          positionStr,
-          threads,
-          maxDepth,
-          timeoutMs,
-          bookPtr === 0 ? null : bookPtr,
-        );
-      } else {
-        resArr = await native._analyzeExact(
-          this.width,
-          this.height,
-          this._solverPtr,
-          positionStr,
-          weak,
-          threads,
-          bookPtr === 0 ? null : bookPtr,
-          timeoutMs,
-          this.align,
-          this.wrap,
-        );
-      }
+      const resArr = await native._analyzeExact(
+        this.width,
+        this.height,
+        this._solverPtr,
+        positionStr,
+        weak,
+        threads,
+        bookPtr === 0 ? null : bookPtr,
+        timeoutMs,
+        this.align,
+        this.wrap,
+      );
       return this.parseResArr(resArr, positionStr);
     });
   }
@@ -359,38 +323,21 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     return this.runTask(async () => {
       const native = getNativeModule();
       if (!native) throw new Error("Native module not loaded");
-      const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
+      const { threads, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
       const weak = opts?.weak ?? false;
 
-      let resArr: Int32Array | number[];
-      if (this.isHeuristic) {
-        // Heuristic solve() does not benefit from LazySMP threading:
-        // deterministic NNUE evaluation = no search diversity between threads.
-        // analyze_heuristic() root-splitting still benefits from threads.
-        resArr = await native._solveHeuristic(
-          this.width,
-          this.height,
-          this._solverPtr,
-          positionStr,
-          threads,
-          maxDepth,
-          timeoutMs,
-          bookPtr === 0 ? null : bookPtr,
-        );
-      } else {
-        resArr = await native._solveExact(
-          this.width,
-          this.height,
-          this._solverPtr,
-          positionStr,
-          weak,
-          threads,
-          bookPtr === 0 ? null : bookPtr,
-          timeoutMs,
-          this.align,
-          this.wrap,
-        );
-      }
+      const resArr = await native._solveExact(
+        this.width,
+        this.height,
+        this._solverPtr,
+        positionStr,
+        weak,
+        threads,
+        bookPtr === 0 ? null : bookPtr,
+        timeoutMs,
+        this.align,
+        this.wrap,
+      );
       return this.parseSolveResArr(resArr, positionStr);
     });
   }
@@ -403,7 +350,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         this._solverPtr,
-        this.isHeuristic,
+        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -418,7 +365,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         this._solverPtr,
-        this.isHeuristic,
+        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -443,7 +390,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
             this.width,
             this.height,
             this._solverPtr,
-            this.isHeuristic,
+            false, // legacy is_heuristic slot (removed in v5)
             this.align,
             this.wrap,
           ),

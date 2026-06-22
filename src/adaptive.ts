@@ -60,9 +60,9 @@ export interface AdaptiveSolverOptions {
 
   /**
    * Default timeout in milliseconds applied to searches.
-   * If not specified, defaults to 5000 ms for all solver types.
-   * For heuristic searches (capability='nnue'|'tactical'), running without a timeout
-   * (explicitly setting to 0) is allowed but will trigger a console warning.
+   * If not specified, defaults to 5000 ms.
+   * Setting to 0 disables the timeout (the exact search runs to completion,
+   * which can be slow on large boards without an opening book).
    */
   defaultTimeoutMs?: number;
 
@@ -98,7 +98,7 @@ export class AdaptiveSolver {
   private _height = 0;
   private _align = 4;
   private _wrap = false;
-  private _capability: SolverCapability = "tactical";
+  private _capability: SolverCapability = "exact";
   private _hasBook = false;
   private _isReady = false;
   private _isSwitching = false;
@@ -121,12 +121,9 @@ export class AdaptiveSolver {
   /**
    * Analysis quality for the current board size.
    *
-   * - `'exact'`    Perfect minimax. Applies to small boards (w<7 && h<7) and
-   *                boards with an embedded or user-supplied opening book.
-   * - `'nnue'`     High-quality heuristic with trained NNUE evaluation.
-   * - `'tactical'` Tactical-only heuristic (no NNUE). Detect wins/losses within
-   *                search depth only. Analysis is not recommended; pass a
-   *                timeoutMs to analyze() or it will throw.
+   * - `'exact'` Perfect minimax. As of v5 the engine is exact-only, so this is
+   *             always `'exact'`. Pass a `timeoutMs` to bound long searches on
+   *             large boards without an opening book.
    */
   get capability(): SolverCapability {
     return this._capability;
@@ -245,9 +242,8 @@ export class AdaptiveSolver {
   /**
    * Analyze all moves at the given position.
    *
-   * For heuristic searches (capability='nnue'|'tactical'), running without a timeout
-   * is allowed but will trigger a console warning, as deep searches on large boards
-   * can take a long time or block indefinitely.
+   * Searches on large boards without an opening book can take a long time;
+   * pass a `timeoutMs` (or rely on the default) to bound the search.
    */
   async analyze(
     position: string,
@@ -328,13 +324,6 @@ export class AdaptiveSolver {
 
   private _withDefaults(opts?: AnalyzeOptions): AnalyzeOptions {
     const timeout = opts?.timeoutMs ?? this._opts.defaultTimeoutMs ?? 5000;
-
-    if (this._capability !== "exact" && timeout === 0) {
-      console.warn(
-        `AdaptiveSolver: Running a heuristic search (${this._capability}) without a timeout limit ` +
-          `can cause the engine to search indefinitely on complex positions. It is highly recommended to specify a timeout.`,
-      );
-    }
 
     return {
       ...opts,

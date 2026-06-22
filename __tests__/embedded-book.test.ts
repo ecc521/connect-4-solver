@@ -157,7 +157,8 @@ describe("Embedded book transparent fallback", () => {
       const solver = new AdaptiveSolver();
       await solver.setBoard(8, 8);
       expect(solver.hasBook).toBe(false);
-      expect(solver.capability).not.toBe("exact");
+      // v5 is exact-only: capability is always "exact" regardless of book state.
+      expect(solver.capability).toBe("exact");
       await solver.destroy();
     });
 

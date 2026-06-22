@@ -10,7 +10,6 @@ interface WorkerMessage {
     width: number;
     height: number;
     cacheSizeMb: number;
-    heuristic: boolean;
     position: string;
     opts: AnalyzeOptions;
     data?: Uint8Array;
@@ -45,12 +44,11 @@ export function setupWorkerHandler(): void {
 
     try {
       if (type === "init-threaded") {
-        const { width, height, cacheSizeMb, heuristic } = payload;
+        const { width, height, cacheSizeMb } = payload;
         const opts: Connect4SolverOptions = {
           width,
           height,
           cacheSizeMb,
-          heuristic,
         };
         solver = new SyncWasmConnect4Solver(opts);
         await solver.init();
@@ -95,12 +93,11 @@ export function setupNoSABWorkerHandler(): void {
     const { id, type, payload } = e.data;
     try {
       if (type === "init-nosab") {
-        const { width, height, cacheSizeMb, heuristic } = payload;
+        const { width, height, cacheSizeMb } = payload;
         const opts: Connect4SolverOptions = {
           width,
           height,
           cacheSizeMb,
-          heuristic,
         };
         solver = new SyncWasmNoSABConnect4Solver(opts);
         await solver.init();

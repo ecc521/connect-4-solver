@@ -15,7 +15,6 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
     width: number;
     height: number;
     cacheSizeMb: number;
-    heuristic: boolean;
   };
   private loadedBookData: Uint8Array | null = null;
   private messageId = 0;
@@ -54,7 +53,6 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
       width: this.width,
       height: this.height,
       cacheSizeMb,
-      heuristic: this.isHeuristic,
     };
 
     this.initPromise = this.sendMessage(
@@ -182,7 +180,6 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
           currentPlayer,
           evaluation: null,
           moveOptions: [],
-          isHeuristic: this.isHeuristic,
           aborted: true,
         } satisfies PositionAnalysis);
       } else {

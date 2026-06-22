@@ -62,7 +62,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         sizeMb * 1024 * 1024,
-        this.isHeuristic,
+        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -78,13 +78,13 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
       this.width,
       this.height,
       this._cachePtr,
-      this.isHeuristic,
+      false, // legacy is_heuristic slot (removed in v5)
       this.align,
       this.wrap,
     );
     if (this._solverPtr === 0) {
       throw new Error(
-        `Failed to create ${this.isHeuristic ? "heuristic" : "exact"} solver for ` +
+        `Failed to create exact solver for ` +
           `${this.width}x${this.height}. This board size may not be supported by the current WASM build.`,
       );
     }
@@ -125,7 +125,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
       this.width,
       this.height,
       this._solverPtr,
-      this.isHeuristic,
+      false, // legacy is_heuristic slot (removed in v5)
       this.align,
       this.wrap,
     );
@@ -169,7 +169,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         this._solverPtr,
-        this.isHeuristic,
+        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -191,7 +191,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         this._solverPtr,
-        this.isHeuristic,
+        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       ),

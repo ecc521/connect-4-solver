@@ -1,6 +1,5 @@
 import { AdaptiveSolver, getSolverCapability } from "./index.js";
 import { Outcome, Player } from "./core.js";
-import { jest } from "@jest/globals";
 
 describe("AdaptiveSolver & Capability Logic", () => {
   describe("getSolverCapability()", () => {
@@ -18,13 +17,10 @@ describe("AdaptiveSolver & Capability Logic", () => {
       expect(getSolverCapability(8, 8, true)).toBe("exact");
     });
 
-    it("should resolve boards with NNUE models as 'nnue'", () => {
-      expect(getSolverCapability(8, 8, false)).toBe("nnue");
-    });
-
-    it("should resolve other board sizes as 'tactical'", () => {
-      expect(getSolverCapability(6, 8, false)).toBe("tactical");
-      expect(getSolverCapability(8, 7, false)).toBe("tactical");
+    it("should resolve large boards as 'exact' (v5 is exact-only)", () => {
+      expect(getSolverCapability(8, 8, false)).toBe("exact");
+      expect(getSolverCapability(6, 8, false)).toBe("exact");
+      expect(getSolverCapability(8, 7, false)).toBe("exact");
     });
   });
 
@@ -53,48 +49,30 @@ describe("AdaptiveSolver & Capability Logic", () => {
       expect(res.evaluation?.winner).toBe(Player.P1);
     });
 
-    it("should switch to 8x8 board and solve with nnue capability", async () => {
+    it("should switch to 8x8 board with exact capability (no book)", async () => {
       await solver.setBoard(8, 8);
       expect(solver.width).toBe(8);
       expect(solver.height).toBe(8);
-      expect(solver.capability).toBe("nnue");
+      expect(solver.capability).toBe("exact");
       expect(solver.hasBook).toBe(false);
 
-      // Use a shallow depth and heuristic to solve quickly
+      // Exact 8x8 from near-empty is intractable; bound it with a timeout so the
+      // search aborts cleanly instead of hanging.
       const res = await solver.analyze("12345678", {
-        maxDepth: 4,
-        timeoutMs: 2000,
+        timeoutMs: 500,
       });
-      expect(res.evaluation).not.toBeNull();
-      expect(res.moveOptions).toHaveLength(8);
-    });
+      expect(res.aborted).toBe(true);
+    }, 30000);
 
-    it("should warn on tactical boards if timeoutMs is explicitly set to 0 (no timeout)", async () => {
+    it("should return a bounded result on large boards when timeoutMs is provided", async () => {
       await solver.setBoard(6, 8);
-      expect(solver.capability).toBe("tactical");
+      expect(solver.capability).toBe("exact");
 
-      const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {
-        /* noop */
-      });
-
-      const res = await solver.solve("123", { timeoutMs: 0, maxDepth: 4 });
-      expect(res.evaluation).toBeDefined();
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "Running a heuristic search (tactical) without a timeout limit",
-        ),
-      );
-
-      warnSpy.mockRestore();
-    });
-
-    it("should succeed on tactical boards if timeoutMs is provided", async () => {
-      await solver.setBoard(6, 8);
-      expect(solver.capability).toBe("tactical");
-
-      const res = await solver.solve("123", { timeoutMs: 500, maxDepth: 4 });
-      expect(res.evaluation).toBeDefined();
-    });
+      const res = await solver.solve("123", { timeoutMs: 500 });
+      // Either it solved quickly or it aborted — in both cases it must return.
+      expect(res).toBeDefined();
+      expect(res.currentPlayer).toBeDefined();
+    }, 30000);
 
     it("should allow custom book overrides via options", async () => {
       let loaderCalled = false;

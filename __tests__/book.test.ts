@@ -156,31 +156,6 @@ describe("Polymorphic Dense Book Packing", () => {
     book.destroy();
   });
 
-  test("should load the generated depth 5 book into heuristic solver and translate exact scores", async () => {
-    const bookData = new Uint8Array(fs.readFileSync(d5Path));
-
-    const solver = new NodeConnect4Solver({ heuristic: true });
-    await solver.init();
-
-    const book = new OpeningBook(solver.width, solver.height);
-    await book.load(bookData);
-
-    // Evaluate a depth 2 position (12)
-    // The exact score is cached in the book as -1 (Loss)
-    // The heuristic solver should translate this to -31001
-    // We use `solve` with a 1ms timeout. Without the book, 1ms would not find a deep loss.
-    const result = await solver.solve("12", { book, timeoutMs: 1 });
-
-    // Heuristic bounds translate exact Loss to <= -31000
-    expect(result.evaluation?.score).toBeLessThanOrEqual(-31000);
-
-    // Evaluate a depth 1 position (1) which is in the book with score 1
-    const result2 = await solver.solve("1", { book, timeoutMs: 1 });
-    expect(result2.evaluation?.score).toBeGreaterThanOrEqual(31000);
-
-    book.destroy();
-  });
-
   test("should support loadBook natively across all solver environments", async () => {
     const bookData = new Uint8Array(fs.readFileSync(d5Path));
 
