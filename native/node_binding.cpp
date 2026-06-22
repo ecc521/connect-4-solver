@@ -181,10 +181,17 @@ const CoreBook* getEffectiveBookNode(void* book_ptr) {
     if (book_ptr) return static_cast<const CoreBook*>(book_ptr);
     const uint8_t* data = EmbeddedBooks::getBookData(W, H);
     if (!data) return nullptr;
-    static const CoreBook* embedded =
-        static_cast<const CoreBook*>(
-            GameSolver::Connect4::OpeningBookBase<W, H>::load_from_memory(
-                data, EmbeddedBooks::getBookSize(W, H), W, H).release());
+    // Lazy-load once per process. If the embedded bytes are still in old (pre-v2) format,
+    // catch and return nullptr — run tools/convert-books.ts then regenerate embedded_books.hpp.
+    static const CoreBook* embedded = [&]() -> const CoreBook* {
+        try {
+            return static_cast<const CoreBook*>(
+                GameSolver::Connect4::OpeningBookBase<W, H>::load_from_memory(
+                    data, EmbeddedBooks::getBookSize(W, H), W, H).release());
+        } catch (const std::exception&) {
+            return nullptr;
+        }
+    }();
     return embedded;
 }
 
@@ -458,16 +465,16 @@ Value ConvertBookToDense(const CallbackInfo& info) {
 
     try {
         #define CONVERT_DENSE_ACTION(NS, W, H, b) \
-            if (dynamic_cast<::GameSolver::Connect4::DenseBook<W, H, typename ::GameSolver::Connect4::GenericPosition<W, H>::position_t, uint8_t>*>(b)) { \
+            if (!dynamic_cast<::GameSolver::Connect4::EliasFanoBook<W, H>*>(b)) { \
                 new_ptr = ptr; \
             } else { \
                 auto dump = b->dump(); \
-                std::vector< typename ::GameSolver::Connect4::GenericPosition<W, H>::position_t> keys; \
-                std::vector<uint8_t> values; \
+                std::vector<typename ::GameSolver::Connect4::GenericPosition<W, H>::position_t> keys; \
+                std::vector<uint16_t> values; \
                 keys.reserve(dump.size()); \
                 values.reserve(dump.size()); \
-                for(const auto& entry : dump) { keys.push_back(entry.first); values.push_back(entry.second); } \
-                new_ptr = new ::GameSolver::Connect4::DenseBook<W, H, typename ::GameSolver::Connect4::GenericPosition<W, H>::position_t, uint8_t>(b->getDepth(), std::move(keys), std::move(values)); \
+                for (const auto& entry : dump) { keys.push_back(entry.first); values.push_back(entry.second); } \
+                new_ptr = new ::GameSolver::Connect4::DenseBook<W, H, typename ::GameSolver::Connect4::GenericPosition<W, H>::position_t>(b->getDepth(), b->kind(), std::move(keys), std::move(values)); \
             }
         
         DISPATCH_BOOK(w, h, ptr, CONVERT_DENSE_ACTION);
@@ -503,7 +510,7 @@ Value ConvertBookToEF(const CallbackInfo& info) {
                 } \
                 std::vector<uint64_t> upper_bits((num_entries + (u >> l) + 64) / 64, 0); \
                 std::vector<uint64_t> lower_bits((num_entries * l + 63) / 64, 0); \
-                std::vector<uint8_t> values(num_entries); \
+                std::vector<uint16_t> values(num_entries); \
                 uint64_t last_upper = 0; \
                 uint64_t upper_idx = 0; \
                 for (size_t i = 0; i < dump.size(); i++) { \
@@ -522,7 +529,7 @@ Value ConvertBookToEF(const CallbackInfo& info) {
                     } \
                     values[i] = dump[i].second; \
                 } \
-                new_ptr = new ::GameSolver::Connect4::EliasFanoBook<W, H>(num_entries, u, l, depth, std::move(upper_bits), std::move(lower_bits), std::move(values)); \
+                new_ptr = new ::GameSolver::Connect4::EliasFanoBook<W, H>(num_entries, u, l, depth, b->kind(), std::move(upper_bits), std::move(lower_bits), std::move(values)); \
             }
         
         DISPATCH_BOOK(w, h, ptr, CONVERT_EF_ACTION);
@@ -559,8 +566,8 @@ Value GetBookFormat(const CallbackInfo& info) {
     std::string format = "unknown";
 
     #define GET_FORMAT_ACTION(NS, W, H, b) \
-        if (dynamic_cast<::GameSolver::Connect4::DenseBook<W, H, typename ::GameSolver::Connect4::GenericPosition<W, H>::position_t, uint8_t>*>(b)) format = "dense"; \
-        else if (dynamic_cast<::GameSolver::Connect4::EliasFanoBook<W, H>*>(b)) format = "elias-fano";
+        if (dynamic_cast<::GameSolver::Connect4::EliasFanoBook<W, H>*>(b)) format = "elias-fano"; \
+        else format = "dense";
     
     DISPATCH_BOOK(w, h, ptr, GET_FORMAT_ACTION);
     return String::New(info.Env(), format);
@@ -609,8 +616,8 @@ Value GetBookScore(const CallbackInfo& info) {
         if (!book) return;
         ::GameSolver::Connect4::GenericPosition<Size::w, Size::h> P(w, h);
         if (P.play(pos_str) == pos_str.length()) {
-            int val = book->get(P);
-            if (val != 0) score = val + (-(w * h + 1) / 2) - 1;
+            auto lu = book->query(P);
+            if (lu.found()) score = lu.lower + (-(w * h + 1) / 2) - 1;
         }
     });
 
@@ -676,8 +683,8 @@ private:
     int width;
     int height;
     int depth;
-    std::vector<std::pair<uint64_t, uint8_t>> items64;
-    std::vector<std::pair<unsigned __int128, uint8_t>> items128;
+    std::vector<std::pair<uint64_t, uint16_t>> items64;
+    std::vector<std::pair<unsigned __int128, uint16_t>> items128;
 
     Napi::Value LoadFromBook(const CallbackInfo& info) {
         void* book_ptr = UnwrapPointer<void>(info[0]);

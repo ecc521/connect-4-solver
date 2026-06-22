@@ -201,7 +201,7 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::negamax(const GenericPosit
 
   if constexpr (HasBook) {
     if (P.nbMoves() <= book_depth) {
-      if(int val = book->get(P)) return val + P.min_score() - 1; // look for solutions stored in opening book
+      if(auto lu = book->query(P); lu.found()) return lu.lower + P.min_score() - 1;
     }
   }
 
@@ -330,7 +330,7 @@ template <bool HasBook>
 
   if constexpr (HasBook) {
     if (P.nbMoves() <= book_depth) {
-      if(int val = book->get(P))      return {val + P.min_score() - 1, -1, (int)P.nbMoves(), getNodeCount()};
+      if(auto lu = book->query(P); lu.found()) return {lu.lower + P.min_score() - 1, -1, (int)P.nbMoves(), getNodeCount()};
     }
   }
 
@@ -408,8 +408,8 @@ flush:
           if (P.canPlay(col)) {
               GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
               P2.playCol(col);
-              if (int val = book->get(P2)) {
-                  int child_score = val + P.min_score() - 1;
+              if (auto lu = book->query(P2); lu.found()) {
+                  int child_score = lu.lower + P.min_score() - 1;
                   if (-child_score == score) {
                       bestMove = col;
                       break;

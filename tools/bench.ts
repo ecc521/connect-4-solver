@@ -14,11 +14,6 @@
  *   --book           Benchmark opening book lookups
  *   (default: both solve + analyze)
  *
- * Engine:
- *   --exact          Test exact solver
- *   --heuristic      Test heuristic solver
- *   (default: both)
- *
  * Filtering:
  *   --sizes 7x6 8x8  Board sizes to test (default: 7x6 8x8)
  *   --threads 1 4     Thread counts to test (default: 1 4)
@@ -64,7 +59,6 @@ function discoverSizes(): string[] {
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
 const YELLOW = "\x1b[33m";
-const CYAN = "\x1b[36m";
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
@@ -78,7 +72,6 @@ interface BenchPos {
 interface BenchResult {
   runtime: string;
   mode: string;
-  engine: string;
   board: string;
   threads: number;
   completed: number;
@@ -88,7 +81,6 @@ interface BenchResult {
   nodes: number;
   mns: number;
   timeMs: number;
-  avgDepth: number | null;
   parityOk: boolean;
   positionsAttempted: number;
   skipped: number;
@@ -113,8 +105,6 @@ interface BenchOptions {
   runSolve: boolean;
   runAnalyze: boolean;
   runBook: boolean;
-  testExact: boolean;
-  testHeuristic: boolean;
   sizes: string[];
   threads: number[];
   seed: number;
@@ -131,8 +121,6 @@ function parseArgs(): BenchOptions {
   let solveRequested = false;
   let analyzeRequested = false;
   let bookRequested = false;
-  let exactRequested = false;
-  let heuristicRequested = false;
   const sizes: string[] = [];
   const threads: number[] = [];
   let seed = 42;
@@ -140,6 +128,7 @@ function parseArgs(): BenchOptions {
   let budget = 2000;
   let maxPositions = 100;
   let verbose = false;
+  let json = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -148,8 +137,6 @@ function parseArgs(): BenchOptions {
     else if (arg === "--solve") solveRequested = true;
     else if (arg === "--analyze") analyzeRequested = true;
     else if (arg === "--book") bookRequested = true;
-    else if (arg === "--exact") exactRequested = true;
-    else if (arg === "--heuristic") heuristicRequested = true;
     else if (arg === "--verbose") verbose = true;
     else if (arg === "--json") json = true;
     else if (arg === "--seed") seed = parseInt(args[++i], 10);
@@ -179,11 +166,6 @@ Modes:
   --book           Benchmark opening book lookups
   (default: both solve + analyze)
 
-Engine:
-  --exact          Test exact solver
-  --heuristic      Test heuristic solver
-  (default: both)
-
 Filtering:
   --sizes 7x6 8x8  Board sizes (default: 7x6 8x8)
   --threads 1 4     Thread counts (default: 1 4)
@@ -212,9 +194,6 @@ Output:
       ? false
       : analyzeRequested || (!solveRequested && !analyzeRequested),
     runBook: bookRequested,
-    testExact: exactRequested || (!exactRequested && !heuristicRequested),
-    testHeuristic:
-      heuristicRequested || (!exactRequested && !heuristicRequested),
     sizes: sizes.length > 0 ? sizes : discoverSizes(),
     threads: threads.length > 0 ? threads : [1, 4],
     seed,
@@ -222,6 +201,7 @@ Output:
     budget,
     maxPositions,
     verbose,
+    json,
   };
 }
 
@@ -277,7 +257,6 @@ async function runBenchmark(
   width: number,
   height: number,
   threads: number,
-  isHeuristic: boolean,
   positions: BenchPos[],
   mode: "solve" | "analyze",
   budget: number,
@@ -285,10 +264,9 @@ async function runBenchmark(
   const dimStr = `${width}x${height}`;
 
   let correct = 0;
-  let completed = 0; // positions that finished without abort/timeout
+  let completed = 0;
   let skipped = 0;
   let totalAttempted = 0;
-  let totalDepth = 0;
   let hardFailures = 0;
   const startNodes: number = await solver.getNodeCount();
   const startTime = performance.now();
@@ -299,15 +277,13 @@ async function runBenchmark(
 
     try {
       let bestScore = -100000;
-      const posStart = performance.now();
 
       if (mode === "analyze") {
         const result = await solver.analyze(bp.pos, {
           threads,
           timeoutMs: opts.timeout,
         });
-        if (!result || (!isHeuristic && result.aborted)) continue;
-        totalDepth += result.depthReached || 0;
+        if (!result || result.aborted) continue;
         if (!result.moveOptions || result.moveOptions.length === 0) continue;
 
         for (const opt of result.moveOptions) {
@@ -318,56 +294,21 @@ async function runBenchmark(
           threads,
           timeoutMs: opts.timeout,
         });
-        if (!result || (!isHeuristic && result.aborted) || !result.evaluation)
-          continue;
-        totalDepth += result.depthReached || 0;
+        if (!result || result.aborted || !result.evaluation) continue;
 
         bestScore = result.evaluation.score;
       }
 
       completed++;
 
-      // Accuracy check
-      if (isHeuristic) {
-        const DRAW_THRESHOLD = 5000;
-        const outcome =
-          bestScore >= 31000
-            ? 1
-            : bestScore <= -31000
-              ? -1
-              : Math.abs(bestScore) <= DRAW_THRESHOLD
-                ? 0
-                : bestScore > 0
-                  ? 1
-                  : -1;
-        const expectedOutcome =
-          bp.expectedScore > 0 ? 1 : bp.expectedScore < 0 ? -1 : 0;
-        if (outcome === expectedOutcome) {
-          correct++;
-        } else {
-          // If the heuristic claims an EXACT forced win but the outcome is wrong, it's a fatal hallucination
-          if (bestScore >= 31000 || bestScore <= -31000) {
-            console.log(
-              `Failed! Pos: ${bp.pos}, EngineScore: ${bestScore}, ExpectedScore: ${bp.expectedScore}`,
-            );
-            hardFailures++;
-            if (opts.verbose) {
-              console.log(
-                `${RED}  FATAL HEURISTIC FAIL: pos="${bp.pos}" expected=${bp.expectedScore} got=${bestScore}${RESET}`,
-              );
-            }
-          }
-        }
+      if (bestScore === bp.expectedScore) {
+        correct++;
       } else {
-        if (bestScore === bp.expectedScore) {
-          correct++;
-        } else {
-          hardFailures++;
-          if (opts.verbose) {
-            console.log(
-              `${RED}  PARITY FAIL: pos="${bp.pos}" expected=${bp.expectedScore} got=${bestScore}${RESET}`,
-            );
-          }
+        hardFailures++;
+        if (opts.verbose) {
+          console.log(
+            `${RED}  PARITY FAIL: pos="${bp.pos}" expected=${bp.expectedScore} got=${bestScore}${RESET}`,
+          );
         }
       }
     } catch (e) {
@@ -375,7 +316,6 @@ async function runBenchmark(
         return {
           runtime: opts.runtime,
           mode: mode === "solve" ? "solve()" : "analyze()",
-          engine: isHeuristic ? "Heuristic" : "Exact",
           board: dimStr,
           threads,
           completed: 0,
@@ -385,7 +325,6 @@ async function runBenchmark(
           nodes: 0,
           mns: 0,
           timeMs: 0,
-          avgDepth: null,
           parityOk: true,
           positionsAttempted: 0,
           skipped: 0,
@@ -406,14 +345,11 @@ async function runBenchmark(
       ? totalNodes / 1_000_000 / (totalMs / 1000)
       : 0;
   const accuracyPct = completed > 0 ? (correct / completed) * 100 : 0;
-  // Parity is strictly enforced for exact solver (100% required)
-  // For heuristic solver, parity only fails if it hallucinates an exact forced win
   const parityOk = hardFailures === 0;
 
   return {
     runtime: opts.runtime,
     mode: mode === "solve" ? "solve()" : "analyze()",
-    engine: isHeuristic ? "Heuristic" : "Exact",
     board: dimStr,
     threads,
     completed: correct,
@@ -423,7 +359,6 @@ async function runBenchmark(
     nodes: totalNodes,
     mns: parseFloat(mns.toFixed(2)),
     timeMs: totalMs,
-    avgDepth: isHeuristic && completed > 0 ? totalDepth / completed : null,
     parityOk,
     positionsAttempted: totalAttempted,
     skipped,
@@ -497,7 +432,6 @@ async function main(): Promise<void> {
           for (const q of queries) {
             const res = await solver.analyze(q, {
               book: book as any,
-              maxDepth: 1,
               threads: 1,
             });
             if (res.evaluation?.score !== undefined && res.nodes === 0) hits++;
@@ -522,10 +456,10 @@ async function main(): Promise<void> {
   const dataDir = path.join(__dirname, "..", "test-data");
 
   console.log(
-    `| ${pad("Mode", 10)} | ${pad("Engine", 10)} | ${pad("Board", 8)} | ${pad("Thr", 3, false)} | ${pad("Pos", 7, false)} | ${pad("Accuracy", 8, false)} | ${pad("AvgDpt", 6, false)} | ${pad("Nodes", 14, false)} | ${pad("MN/s", 6, false)} | ${pad("Time", 8, false)} |`,
+    `| ${pad("Mode", 10)} | ${pad("Board", 8)} | ${pad("Thr", 3, false)} | ${pad("Pos", 7, false)} | ${pad("Accuracy", 8, false)} | ${pad("Nodes", 14, false)} | ${pad("MN/s", 6, false)} | ${pad("Time", 8, false)} |`,
   );
   console.log(
-    `|${"-".repeat(12)}|${"-".repeat(12)}|${"-".repeat(10)}|${"-".repeat(5)}|${"-".repeat(9)}|${"-".repeat(10)}|${"-".repeat(8)}|${"-".repeat(16)}|${"-".repeat(8)}|${"-".repeat(10)}|`,
+    `|${"-".repeat(12)}|${"-".repeat(10)}|${"-".repeat(5)}|${"-".repeat(9)}|${"-".repeat(10)}|${"-".repeat(16)}|${"-".repeat(8)}|${"-".repeat(10)}|`,
   );
 
   for (const sizeStr of opts.sizes) {
@@ -545,124 +479,111 @@ async function main(): Promise<void> {
     // Sample once per board size — same positions used across all combos
     const sampled = samplePositions(allPositions, opts.maxPositions, rng);
 
-    const engines: { name: string; heuristic: boolean }[] = [];
-    if (opts.testExact) engines.push({ name: "Exact", heuristic: false });
-    if (opts.testHeuristic)
-      engines.push({ name: "Heuristic", heuristic: true });
+    const modes: ("solve" | "analyze")[] = [];
+    if (opts.runSolve) modes.push("solve");
+    if (opts.runAnalyze) modes.push("analyze");
 
-    for (const engine of engines) {
-      const modes: ("solve" | "analyze")[] = [];
-      if (opts.runSolve) modes.push("solve");
-      if (opts.runAnalyze) modes.push("analyze");
+    for (const mode of modes) {
+      // Track baseline position count so subsequent thread counts
+      // use the identical set of positions (budget only applies to baseline)
+      let baselinePositionCount = 0;
 
-      for (const mode of modes) {
-        // Track baseline position count so subsequent thread counts
-        // use the identical set of positions (budget only applies to baseline)
-        let baselinePositionCount = 0;
-
-        for (const tCount of opts.threads) {
-          // Create a fresh solver per combo to avoid TT warming artifacts
-          let solver: any;
-          if (opts.runtime === "native") {
-            const { NodeConnect4Solver } = await import("../src/node");
-            solver = new NodeConnect4Solver({
-              width: w,
-              height: h,
-              align,
-              wrap,
-              heuristic: engine.heuristic,
-            });
-          } else {
-            const { SyncWasmNoSABConnect4Solver } = await import("../src/sync");
-            solver = new SyncWasmNoSABConnect4Solver({
-              width: w,
-              height: h,
-              align,
-              wrap,
-              heuristic: engine.heuristic,
-            });
-          }
-          try {
-            await solver.init();
-          } catch (err) {
-            if (opts.verbose) {
-              console.log(
-                `| ${pad(mode + "()", 10)} | ${pad(engine.name, 10)} | ${pad(sizeStr, 5)} | ${pad(tCount.toString(), 3, false)} | ${pad("-", 7, false)} | ${pad("Skipped", 8, false)} | ${pad("-", 6, false)} | ${pad("-", 14, false)} | ${pad("-", 6, false)} | ${pad("-", 8, false)} |`,
-              );
-            }
-            try {
-              solver.release();
-            } catch {}
-            continue;
-          }
-
-          // First thread count: apply budget to determine position set
-          // Subsequent thread counts: use the same positions (no budget)
-          const isBaseline = baselinePositionCount === 0;
-          const positionsForRun = isBaseline
-            ? sampled
-            : sampled.slice(0, baselinePositionCount);
-
-          const result = await runBenchmark(
-            opts,
-            solver,
-            w,
-            h,
-            tCount,
-            engine.heuristic,
-            positionsForRun,
-            mode,
-            isBaseline ? opts.budget : Number.MAX_SAFE_INTEGER,
-          );
-          allResults.push(result);
-
-          if (isBaseline) {
-            baselinePositionCount = result.positionsAttempted;
-          }
-
-          if (!result.parityOk) parityFailures++;
-
-          if (!opts.json) {
-            let accStr =
-              result.skipped > 0
-                ? `${result.completed}(${result.skipped})/${result.positionsAttempted}`
-                : `${result.completed}/${result.positionsAttempted}`;
-            let accPctStr = `${result.accuracyPct.toFixed(1)}%`;
-            let parityMark = result.parityOk ? "" : ` ${RED}FAIL${RESET}`;
-            let accColor =
-              result.accuracyPct >= 100
-                ? GREEN
-                : result.accuracyPct >= 80
-                  ? YELLOW
-                  : RED;
-            let depthStr =
-              result.avgDepth !== null ? result.avgDepth.toFixed(1) : "-";
-
-            let timeStr =
-              result.timeMs < 1
-                ? `${result.timeMs.toFixed(3)}ms`
-                : `${Math.round(result.timeMs)}ms`;
-
-            let nodesStr = result.nodes.toLocaleString();
-            let mnsStr = result.mns.toFixed(2);
-
-            if (result.unsupported) {
-              accStr = "N/A";
-              accPctStr = "N/A";
-              accColor = DIM;
-              depthStr = "-";
-              nodesStr = "N/A";
-              mnsStr = "N/A";
-              timeStr = "N/A";
-            }
-
+      for (const tCount of opts.threads) {
+        // Create a fresh solver per combo to avoid TT warming artifacts
+        let solver: any;
+        if (opts.runtime === "native") {
+          const { NodeConnect4Solver } = await import("../src/node");
+          solver = new NodeConnect4Solver({
+            width: w,
+            height: h,
+            align,
+            wrap,
+          });
+        } else {
+          const { SyncWasmNoSABConnect4Solver } = await import("../src/sync");
+          solver = new SyncWasmNoSABConnect4Solver({
+            width: w,
+            height: h,
+            align,
+            wrap,
+          });
+        }
+        try {
+          await solver.init();
+        } catch (err) {
+          if (opts.verbose) {
             console.log(
-              `| ${pad(result.mode, 10)} | ${pad(result.engine, 10)} | ${pad(result.board, 5)} | ${pad(String(result.threads), 3, false)} | ${pad(accStr, 7, false)} | ${accColor}${pad(accPctStr, 8, false)}${RESET} | ${pad(depthStr, 6, false)} | ${pad(nodesStr, 14, false)} | ${pad(mnsStr, 6, false)} | ${pad(timeStr, 8, false)} |${parityMark}`,
+              `| ${pad(mode + "()", 10)} | ${pad(sizeStr, 5)} | ${pad(tCount.toString(), 3, false)} | ${pad("-", 7, false)} | ${pad("Skipped", 8, false)} | ${pad("-", 14, false)} | ${pad("-", 6, false)} | ${pad("-", 8, false)} |`,
             );
           }
-
-          solver.release();
+          try {
+            solver.release();
+          } catch {}
+          continue;
         }
+
+        // First thread count: apply budget to determine position set
+        // Subsequent thread counts: use the same positions (no budget)
+        const isBaseline = baselinePositionCount === 0;
+        const positionsForRun = isBaseline
+          ? sampled
+          : sampled.slice(0, baselinePositionCount);
+
+        const result = await runBenchmark(
+          opts,
+          solver,
+          w,
+          h,
+          tCount,
+          positionsForRun,
+          mode,
+          isBaseline ? opts.budget : Number.MAX_SAFE_INTEGER,
+        );
+        allResults.push(result);
+
+        if (isBaseline) {
+          baselinePositionCount = result.positionsAttempted;
+        }
+
+        if (!result.parityOk) parityFailures++;
+
+        if (!opts.json) {
+          let accStr =
+            result.skipped > 0
+              ? `${result.completed}(${result.skipped})/${result.positionsAttempted}`
+              : `${result.completed}/${result.positionsAttempted}`;
+          let accPctStr = `${result.accuracyPct.toFixed(1)}%`;
+          let parityMark = result.parityOk ? "" : ` ${RED}FAIL${RESET}`;
+          let accColor =
+            result.accuracyPct >= 100
+              ? GREEN
+              : result.accuracyPct >= 80
+                ? YELLOW
+                : RED;
+
+          let timeStr =
+            result.timeMs < 1
+              ? `${result.timeMs.toFixed(3)}ms`
+              : `${Math.round(result.timeMs)}ms`;
+
+          let nodesStr = result.nodes.toLocaleString();
+          let mnsStr = result.mns.toFixed(2);
+
+          if (result.unsupported) {
+            accStr = "N/A";
+            accPctStr = "N/A";
+            accColor = DIM;
+            nodesStr = "N/A";
+            mnsStr = "N/A";
+            timeStr = "N/A";
+          }
+
+          console.log(
+            `| ${pad(result.mode, 10)} | ${pad(result.board, 5)} | ${pad(String(result.threads), 3, false)} | ${pad(accStr, 7, false)} | ${accColor}${pad(accPctStr, 8, false)}${RESET} | ${pad(nodesStr, 14, false)} | ${pad(mnsStr, 6, false)} | ${pad(timeStr, 8, false)} |${parityMark}`,
+          );
+        }
+
+        solver.release();
       }
     }
   }

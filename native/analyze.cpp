@@ -187,8 +187,8 @@ int getBookScore(int w, int h, void* book, const char* position) {
         if (!eff) return;
         GenericPosition<Size::w, Size::h> P(w, h);
         if (P.play(pos_str) == pos_str.length()) {
-            int val = eff->get(P);
-            if (val != 0) score = val + (-(w * h + 1) / 2) - 1;
+            auto lu = eff->query(P);
+            if (lu.found()) score = lu.lower + (-(w * h + 1) / 2) - 1;
         }
     });
     return score;

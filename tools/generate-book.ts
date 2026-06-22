@@ -93,7 +93,6 @@ async function run() {
 
   const { NodeConnect4Solver, NativeCache, getNativeModule, isFastPath } =
     await import("../src/node.js");
-  const { OpeningBook } = await import("../src/index.js");
 
   const native = getNativeModule();
   if (!native) {
@@ -129,8 +128,9 @@ async function run() {
     // stat failure (unusual cwd, etc.) — skip the staleness check silently.
   }
 
-  let bootstrapBook: OpeningBook | null = null;
+  let bootstrapBook: any = null;
   if (bootstrap) {
+    const { OpeningBook } = await import("../src/index.js");
     console.log(`[!] Loading bootstrap book from ${bootstrap}...`);
     const bookData = fs.readFileSync(bootstrap);
     bootstrapBook = await OpeningBook.fromBuffer(bookData);
@@ -190,14 +190,13 @@ async function run() {
 
   process.on("SIGINT", saveAndExit);
 
-  const sharedCache = new NativeCache(width, height, cacheSizeMb, false);
+  const sharedCache = new NativeCache(width, height, cacheSizeMb);
   const solvers: NodeConnect4Solver[] = [];
   for (let i = 0; i < threads; i++) {
     const s = new NodeConnect4Solver({
       width,
       height,
       sharedCache,
-      heuristic: false,
     });
     await s.init();
     solvers.push(s);
