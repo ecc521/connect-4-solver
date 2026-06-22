@@ -21,8 +21,8 @@ These are the forks where I want a yes/no before executing. Details in the secti
 |---|----------|-------------------|----|
 | D1 | Reconcile working trees before touching anything | **Commit local TT work + upstream the monorepo's submodule changes first** | §1 |
 | D2 | Remove NNUE + training + heuristic solver | Yes — clean cut, ~5k LOC | §2 |
-| D3 | Drop the generic `WIDTH==-1` runtime path; require every supported size be compiled | **Yes** — the 50% hit is real and it's the only thing forcing 128-bit + dynamic loops | §3 |
-| D4 | The explicit compiled-size set for the default bundle | See proposed list in §3.3 — confirm/edit | §3 |
+| D3 | ✅ RESOLVED — **KEEP** the generic `WIDTH==-1` path. It's only ~60–75 isolated lines (mostly `DynamicCache`), folds away for specialized sizes (zero cost to hot paths), and is correct-but-~50% for the small/rare boards it serves. Universal fallback for any ≤127-bit board; throws above that. | §3 |
+| D4 | ✅ RESOLVED — specialized speed list = **6×7, 6×8, 7×6, 7×7, 7×8, 7×9, 8×6, 8×7, 8×8, 9×7** (+ variants C5 8×8, C4-wrap 7×6, C5-wrap 8×8) + generic fallback. Done in `19bc6c7`. | §3 |
 | D5 | Book format: extend header for weak/strong flag + explicit "partial" semantics | Yes, small forward-compatible bump | §4 |
 | D6 | Keep Connect-5 / wraparound variants | Yes — they're already nearly free; one cleanup item | §5 |
 | D7 | Larger boards (>8 wide / no book) — drop from default bundle | **Yes**, make them opt-in compile flags | §3.4 |
@@ -215,7 +215,17 @@ headers. Binary shrinks (see §3.4).
 
 ---
 
-## 3. Template / instantiation scheme — drop the generic path
+## 3. Template / instantiation scheme — KEEP generic, expand speed list
+
+> ✅ **RESOLVED (reversed from the original "drop generic" lean).** Investigation showed
+> the generic `WIDTH==-1` path is only ~60–75 cleanly-isolated lines (mainly the
+> `DynamicCache` in Position.hpp + a handful of `if constexpr (W != -1) … else …` mask
+> helpers) and — crucially — it **folds away to nothing for specialized instantiations**
+> (`w_val = W_CONST != -1 ? W_CONST : P.width()` becomes a compile-time constant), so it
+> costs the hot sizes zero. So: **keep generic** as the universal correct (≈50%) fallback
+> for any ≤127-bit board, and just **specialize the hot sizes for speed**. Final speed
+> list landed in `19bc6c7` (see D4 above). Sections 3.2–3.4 below are retained as the
+> original analysis; the "delete WIDTH==-1" recommendation in 3.3 is **superseded** by this.
 
 ### 3.1 What exists today (the "hybrid")
 Board geometry is a **compile-time** template: `Solver<WIDTH, HEIGHT, ALIGN, WRAP>`.
