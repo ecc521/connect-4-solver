@@ -150,12 +150,15 @@ heuristic. **Native addon builds & links cleanly, `tsc` passes, exact test suite
 (embedded-book/variants/abort 16/16).** (WASM + mobile not buildable in this env.)
 
 **Remaining to finish §2 (next session):**
-1. **TS API cleanup (overlaps §3.5):** remove the now-ignored `heuristic` option,
-   `maxDepth`, `isHeuristic`/`depthReached` fields, the dead `if (this.isHeuristic)`
-   branches and `_analyzeHeuristic`/`_solveHeuristic` interface decls in
-   `core.ts`/`abstract-solver.ts`/`node.ts`/`native.ts`/`async.ts`; drop `"nnue"` from
-   `capabilities.ts` + `SCORE_NNUE_MAX` (`constants.ts`). Also retire the legacy
-   `is_heuristic` native arg slots once both sides are updated together.
+1. ✅ **DONE (`5d1a72c`) — TS API cleanup / `isHeuristic` removed entirely.** Removed the
+   `heuristic` option, `maxDepth`, `isHeuristic`/`depthReached` fields, all
+   `if (this.isHeuristic)` branches, `_analyzeHeuristic`/`_solveHeuristic` interface
+   decls, `"nnue"` capability (+`NNUE_BOARDS`), `SCORE_NNUE_MAX`; `SolverCapability`
+   reduced to `"exact"`. Kept `timeoutMs`/`weak`/`threads`/`book`. The native binding
+   `is_heuristic` positional slot is unchanged (TS passes literal `false`) — retiring that
+   ABI slot is an optional final tidy, low value. Tests pruned; a `timeoutMs` abort test
+   was added (replaces the now-intractable unbounded 8×8 case). The verifier/`extractProofTree`
+   are **officially dropped** (too slow — branching factor made it only ~3× vs direct solve).
 2. **Mobile bridges (not compiled here):** remove `Size::HeuristicSolver` usage +
    heuristic JNI/Obj-C funcs and the Kotlin/Swift `AnalyzeHeuristicArgs`/AsyncFunctions
    in `android/cpp/react-native-connect-4-solver.cpp`, `ios/Connect4SolverWrapper.mm`,
