@@ -15,7 +15,6 @@ async function main(): Promise<void> {
   await solver.setBoard(7, 6);
 
   console.log(`Board Size: ${solver.width}x${solver.height}`);
-  console.log(`Capability: ${solver.capability}`); // Expected: 'exact'
   console.log(`Has Book:   ${solver.hasBook}`); // Expected: true (auto-loaded embedded book)
 
   console.log("\nSolving position '443322' (Exact)...");
@@ -30,54 +29,52 @@ async function main(): Promise<void> {
   console.log("");
 
   // =========================================================================
-  // CASE 2: 8x8 Board (NNUE Heuristic Solver)
+  // CASE 2: 8x8 Board (Exact Solver, no embedded book)
   // =========================================================================
   console.log("--- CASE 2: Switching to 8x8 Board ---");
   await solver.setBoard(8, 8);
 
   console.log(`Board Size: ${solver.width}x${solver.height}`);
-  console.log(`Capability: ${solver.capability}`); // Expected: 'nnue' (has trained NNUE model)
   console.log(`Has Book:   ${solver.hasBook}`); // Expected: false (no embedded book)
 
   console.log(
-    "\nAnalyzing position '12345678' (NNUE with shallow depth limit)...",
+    "\nAnalyzing position '12345678' (exact, bounded by a timeout)...",
   );
-  const nnueRes = await solver.analyze("12345678", { maxDepth: 4 });
+  // Without a book, large boards can search for a long time. Pass a timeoutMs
+  // to bound the search; the result is flagged `aborted: true` if it runs out.
+  const res = await solver.analyze("12345678", { timeoutMs: 500 });
 
-  if (nnueRes.evaluation) {
-    console.log(`Score (Centipawns): ${nnueRes.evaluation.score}`);
-    console.log(`Best Move Column:   ${nnueRes.bestMove}`);
-    console.log(`Search Depth:       ${nnueRes.depthReached}`);
+  if (res.evaluation) {
+    console.log(`Score:            ${res.evaluation.score}`);
+    console.log(`Outcome:          ${res.evaluation.outcome}`);
+    console.log(`Best Move Column: ${res.bestMove}`);
   }
+  console.log(`Aborted:          ${res.aborted ?? false}`);
   console.log("");
 
   // =========================================================================
-  // CASE 3: 6x8 Board (Tactical Heuristic Solver - Guard Clause)
+  // CASE 3: 6x8 Board (Exact Solver, no embedded book)
   // =========================================================================
   console.log("--- CASE 3: Switching to 6x8 Board ---");
   await solver.setBoard(6, 8);
 
   console.log(`Board Size: ${solver.width}x${solver.height}`);
-  console.log(`Capability: ${solver.capability}`); // Expected: 'tactical' (win/loss search only)
   console.log(`Has Book:   ${solver.hasBook}`); // Expected: false
 
   console.log(
     "\nSolving '123' with timeoutMs: 0 (explicitly infinite - triggers warning)...",
   );
-  const warnRes = await solver.solve("123", { timeoutMs: 0, maxDepth: 4 });
+  const warnRes = await solver.solve("123", { timeoutMs: 0 });
   if (warnRes.evaluation) {
     console.log(`Best Move Column (with timeoutMs: 0): ${warnRes.bestMove}`);
   }
 
-  console.log("\nSolving '123' with explicit timeoutMs and maxDepth...");
-  const tacticalRes = await solver.solve("123", {
-    timeoutMs: 500,
-    maxDepth: 4,
-  });
+  console.log("\nSolving '123' with an explicit timeoutMs...");
+  const boundedRes = await solver.solve("123", { timeoutMs: 500 });
 
-  if (tacticalRes.evaluation) {
-    console.log(`Best Move Column:   ${tacticalRes.bestMove}`);
-    console.log(`Search Depth:       ${tacticalRes.depthReached}`);
+  if (boundedRes.evaluation) {
+    console.log(`Best Move Column:   ${boundedRes.bestMove}`);
+    console.log(`Outcome:            ${boundedRes.evaluation.outcome}`);
   }
   console.log("");
 

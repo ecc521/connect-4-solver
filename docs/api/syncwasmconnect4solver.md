@@ -16,7 +16,7 @@ import {
 ::: warning ⚠️ Main Thread Blocking
 These solvers evaluate synchronously. The JavaScript main thread will be entirely blocked during this process, meaning your UI will freeze and events will not fire until execution completes.
 
-For the Heuristic Solver, the main thread will block until your `timeoutMs` threshold is reached. For the Exact Solver, the thread will block **until the position is fully calculated**. If you require long computations without freezing the browser, use the `WebWorkerWasmConnect4Solver` instead.
+The thread will block **until the position is fully calculated** (or until your `timeoutMs` threshold is reached, if set). If you require long computations without freezing the browser, use the `WebWorkerWasmConnect4Solver` instead.
 :::
 
 ## Constructors
@@ -24,8 +24,8 @@ For the Heuristic Solver, the main thread will block until your `timeoutMs` thre
 **Implements:** [`BaseConnect4Solver`](./base-solver)
 
 ```typescript
-new SyncWasmConnect4Solver(options?: { width?: number, height?: number, cacheSizeMb?: number, heuristic?: boolean });
-new SyncWasmNoSABConnect4Solver(options?: { width?: number, height?: number, cacheSizeMb?: number, heuristic?: boolean });
+new SyncWasmConnect4Solver(options?: { width?: number, height?: number, cacheSizeMb?: number });
+new SyncWasmNoSABConnect4Solver(options?: { width?: number, height?: number, cacheSizeMb?: number });
 ```
 
 ### Which class should I use? (SharedArrayBuffer)

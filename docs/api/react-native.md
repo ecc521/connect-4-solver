@@ -17,5 +17,5 @@ To use this module, you must have successfully run `pod install` in your `ios/` 
 **Implements:** [`BaseConnect4Solver`](./base-solver)
 
 ```typescript
-new ReactNativeConnect4Solver(options?: { width?: number, height?: number, cacheSizeMb?: number, heuristic?: boolean });
+new ReactNativeConnect4Solver(options?: { width?: number, height?: number, cacheSizeMb?: number });
 ```

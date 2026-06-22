@@ -6,12 +6,12 @@ This repository provides an extremely fast, high-performance, and "perfect" Conn
 ## Key Directories and Files
 
 - **`native/`**
-  Contains the core C++ algorithm (`Solver.cpp`, `TranspositionTable.hpp`, `MoveSorter.hpp`, `HeuristicSolver.hpp`) alongside Emscripten binding hooks (`analyze.cpp`) and native JSI-compatible bridging logic. This is where the actual mathematical evaluation takes place.
+  Contains the core C++ algorithm (`Solver.cpp`, `TranspositionTable.hpp`, `MoveSorter.hpp`) alongside Emscripten binding hooks (`analyze.cpp`) and native JSI-compatible bridging logic. This is where the actual mathematical evaluation takes place.
 - **`src/`**
-  Contains the TypeScript library source code (e.g. `index.ts`, `core.ts`, `threaded.ts`, `heuristic.ts`). It wraps the WebAssembly and Native module hooks to expose a clean, object-oriented, and strongly-typed API to the end-user.
+  Contains the TypeScript library source code (e.g. `index.ts`, `core.ts`, `threaded.ts`). It wraps the WebAssembly and Native module hooks to expose a clean, object-oriented, and strongly-typed API to the end-user.
 
 - **`ios/`** & **`android/`**
-  Provide the platform-specific boilerplate for React Native mapping the C++ solver directly to Obj-C/Swift (iOS) and JNI/Java (Android). This allows mobile developers to use this library natively without WebAssembly overhead, including the newly added `HeuristicSolver` endpoints.
+  Provide the platform-specific boilerplate for React Native mapping the C++ solver directly to Obj-C/Swift (iOS) and JNI/Java (Android). This allows mobile developers to use this library natively without WebAssembly overhead.
 
 - **`test-data/`**
   Stores `.txt` files containing tens of thousands of pre-evaluated Connect 4 positions across various board sizes. These are used extensively by Jest to run continuous parity tests to ensure the TS wrapper outputs match the pure C++ expectations.
@@ -46,6 +46,6 @@ npx node-gyp rebuild --jobs max
 
 ## Generating New Books
 
-The `TranspositionTable` cache sizes natively default to tight memory constraints optimized for WebAssembly, mobile environments, and browsers (e.g. `TABLE_SIZE=23` mapping to ~32MB, and `HEURISTIC_TABLE_SIZE=22` mapping to ~24MB).
+The `TranspositionTable` cache sizes natively default to tight memory constraints optimized for WebAssembly, mobile environments, and browsers (e.g. `TABLE_SIZE=23` mapping to ~32MB).
 
 If you are running the `tools/generate-book.ts` script to recursively generate a highly complex dense opening book natively, the script will automatically pass your `--cache` allocation argument downward into the native `ThreadedSolverCache`. This temporarily inflates the transposition table size (e.g., to multiple gigabytes) to utilize host RAM during the alpha-beta search without forcing massive memory footprints onto the consumer-facing `.wasm` libraries.
