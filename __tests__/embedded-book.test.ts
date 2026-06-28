@@ -22,8 +22,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _dir = path.dirname(fileURLToPath(import.meta.url));
 
 describe("Embedded book transparent fallback", () => {
   // Skip all tests if native module is not available (CI without compiled addon)
@@ -108,7 +107,7 @@ describe("Embedded book transparent fallback", () => {
 
       // Load the actual embedded efbook file as a custom book to simulate override
       const efbookPath = path.join(
-        __dirname,
+        _dir,
         "..",
         "data",
         "7x6_dense7.efbook",
@@ -163,7 +162,7 @@ describe("Embedded book transparent fallback", () => {
       // Use the real 7x6 efbook for a non-embedded-book size if available, else skip.
       // (We need valid book data — passing garbage to the native C++ causes a crash.)
       const efbookPath = path.join(
-        __dirname,
+        _dir,
         "..",
         "data",
         "7x6_dense7.efbook",

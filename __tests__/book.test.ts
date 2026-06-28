@@ -7,18 +7,17 @@ import * as path from "path";
 import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _dir = path.dirname(fileURLToPath(import.meta.url));
 
 describe("Polymorphic Dense Book Packing", () => {
-  const mockTxt = path.join(__dirname, "mock_scored.txt");
-  const d5Path = path.join(__dirname, "..", "data", "7x6_dense5.book");
-  const d14Path = path.join(__dirname, "..", "data", "7x6_dense14.book");
-  const d20Path = path.join(__dirname, "..", "data", "7x6_dense20.book");
+  const mockTxt = path.join(_dir, "mock_scored.txt");
+  const d5Path = path.join(_dir, "..", "data", "7x6_dense5.book");
+  const d14Path = path.join(_dir, "..", "data", "7x6_dense14.book");
+  const d20Path = path.join(_dir, "..", "data", "7x6_dense20.book");
 
   beforeAll(() => {
     // Ensure data directory exists
-    const dataDir = path.join(__dirname, "..", "data");
+    const dataDir = path.join(_dir, "..", "data");
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
@@ -165,7 +164,7 @@ describe("Polymorphic Dense Book Packing", () => {
       | SyncWasmNoSABConnect4Solver
     )[] = [new NodeConnect4Solver()];
 
-    if (fs.existsSync(path.join(__dirname, "..", "build", "analyze.wasm"))) {
+    if (fs.existsSync(path.join(_dir, "..", "build", "analyze.wasm"))) {
       solvers.push(new SyncWasmConnect4Solver());
       solvers.push(new SyncWasmNoSABConnect4Solver());
     }
