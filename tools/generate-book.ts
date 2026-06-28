@@ -70,7 +70,7 @@ async function run() {
     threads = 12,
     useEf = false,
     bootstrap = "",
-    weak = false,
+    bounded = false,
     filterForced = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -81,13 +81,13 @@ async function run() {
     if (args[i] === "--threads") threads = parseInt(args[++i]);
     if (args[i] === "--ef") useEf = true;
     if (args[i] === "--bootstrap") bootstrap = args[++i];
-    if (args[i] === "--weak") weak = true;
+    if (args[i] === "--bounded") bounded = true;
     if (args[i] === "--filter-forced") filterForced = true;
   }
 
   console.log("=========================================================");
   console.log(
-    ` ${width}x${height} ${threads}-Core Native Iterative Alpha-Beta Orchestrator${weak ? " (WEAK SOLVER)" : ""}`,
+    ` ${width}x${height} ${threads}-Core Native Iterative Alpha-Beta Orchestrator${bounded ? " (BOUNDED)" : ""}`,
   );
   console.log("=========================================================");
 
@@ -158,6 +158,7 @@ async function run() {
   );
 
   const builder = new native.BookBuilder(width, height, depth);
+  builder.setBounded(bounded);
   let processed = 0;
 
   const outputDir = path.join(__dirname, "../data");
@@ -165,7 +166,7 @@ async function run() {
     fs.mkdirSync(outputDir, { recursive: true });
   }
   const fileExt = useEf ? ".efbook" : ".book";
-  const typeStr = weak ? "dense_weak" : "dense";
+  const typeStr = bounded ? "dense_bounded" : "dense";
   const outputFile = path.join(
     outputDir,
     `${width}x${height}_${typeStr}${depth}${fileExt}`,
@@ -206,7 +207,7 @@ async function run() {
     `[+] Created ${threads} native solvers sharing a ${sharedCache.allocatedCacheSizeMb}MB cache${sharedCache.allocatedCacheSizeMb !== cacheSizeMb ? ` (Requested: ${cacheSizeMb}MB)` : ""}.`,
   );
   console.log(
-    `[+] Crunching ${weak ? "WEAK " : ""}Alpha-Beta evaluations using ${threads} concurrent workers...`,
+    `[+] Crunching ${bounded ? "BOUNDED " : ""}Alpha-Beta evaluations using ${threads} concurrent workers...`,
   );
 
   const start = Date.now();
@@ -226,7 +227,7 @@ async function run() {
       try {
         analysis = await solver.analyze(pos, {
           threads: 1,
-          weak,
+          weak: bounded, // bounded mode uses weak null-window search for speed
           book: bookPtr ? { ptr: bookPtr } : undefined,
         } as any);
       } catch (e) {

@@ -15,7 +15,7 @@ describe("Exact analysis benchmark", () => {
       // Non-terminal positions return a full set of per-column move options;
       // terminal positions return an overall evaluation with no move options.
       // Either way the analysis must produce a usable result.
-      const isUsable = (r: { moveOptions: unknown[]; evaluation: unknown }) =>
+      const isUsable = (r: { moveOptions: unknown[]; evaluation: unknown }): boolean =>
         r.moveOptions.length > 0 || r.evaluation !== null;
       expect(isUsable(single)).toBe(true);
       expect(isUsable(threaded)).toBe(true);

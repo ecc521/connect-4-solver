@@ -20,7 +20,6 @@ interface NativeSolverType {
     w: number,
     h: number,
     sizeBytes: number,
-    heuristic: boolean,
     align: number,
     wrap: boolean,
   ): string;
@@ -29,7 +28,6 @@ interface NativeSolverType {
     w: number,
     h: number,
     cachePtr: string,
-    heuristic: boolean,
     align: number,
     wrap: boolean,
   ): string;
@@ -37,7 +35,6 @@ interface NativeSolverType {
     solverPtr: string,
     w: number,
     h: number,
-    heuristic: boolean,
     align: number,
     wrap: boolean,
   ): void;
@@ -47,7 +44,6 @@ interface NativeSolverType {
     solverPtr: string,
     w: number,
     h: number,
-    heuristic: boolean,
     align: number,
     wrap: boolean,
   ): void;
@@ -162,7 +158,6 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         this.width,
         this.height,
         sizeMb * 1024 * 1024,
-        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -178,7 +173,6 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       this.width,
       this.height,
       this._cachePtrStr,
-      false, // legacy is_heuristic slot (removed in v5)
       this.align,
       this.wrap,
     );
@@ -206,6 +200,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
       this.height,
       b64,
     );
+    this._bookKind = ReactNativeConnect4Solver.parseBookHeaderKind(data);
     return Promise.resolve();
   }
 
@@ -413,7 +408,6 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         this._solverPtrStr,
         this.width,
         this.height,
-        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -432,7 +426,6 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         this._solverPtrStr,
         this.width,
         this.height,
-        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -449,6 +442,7 @@ export class ReactNativeConnect4Solver extends BaseConnect4Solver {
         this._bookPtr as string,
       );
       this._bookPtr = "0";
+      this._bookKind = null;
     }
     this.initialized = false;
   }

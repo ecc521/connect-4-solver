@@ -160,7 +160,10 @@ export class OpeningBook {
   getScore(position: string): number | undefined {
     const native = getNativeModule();
     if (native) {
-      return native._getBookScore(this.width, this.height, this._ptr, position);
+      const lu = native._getBookLookup(this.width, this.height, this._ptr, position);
+      if (lu === undefined) return undefined;
+      const [lo, hi] = lu;
+      return lo === hi ? lo : undefined; // bounded entries have no single exact score
     } else if (this.mod) {
       const posPtr = this.mod.stringToNewUTF8(position);
       try {

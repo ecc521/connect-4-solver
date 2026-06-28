@@ -11,7 +11,7 @@ module.exports = {
       "ts-jest",
       {
         useESM: true,
-        diagnostics: { ignoreCodes: [151002] },
+        diagnostics: { ignoreCodes: [151002, 1343, 2441] },
       },
     ],
   },

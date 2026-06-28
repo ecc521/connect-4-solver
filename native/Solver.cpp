@@ -201,7 +201,16 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::negamax(const GenericPosit
 
   if constexpr (HasBook) {
     if (P.nbMoves() <= book_depth) {
-      if(auto lu = book->query(P); lu.found()) return lu.lower + P.min_score() - 1;
+      if (auto lu = book->query(P); lu.found()) {
+        if (lu.lower == lu.upper) return lu.lower + P.min_score() - 1;
+        int lo = lu.lower + P.min_score() - 1;
+        int hi = lu.upper + P.min_score() - 1;
+        if (lo >= beta)  return lo;
+        if (hi <= alpha) return hi;
+        alpha = std::max(alpha, lo);
+        beta  = std::min(beta,  hi);
+        // bounds didn't close the window — fall through with tightened alpha/beta
+      }
     }
   }
 
@@ -328,14 +337,22 @@ template <bool HasBook>
     return {score, -1, (int)P.nbMoves(), getNodeCount()};
   }
 
-  if constexpr (HasBook) {
-    if (P.nbMoves() <= book_depth) {
-      if(auto lu = book->query(P); lu.found()) return {lu.lower + P.min_score() - 1, -1, (int)P.nbMoves(), getNodeCount()};
-    }
-  }
-
   int min = -((P.width() * P.height()) - P.nbMoves()) / 2;
   int max = ((P.width() * P.height()) + 1 - P.nbMoves()) / 2;
+
+  if constexpr (HasBook) {
+    if (P.nbMoves() <= book_depth) {
+      if (auto lu = book->query(P); lu.found()) {
+        if (lu.lower == lu.upper) return {lu.lower + P.min_score() - 1, -1, (int)P.nbMoves(), getNodeCount()};
+        int blo = lu.lower + P.min_score() - 1;
+        int bhi = lu.upper + P.min_score() - 1;
+        min = std::max(min, blo);
+        max = std::min(max, bhi);
+        if (min >= max) return {min, -1, (int)P.nbMoves(), getNodeCount()};
+        // bounds narrowed the window — fall through with tightened min/max
+      }
+    }
+  }
   int score = 0;
   if (weak) {
     min = -1;

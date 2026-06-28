@@ -43,12 +43,12 @@ namespace Connect4 {
 //   [6]    flags      see FLAG_* constants below
 //   [7]    align      in-a-row count (4 or 5)
 //   [8]    key_bytes  key width in bytes for dense; 0 for EF
-//   [9]    value_bytes 1 (Exact/Weak) or 2 (Bounded)
+//   [9]    value_bytes 1 (Exact) or 2 (Bounded)
 //   [10-17] num_entries  uint64_t LE
 //
 // flags byte:
 //   bits 0-1: storage  00=Dense  01=Elias-Fano
-//   bits 2-3: kind     00=Exact  01=Weak  10=Bounded
+//   bits 2-3: kind     00=Exact  10=Bounded
 //   bit  4:   wrap     0=false   1=true
 //   bits 5-7: reserved (0)
 //
@@ -65,7 +65,7 @@ namespace Connect4 {
 //     lower_bits  uint64_t[]    (EF lower bitvector, omitted when L=0)
 //     values      [num_entries × value_bytes]
 //
-// Value encoding (same for Exact, Weak, and both bytes of Bounded):
+// Value encoding (same for Exact and both bytes of Bounded):
 //   stored_value = score - min_score(W, H) + 1
 //   where min_score(W,H) = -((W*H+1)/2)
 //   0 is the not-in-book sentinel — never a valid stored score.
@@ -75,7 +75,7 @@ namespace Connect4 {
 //   byte 1 = upper bound (encoded)
 //   [0, 0] = not in book
 //   Both bytes are always ≥ 1 for a valid entry (the encoding guarantees this).
-//   Upper byte = 0 with lower byte > 0 is used when loading Exact/Weak books
+//   Upper byte = 0 with lower byte > 0 is used when loading Exact books
 //   into the uint16_t value slot; query() treats this as lower == upper (exact).
 //
 // Note: 128-bit EF (for boards where W*(H+1) > 64) is not yet implemented.
@@ -91,14 +91,13 @@ static constexpr uint8_t FLAG_STORAGE_DENSE = 0x00;
 static constexpr uint8_t FLAG_STORAGE_EF    = 0x01;
 static constexpr uint8_t FLAG_KIND_MASK     = 0x0C;
 static constexpr uint8_t FLAG_KIND_EXACT    = 0x00;
-static constexpr uint8_t FLAG_KIND_WEAK     = 0x04;
 static constexpr uint8_t FLAG_KIND_BOUNDED  = 0x08;
 static constexpr uint8_t FLAG_WRAP          = 0x10;
 
-enum class BookKind : uint8_t { Exact = 0, Weak = 1, Bounded = 2 };
+enum class BookKind : uint8_t { Exact = 0, Bounded = 2 };
 
 // Result of a book lookup.
-// lower == upper for Exact/Weak books.
+// lower == upper for Exact books; lower < upper for Bounded books.
 // found() returns false (lower == 0) on a miss.
 // Values are score-encoded: decode with  score = lower + min_score(W,H) - 1
 struct BookLookup {
@@ -147,7 +146,7 @@ class OpeningBookBase {
 public:
     using pos_t = typename GenericPosition<W, H>::position_t;
     // uint16_t value slot: low byte = lower (or exact), high byte = upper.
-    // High byte == 0 means Exact/Weak (lower == upper). Value 0 == not in book.
+    // High byte == 0 means Exact (lower == upper). Value 0 == not in book.
     using EntryList = std::vector<std::pair<pos_t, uint16_t>>;
 
     virtual BookLookup query(const GenericPosition<W, H>& P) const = 0;
@@ -186,11 +185,7 @@ protected:
     }
 
     static uint8_t kindFlags(BookKind bkind) {
-        switch (bkind) {
-            case BookKind::Weak:    return FLAG_KIND_WEAK;
-            case BookKind::Bounded: return FLAG_KIND_BOUNDED;
-            default:                return FLAG_KIND_EXACT;
-        }
+        return bkind == BookKind::Bounded ? FLAG_KIND_BOUNDED : FLAG_KIND_EXACT;
     }
 
     static uint8_t valueBytes(BookKind bkind) {
@@ -510,7 +505,6 @@ inline std::unique_ptr<OpeningBookBase<W, H>> OpeningBookBase<W, H>::load(
     uint8_t kind_bits = flags & FLAG_KIND_MASK;
     BookKind kind;
     if      (kind_bits == FLAG_KIND_EXACT)   kind = BookKind::Exact;
-    else if (kind_bits == FLAG_KIND_WEAK)    kind = BookKind::Weak;
     else if (kind_bits == FLAG_KIND_BOUNDED) kind = BookKind::Bounded;
     else throw std::runtime_error("Unknown book kind bits: " + std::to_string(kind_bits) + ".");
 

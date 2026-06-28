@@ -115,6 +115,11 @@ export class AdaptiveSolver {
     return this._hasBook;
   }
 
+  /** Kind of the currently-loaded opening book, or `null` if no book is loaded. */
+  get bookKind(): "exact" | "bounded" | null {
+    return this._solver?.bookKind ?? null;
+  }
+
   /** True once setBoard() has completed successfully. */
   get isReady(): boolean {
     return this._isReady;

@@ -6,11 +6,13 @@
 
 Every solver accepts the following configuration object upon instantiation:
 
-| Parameter     | Default | Description                                              |
-| ------------- | ------- | -------------------------------------------------------- |
-| `width`       | 7       | Board width columns                                      |
-| `height`      | 6       | Board height rows                                        |
-| `cacheSizeMb` | 100     | Cache memory allocation in MB                            |
+| Parameter     | Default | Description                                                                                                                                   |
+| ------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `width`       | 7       | Board width in columns.                                                                                                                       |
+| `height`      | 6       | Board height in rows.                                                                                                                         |
+| `cacheSizeMb` | 100     | Transposition table memory allocation in MB.                                                                                                  |
+| `align`       | 4       | Win condition — pieces in a row required to win. `4` = standard Connect 4; `5` = Connect-5. See [Supported Sizes](#supported-board-sizes).    |
+| `wrap`        | `false` | Cylindrical board — columns wrap horizontally. See [Supported Sizes](#supported-board-sizes) for which `(width, height, align)` combinations support wrapping. |
 
 ## Core Methods
 
@@ -50,6 +52,14 @@ Unlike `analyze()`, which evaluates every possible column to create a heat-map, 
 
 > **Result Difference:** When using `solve()`, the `moveOptions` array in the returned `PositionAnalysis` will be empty. The best move is instead available in the top-level `bestMove` field.
 
+### `queryBook(position: string)`
+
+Performs a book-only lookup — no search is run. Returns a `BookResult` on a hit, or `null` on a miss. Useful for displaying an instant result before deciding whether to run a timed solve.
+
+The native and WASM solvers fall back to the embedded book automatically; `queryBook` exposes that lookup directly.
+
+**Returns:** `Promise<BookResult | null>`
+
 ### `stop()`
 
 Signals the solver to abort the current search.
@@ -72,12 +82,38 @@ Safely destroys the explicitly allocated pointers and frees the cache memory fro
 
 > **Note:** Once `release()` is called, the solver instance is permanently destroyed and cannot be reused. Create a new solver to continue evaluating.
 
+### `bookKind` (property)
+
+```typescript
+get bookKind(): "exact" | "bounded" | null
+```
+
+The kind of the currently-loaded opening book, decoded from the v2 file header. Returns `null` if no book is loaded.
+
+| Value       | Meaning                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| `"exact"`   | Full minimax scores (default). `BookResult.exact` is a distance-to-result.                |
+| `"bounded"` | Score interval `[lower, upper]`. The solver uses these as alpha-beta bounds during search. A book generated with `--weak` is a bounded book whose intervals span the full Win or Loss range. |
+
+---
+
 ### Supported Board Sizes
 
-The WASM bundle includes evaluators for the following board sizes:
-`"6x5", "6x6", "7x6", "7x7", "8x6", "9x6", "8x8", "9x7", "11x4"`
+**Standard Connect 4** (`align=4`, `wrap=false`) — specialized, full speed:
 
-> Additional sizes can be supported by compiling the C++ source with Emscripten yourself.
+`6×7`, `6×8`, `7×6`, `7×7`, `7×8`, `7×9`, `8×6`, `8×7`, `8×8`, `9×7`
+
+**Variants** — specialized:
+
+| `align` | `wrap`  | Board | Mode              |
+| ------- | ------- | ----- | ----------------- |
+| 5       | `false` | 8×8   | Connect-5         |
+| 4       | `true`  | 7×6   | C4 Wraparound     |
+| 5       | `true`  | 8×8   | C5 Wraparound     |
+
+**Generic fallback** — any standard C4 board whose bitboard fits in 127 bits resolves automatically at roughly half the speed of a specialized size. Unsupported sizes (>127 bits, or variant combos not listed above) throw at init time.
+
+> Additional sizes can be added by compiling the C++ source with custom `SUPPORTED_SIZES_X_MACRO` entries.
 
 ## Returned Types
 
@@ -110,3 +146,17 @@ export interface Evaluation {
   score: number; // Raw C++ engine score (positive = current player winning)
 }
 ```
+
+### `BookResult`
+
+Returned by `queryBook()` on a hit.
+
+```typescript
+export interface BookResult {
+  exact?: number;  // exact score (positive = player-to-move winning, 0 = draw)
+  lower?: number;  // lower bound (bounded books)
+  upper?: number;  // upper bound (bounded books)
+}
+```
+
+An exact book populates `exact`. A bounded book populates `lower`/`upper`. A miss returns `null`, not an empty object.

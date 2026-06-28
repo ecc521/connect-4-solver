@@ -19,7 +19,6 @@
 #define BOARD_HEIGHT_MACRO 6
 #endif
 
-#include "../../native/HeuristicSolver.hpp"
 #include "../../native/Solver.hpp"
 #include "../../native/TranspositionTable.hpp"
 #include "../../native/ThreadPool.hpp"
@@ -323,170 +322,15 @@ void run_exact_analyze(const std::vector<BenchPos> &positions, int threads,
             << (correct == completed ? " ✓" : " FAIL") << " |\n";
 }
 
-// --- Heuristic analyze benchmark ---
-template <int W, int H>
-void run_heuristic_analyze(const std::vector<BenchPos> &positions,
-                           int threads, int budget_ms = 2000, int timeout_ms_per = 200) {
-  size_t mem_size = get_cache_size();
-  auto cache = HeuristicSolver<W, H>::createCache(mem_size);
-  
-  std::vector<std::unique_ptr<HeuristicSolver<W, H>>> solvers;
-  for (int i = 0; i < threads; i++) {
-    solvers.push_back(HeuristicSolver<W, H>::createWithCache(cache.get()));
-  }
-
-  std::atomic<uint64_t> total_depth{0};
-  std::atomic<int> sign_accurate_count{0};
-  std::atomic<int> completed{0};
-  std::atomic<int> next_pos{0};
-  auto bench_start = Clock::now();
-
-  auto worker = [&](int tid) {
-    while (true) {
-      int idx = next_pos.fetch_add(1);
-      if (idx >= (int)positions.size() || elapsed_ms(bench_start) > budget_ms) break;
-
-      const auto &bp = positions[idx];
-      GenericPosition<W, H> p;
-      p.play(bp.pos);
-      auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()).time_since_epoch().count();
-      
-      auto res = solvers[tid]->analyze_heuristic(p, 42, 1, now_ms + timeout_ms_per);
-      int score = res.first.empty() ? 0 : res.first[0];
-      total_depth += res.second;
-      completed++;
-      if ((score > 0 && bp.expected_score > 0) || (score < 0 && bp.expected_score < 0) || (score == 0 && bp.expected_score == 0)) {
-        sign_accurate_count++;
-      }
-    }
-  };
-
-  std::vector<std::thread> thread_pool;
-  for (int i = 0; i < threads; i++) {
-    thread_pool.emplace_back(worker, i);
-  }
-  for (auto &t : thread_pool) {
-    t.join();
-  }
-
-  uint64_t total_nodes = 0;
-  for (const auto &s : solvers) total_nodes += s->getNodeCount();
-  double total_ms = elapsed_ms(bench_start);
-  double mns = (total_nodes / 1000000.0) / (total_ms / 1000.0);
-
-  if (threads == 1) {
-    std::cout << "\n| Mode      | Type      | Board | Cache  | Slot    | Thr | Pos  "
-                 "| Nodes      | MN/s  | Time    | Avg Depth | Sign Acc |\n";
-    std::cout << "|-----------|-----------|-------|--------|---------|-----|---"
-                 "---|------------|-------|---------|-----------|----------|\n";
-  }
-
-  std::string board_str = std::to_string(W) + "x" + std::to_string(H);
-  double avg_depth = (int)completed == 0 ? 0.0 : (double)total_depth / (int)completed;
-  std::cout << "| " << std::left << std::setw(9) << "analyze()"
-            << " | " << std::setw(9) << "Heuristic"
-            << " | " << std::setw(5) << board_str << " | " << std::setw(6)
-            << std::to_string(mem_size / (1024 * 1024)) + " MB" << " | "
-            << std::setw(7) << std::to_string(cache->getSlotWidth()) + "-bit"
-            << " | " << std::setw(3) << threads << " | " << std::setw(4)
-            << (int)completed << " | " << std::setw(10) << total_nodes
-            << " | " << std::fixed << std::setprecision(2) << std::setw(5)
-            << mns << " | " << std::setw(7)
-            << std::to_string((int)total_ms) + " ms" << " | " << std::setw(9)
-            << std::setprecision(2) << avg_depth
-            << " | " << (int)sign_accurate_count << "/" << (int)completed << " ("
-            << (completed > 0 ? (int)((double)sign_accurate_count / completed * 100.0) : 0)
-            << "%) |\n";
-}
-
-// --- Heuristic solve benchmark ---
-template <int W, int H>
-void run_heuristic_solve(const std::vector<BenchPos> &positions, int threads,
-                         int budget_ms = 2000, int timeout_ms_per = 200) {
-  size_t mem_size = get_cache_size();
-  auto cache = HeuristicSolver<W, H>::createCache(mem_size);
-  
-  std::vector<std::unique_ptr<HeuristicSolver<W, H>>> solvers;
-  for (int i = 0; i < threads; i++) {
-    solvers.push_back(HeuristicSolver<W, H>::createWithCache(cache.get()));
-  }
-
-  std::atomic<uint64_t> total_depth{0};
-  std::atomic<int> sign_accurate_count{0};
-  std::atomic<int> completed{0};
-  std::atomic<int> next_pos{0};
-  auto bench_start = Clock::now();
-
-  auto worker = [&](int tid) {
-    while (true) {
-      int idx = next_pos.fetch_add(1);
-      if (idx >= (int)positions.size() || elapsed_ms(bench_start) > budget_ms) break;
-
-      const auto &bp = positions[idx];
-      GenericPosition<W, H> p;
-      p.play(bp.pos);
-      auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()).time_since_epoch().count();
-      
-      auto res = solvers[tid]->solve_heuristic(p, 42, now_ms + timeout_ms_per, true, nullptr, 1);
-      total_depth += res.depth;
-      int score = res.score;
-      completed++;
-      if ((score > 0 && bp.expected_score > 0) || (score < 0 && bp.expected_score < 0) || (score == 0 && bp.expected_score == 0)) {
-        sign_accurate_count++;
-      }
-    }
-  };
-
-  std::vector<std::thread> thread_pool;
-  for (int i = 0; i < threads; i++) {
-    thread_pool.emplace_back(worker, i);
-  }
-  for (auto &t : thread_pool) {
-    t.join();
-  }
-
-  uint64_t total_nodes = 0;
-  for (const auto &s : solvers) total_nodes += s->getNodeCount();
-  double total_ms = elapsed_ms(bench_start);
-  double mns = (total_nodes / 1000000.0) / (total_ms / 1000.0);
-
-  static bool hsolve_header_printed = false;
-  if (!hsolve_header_printed) {
-    std::cout << "\n| Mode      | Type      | Board | Cache  | Slot    | Thr | Pos  "
-                 "| Nodes      | MN/s  | Time    | Avg Depth | Sign Acc |\n";
-    std::cout << "|-----------|-----------|-------|--------|---------|-----|---"
-                 "---|------------|-------|---------|-----------|----------|\n";
-    hsolve_header_printed = true;
-  }
-
-  std::string board_str = std::to_string(W) + "x" + std::to_string(H);
-  double avg_depth = (int)completed == 0 ? 0.0 : (double)total_depth / (int)completed;
-  std::cout << "| " << std::left << std::setw(9) << "solve()"
-            << " | " << std::setw(9) << "Heuristic"
-            << " | " << std::setw(5) << board_str << " | " << std::setw(6)
-            << std::to_string(mem_size / (1024 * 1024)) + " MB" << " | "
-            << std::setw(7) << std::to_string(cache->getSlotWidth()) + "-bit"
-            << " | " << std::setw(3) << threads << " | " << std::setw(4)
-            << (int)completed << " | " << std::setw(10) << total_nodes
-            << " | " << std::fixed << std::setprecision(2) << std::setw(5)
-            << mns << " | " << std::setw(7)
-            << std::to_string((int)total_ms) + " ms" << " | " << std::setw(9)
-            << std::setprecision(2) << avg_depth
-            << " | " << (int)sign_accurate_count << "/" << (int)completed << " ("
-            << (completed > 0 ? (int)((double)sign_accurate_count / completed * 100.0) : 0)
-            << "%) |\n";
-}
-
 int main(int argc, char* argv[]) {
-  bool flag_heuristic = false, flag_exact = false;
+  bool flag_exact = false;
   bool flag_solve = false, flag_analyze = false;
   bool flag_pgo = false, flag_fresh = false;
   int budget_ms = 2000;
   int timeout_ms = 200;
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
-    if (arg == "--heuristic") flag_heuristic = true;
-    else if (arg == "--exact") flag_exact = true;
+    if (arg == "--exact") flag_exact = true;
     else if (arg == "--solve") flag_solve = true;
     else if (arg == "--analyze") flag_analyze = true;
     else if (arg == "--pgo") flag_pgo = true;
@@ -499,11 +343,9 @@ int main(int argc, char* argv[]) {
       return 1;
     }
   }
-  bool run_all = !flag_heuristic && !flag_exact && !flag_solve && !flag_analyze;
-  bool do_heuristic_analyze = run_all || (flag_heuristic && !flag_solve) || (flag_analyze && !flag_exact) || (flag_heuristic && flag_analyze);
-  bool do_exact_analyze = run_all || (flag_exact && !flag_solve) || (flag_analyze && !flag_heuristic) || (flag_exact && flag_analyze);
-  bool do_heuristic_solve = run_all || (flag_heuristic && !flag_analyze) || (flag_solve && !flag_exact) || (flag_heuristic && flag_solve);
-  bool do_exact_solve = run_all || (flag_exact && !flag_analyze) || (flag_solve && !flag_heuristic) || (flag_exact && flag_solve);
+  bool run_all = !flag_exact && !flag_solve && !flag_analyze;
+  bool do_exact_analyze = run_all || flag_analyze || (flag_exact && !flag_solve);
+  bool do_exact_solve = run_all || flag_solve || (flag_exact && !flag_analyze);
 
   if (flag_pgo) run_all = true;
 
@@ -527,10 +369,6 @@ int main(int argc, char* argv[]) {
 
   const size_t max_solve = flag_pgo ? 50 : 50;
   const size_t max_analyze = flag_pgo ? 100 : 100;
-  const size_t max_heuristic = flag_pgo ? 100 : 100;
-
-  std::vector<BenchPos> heuristic_subset;
-  for (size_t i = 0; i < max_heuristic && i < valid_positions.size(); i++) heuristic_subset.push_back(valid_positions[i]);
 
   std::vector<BenchPos> exact_subset;
   int min_length_analyze = 0;
@@ -566,22 +404,6 @@ int main(int argc, char* argv[]) {
       run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 1, budget_ms, timeout_ms);
       run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 4, budget_ms, timeout_ms);
       run_exact_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(exact_subset, 18, budget_ms, timeout_ms);
-    }
-  }
-
-  if (do_heuristic_solve) {
-    if (!heuristic_subset.empty()) {
-      run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 1, budget_ms, timeout_ms);
-      run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 4, budget_ms, timeout_ms);
-      run_heuristic_solve<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 18, budget_ms, timeout_ms);
-    }
-  }
-
-  if (do_heuristic_analyze) {
-    if (!heuristic_subset.empty()) {
-      run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 1, budget_ms, timeout_ms);
-      run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 4, budget_ms, timeout_ms);
-      run_heuristic_analyze<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(heuristic_subset, 18, budget_ms, timeout_ms);
     }
   }
 

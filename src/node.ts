@@ -4,7 +4,7 @@ import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
-const require = createRequire(import.meta.url);
+const _require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -13,7 +13,6 @@ export interface NativeModuleType {
     w: number,
     h: number,
     cache: unknown,
-    heuristic: boolean,
     align: number,
     wrap: boolean,
   ): unknown;
@@ -21,7 +20,6 @@ export interface NativeModuleType {
     w: number,
     h: number,
     solver: unknown,
-    heuristic: boolean,
     align: number,
     wrap: boolean,
   ): void;
@@ -29,7 +27,6 @@ export interface NativeModuleType {
     w: number,
     h: number,
     size: number,
-    heuristic: boolean,
     align: number,
     wrap: boolean,
   ): unknown;
@@ -62,7 +59,6 @@ export interface NativeModuleType {
     w: number,
     h: number,
     solver: unknown,
-    isHeuristic: boolean,
     align: number,
     wrap: boolean,
   ): void;
@@ -78,12 +74,12 @@ export interface NativeModuleType {
     format: string,
   ): void;
   _getBookFormat(w: number, h: number, book: unknown): string;
-  _getBookScore(
+  _getBookLookup(
     w: number,
     h: number,
     book: unknown,
     pos: string,
-  ): number | undefined;
+  ): Int32Array | undefined;
   _getBookBuffer(
     w: number,
     h: number,
@@ -95,7 +91,6 @@ export interface NativeModuleType {
     w: number,
     h: number,
     solver: unknown,
-    heuristic: boolean,
     align: number,
     wrap: boolean,
   ): number;
@@ -114,6 +109,7 @@ export interface NativeModuleType {
     add(key: bigint, score: number): void;
     addPosition(pos: string, score: number): void;
     loadFromBook(bookPtr: number): void;
+    setBounded(bounded: boolean): void;
     saveDense(path: string): void;
     getDenseBuffer(): Uint8Array;
     saveEliasFano(path: string): void;
@@ -129,7 +125,7 @@ export function getNativeModule(): NativeModuleType | null {
     nativeModuleAttempted = true;
     try {
       if (typeof process !== "undefined" && process?.versions?.node) {
-        const path = require("path") as { join: (...args: string[]) => string };
+        const path = _require("path") as { join: (...args: string[]) => string };
         const nodePath = path.join(
           __dirname,
           "..",
@@ -137,7 +133,7 @@ export function getNativeModule(): NativeModuleType | null {
           "Release",
           "connect4.node",
         );
-        NativeModule = require(nodePath) as NativeModuleType;
+        NativeModule = _require(nodePath) as NativeModuleType;
       }
     } catch {
       // Fail silently
@@ -185,7 +181,6 @@ export class NativeCache {
         width,
         height,
         sizeMb * 1024 * 1024,
-        false, // legacy is_heuristic slot (removed in v5)
         align,
         wrap,
       );
@@ -248,7 +243,6 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
           this.width,
           this.height,
           sizeMb * 1024 * 1024,
-          false, // legacy is_heuristic slot (removed in v5)
           this.align,
           this.wrap,
         );
@@ -265,7 +259,6 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       this.width,
       this.height,
       this._cachePtr,
-      false, // legacy is_heuristic slot (removed in v5)
       this.align,
       this.wrap,
     ) as number;
@@ -302,6 +295,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
             `The book data may be invalid or the wrong format for this board size.`,
         );
       }
+      this._bookKind = NodeConnect4Solver.parseBookHeaderKind(_data);
     }
     return Promise.resolve();
   }
@@ -309,17 +303,18 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
   queryBook(positionStr: string): Promise<BookResult | null> {
     const native = getNativeModule();
     if (!native) return Promise.resolve(null);
-    // Pass _bookPtr (0 if none) — the native side falls back to the embedded book
-    // for this size, so this works for embedded-book sizes that never call loadBook.
-    // null (not 0) when no explicit book — the native UnwrapPointer maps null →
-    // nullptr and then falls back to the embedded book for this size.
-    const score = native._getBookScore(
+    // null (not 0) when no explicit book — the native side falls back to the
+    // embedded book for this size, so this works for embedded-book sizes too.
+    const lu = native._getBookLookup(
       this.width,
       this.height,
       this._bookPtr || null,
       positionStr,
     );
-    return Promise.resolve(score === undefined ? null : { exact: score });
+    if (lu === undefined) return Promise.resolve(null);
+    const [lo, hi] = lu;
+    if (lo === hi) return Promise.resolve({ exact: lo });
+    return Promise.resolve({ lower: lo, upper: hi });
   }
 
   async analyze(
@@ -385,7 +380,6 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         this._solverPtr,
-        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -400,7 +394,6 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         this._solverPtr,
-        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -410,6 +403,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       if (this._bookPtr) {
         native._destroyBook(this.width, this.height, this._bookPtr);
         this._bookPtr = 0;
+        this._bookKind = null;
       }
     }
     this.initialized = false;
@@ -425,7 +419,6 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
             this.width,
             this.height,
             this._solverPtr,
-            false, // legacy is_heuristic slot (removed in v5)
             this.align,
             this.wrap,
           ),

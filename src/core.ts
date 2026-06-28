@@ -55,17 +55,13 @@ export interface Evaluation {
 /**
  * Result of a book-only lookup (`queryBook`). No search is performed.
  *
- * The shape is forward-compatible with weak/bounds books: a strong (exact) book
- * populates `exact`; a future bounds book will populate `lower`/`upper`. All fields
- * are optional and a miss returns `null` (not an empty object).
- *
- * NOTE: until the book-format `kind` byte lands, every hit is reported as `exact`
- * (for a weak book that value is the Win/Draw/Loss sign, not a true distance).
+ * An exact book populates `exact`. A bounded book populates `lower`/`upper`
+ * (and `exact` is absent). All fields are optional; a miss returns `null`.
  */
 export interface BookResult {
   exact?: number; // exact score (positive = player-to-move winning, 0 = draw)
-  lower?: number; // lower bound on the score (bounds/weak books)
-  upper?: number; // upper bound on the score (bounds/weak books)
+  lower?: number; // lower bound on the score (bounded books)
+  upper?: number; // upper bound on the score (bounded books)
 }
 
 export interface PositionAnalysis {
@@ -186,6 +182,21 @@ export abstract class BaseConnect4Solver {
   public allocatedCacheSizeMb = 0;
   protected initialized = false;
   protected _bookPtr: number | string | object = 0;
+  protected _bookKind: "exact" | "bounded" | null = null;
+
+  /** Kind of the currently-loaded opening book, or `null` if no book is loaded. */
+  get bookKind(): "exact" | "bounded" | null {
+    return this._bookPtr ? this._bookKind : null;
+  }
+
+  /** Reads the flags byte from a v2 book header to determine its kind. Falls back to "exact" for unrecognized formats. */
+  static parseBookHeaderKind(data: Uint8Array): "exact" | "bounded" {
+    // v2 header: [0-1]=magic 0xC4 0x42, [2]=version 0x02, [6]=flags
+    if (data.length < 7 || data[0] !== 0xc4 || data[1] !== 0x42) return "exact";
+    const kindBits = data[6] & 0x0c;
+    if (kindBits === 0x08) return "bounded";
+    return "exact";
+  }
 
   constructor(
     widthOrOpts?: number | Connect4SolverOptions,

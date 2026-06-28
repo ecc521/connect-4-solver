@@ -30,9 +30,8 @@ Value CreateCache(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     size_t bytes = info[2].As<Number>().Int64Value();
-    // info[3] = legacy is_heuristic slot (ignored; exact-only since v5)
-    int align = info[4].As<Number>().Int32Value();
-    bool wrap = info[5].As<Boolean>().Value();
+    int align = info[3].As<Number>().Int32Value();
+    bool wrap = info[4].As<Boolean>().Value();
     void* ptr = nullptr;
     dispatch_void(w, h, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
@@ -53,9 +52,8 @@ Value CreateSolver(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     void* cache_ptr = UnwrapPointer<void>(info[2]);
-    // info[3] = legacy is_heuristic slot (ignored; exact-only since v5)
-    int align = info[4].As<Number>().Int32Value();
-    bool wrap = info[5].As<Boolean>().Value();
+    int align = info[3].As<Number>().Int32Value();
+    bool wrap = info[4].As<Boolean>().Value();
     void* ptr = nullptr;
     dispatch_void(w, h, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
@@ -68,9 +66,8 @@ Value DestroySolver(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     void* solver = UnwrapPointer<void>(info[2]);
-    // info[3] = legacy is_heuristic slot (ignored; exact-only since v5)
-    int align = info[4].As<Number>().Int32Value();
-    bool wrap = info[5].As<Boolean>().Value();
+    int align = info[3].As<Number>().Int32Value();
+    bool wrap = info[4].As<Boolean>().Value();
     dispatch_void(w, h, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
         delete static_cast<typename Size::Solver*>(solver);
@@ -390,9 +387,8 @@ Value StopSolver(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     void* solver = UnwrapPointer<void>(info[2]);
-    // info[3] = legacy is_heuristic slot (ignored; exact-only since v5)
-    int align = info[4].As<Number>().Int32Value();
-    bool wrap = info[5].As<Boolean>().Value();
+    int align = info[3].As<Number>().Int32Value();
+    bool wrap = info[4].As<Boolean>().Value();
     dispatch_void(w, h, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
         static_cast<typename Size::Solver*>(solver)->stop();
@@ -405,9 +401,8 @@ Value GetNodeCount(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     void* solver = UnwrapPointer<void>(info[2]);
-    // info[3] = legacy is_heuristic slot (ignored; exact-only since v5)
-    int align = info[4].As<Number>().Int32Value();
-    bool wrap = info[5].As<Boolean>().Value();
+    int align = info[3].As<Number>().Int32Value();
+    bool wrap = info[4].As<Boolean>().Value();
     uint64_t count = 0;
     dispatch_void(w, h, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
@@ -599,15 +594,15 @@ Value DumpBook(const CallbackInfo& info) {
     return result;
 }
 
-Value GetBookScore(const CallbackInfo& info) {
+// Returns a two-element Int32Array [lower_score, upper_score], or undefined on miss.
+// For exact books lower == upper. For bounded books lower < upper.
+Value GetBookLookup(const CallbackInfo& info) {
     int w = info[0].As<Number>().Int32Value();
     int h = info[1].As<Number>().Int32Value();
     void* ptr = UnwrapPointer<void>(info[2]);
     std::string pos_str = info[3].As<String>().Utf8Value();
 
-    int score = -32000;
-    // ptr may be null — fall back to the compiled-in embedded book for this size
-    // (so queryBook works for embedded-book sizes like 7x6 that never call loadBook).
+    int lo = -32000, hi = -32000;
     int align = 4; bool wrap = false;
     dispatch_void(w, h, align, wrap, [&](auto tag) {
         using Size = typename decltype(tag)::type;
@@ -617,14 +612,20 @@ Value GetBookScore(const CallbackInfo& info) {
         ::GameSolver::Connect4::GenericPosition<Size::w, Size::h> P(w, h);
         if (P.play(pos_str) == pos_str.length()) {
             auto lu = book->query(P);
-            if (lu.found()) score = lu.lower + (-(w * h + 1) / 2) - 1;
+            if (lu.found()) {
+                int min_score = (-(w * h + 1) / 2);
+                lo = lu.lower + min_score - 1;
+                hi = lu.upper + min_score - 1;
+            }
         }
     });
 
-    if (score <= -32000 || score >= 32000) {
-        return info.Env().Undefined();
-    }
-    return Number::New(info.Env(), score);
+    if (lo <= -32000) return info.Env().Undefined();
+
+    auto arr = Int32Array::New(info.Env(), 2);
+    arr[0] = lo;
+    arr[1] = hi;
+    return arr;
 }
 
 Value GetBookBuffer(const CallbackInfo& info) {
@@ -659,6 +660,7 @@ public:
             InstanceMethod("add", &BookBuilder::Add),
             InstanceMethod("addPosition", &BookBuilder::AddPosition),
             InstanceMethod("loadFromBook", &BookBuilder::LoadFromBook),
+            InstanceMethod("setBounded", &BookBuilder::SetBounded),
             InstanceMethod("saveDense", &BookBuilder::SaveDense),
             InstanceMethod("getDenseBuffer", &BookBuilder::GetDenseBuffer),
             InstanceMethod("saveEliasFano", &BookBuilder::SaveEliasFano),
@@ -683,8 +685,40 @@ private:
     int width;
     int height;
     int depth;
+    GameSolver::Connect4::BookKind bkind = GameSolver::Connect4::BookKind::Exact;
     std::vector<std::pair<uint64_t, uint16_t>> items64;
     std::vector<std::pair<unsigned __int128, uint16_t>> items128;
+
+    Napi::Value SetBounded(const CallbackInfo& info) {
+        bool bounded = info[0].As<Boolean>().Value();
+        bkind = bounded ? GameSolver::Connect4::BookKind::Bounded
+                        : GameSolver::Connect4::BookKind::Exact;
+        return info.Env().Undefined();
+    }
+
+    // Returns the uint16_t to store for a raw score. For Bounded books, win/loss
+    // scores are expanded into coarse [lower, upper] intervals; draws are exact.
+    uint16_t encodeItem(int raw_score) const {
+        int abs_min = (width * height + 1) / 2;
+        if (bkind == GameSolver::Connect4::BookKind::Bounded) {
+            uint8_t lo, hi;
+            if (raw_score > 1 || raw_score < -1) {
+                // exact score from canWinNext — preserve it (lo == hi signals exact)
+                uint8_t enc = (uint8_t)(raw_score + abs_min + 1);
+                lo = hi = enc;
+            } else if (raw_score > 0) {
+                lo = (uint8_t)(abs_min + 2);       // encode(+1) = weakest win
+                hi = (uint8_t)(2 * abs_min + 1);   // encode(max_score) = strongest win
+            } else if (raw_score == 0) {
+                lo = hi = (uint8_t)(abs_min + 1);  // encode(0) = draw
+            } else {
+                lo = 1;                             // encode(min_score) = strongest loss
+                hi = (uint8_t)(abs_min);            // encode(-1) = weakest loss
+            }
+            return ((uint16_t)hi << 8) | lo;
+        }
+        return (uint8_t)(raw_score + abs_min + 1);
+    }
 
     Napi::Value LoadFromBook(const CallbackInfo& info) {
         void* book_ptr = UnwrapPointer<void>(info[0]);
@@ -774,27 +808,16 @@ private:
         bool lossless;
         uint64_t key = info[0].As<BigInt>().Uint64Value(&lossless);
         int raw_score = info[1].As<Number>().Int32Value();
-        uint8_t score = 0;
-        
-        #define ENCODE_SCORE_ACTION(NS, W, H, b) \
-            score = (uint8_t)(raw_score - (-(width * height + 1) / 2) + 1);
-            
-        DISPATCH_BOOK(width, height, nullptr, ENCODE_SCORE_ACTION);
-
-        if (is128()) items128.push_back({key, score});
-        else items64.push_back({key, score});
+        uint16_t stored = encodeItem(raw_score);
+        if (is128()) items128.push_back({key, stored});
+        else items64.push_back({key, stored});
         return info.Env().Undefined();
     }
 
     Napi::Value AddPosition(const CallbackInfo& info) {
         std::string pos = info[0].As<String>().Utf8Value();
         int raw_score = info[1].As<Number>().Int32Value();
-        uint8_t score = 0;
-
-        #define ENCODE_POS_SCORE_ACTION(NS, W, H, b) \
-            score = (uint8_t)(raw_score - (-(width * height + 1) / 2) + 1);
-            
-        DISPATCH_BOOK(width, height, nullptr, ENCODE_POS_SCORE_ACTION);
+        uint16_t score = encodeItem(raw_score);
         
         if (width == 6 && height == 5) { GameSolver::Connect4::GenericPosition<6, 5> P; P.play(pos); items64.push_back({P.key3(), score}); }
         else if (width == 6 && height == 6) { GameSolver::Connect4::GenericPosition<6, 6> P; P.play(pos); items64.push_back({P.key3(), score}); }
@@ -878,233 +901,233 @@ private:
 
     Napi::Value SaveDense(const CallbackInfo& info) {
         std::string filename = info[0].As<String>().Utf8Value();
-        if (width == 6 && height == 5) GameSolver::Connect4::OpeningBookBase<6, 5>::save_dense(filename, depth, items64);
-        else if (width == 6 && height == 6) GameSolver::Connect4::OpeningBookBase<6, 6>::save_dense(filename, depth, items64);
-        else if (width == 7 && height == 6) GameSolver::Connect4::OpeningBookBase<7, 6>::save_dense(filename, depth, items64);
-        else if (width == 7 && height == 7) GameSolver::Connect4::OpeningBookBase<7, 7>::save_dense(filename, depth, items64);
-        else if (width == 8 && height == 6) GameSolver::Connect4::OpeningBookBase<8, 6>::save_dense(filename, depth, items64);
-        else if (width == 4 && height == 4) GameSolver::Connect4::OpeningBookBase<4, 4>::save_dense(filename, depth, items64);
-        else if (width == 4 && height == 5) GameSolver::Connect4::OpeningBookBase<4, 5>::save_dense(filename, depth, items64);
-        else if (width == 4 && height == 6) GameSolver::Connect4::OpeningBookBase<4, 6>::save_dense(filename, depth, items64);
-        else if (width == 4 && height == 7) GameSolver::Connect4::OpeningBookBase<4, 7>::save_dense(filename, depth, items64);
-        else if (width == 4 && height == 8) GameSolver::Connect4::OpeningBookBase<4, 8>::save_dense(filename, depth, items64);
-        else if (width == 4 && height == 9) GameSolver::Connect4::OpeningBookBase<4, 9>::save_dense(filename, depth, items64);
-        else if (width == 4 && height == 10) GameSolver::Connect4::OpeningBookBase<4, 10>::save_dense(filename, depth, items64);
-        else if (width == 4 && height == 11) GameSolver::Connect4::OpeningBookBase<4, 11>::save_dense(filename, depth, items64);
-        else if (width == 4 && height == 12) GameSolver::Connect4::OpeningBookBase<4, 12>::save_dense(filename, depth, items64);
-        else if (width == 5 && height == 4) GameSolver::Connect4::OpeningBookBase<5, 4>::save_dense(filename, depth, items64);
-        else if (width == 5 && height == 5) GameSolver::Connect4::OpeningBookBase<5, 5>::save_dense(filename, depth, items64);
-        else if (width == 5 && height == 6) GameSolver::Connect4::OpeningBookBase<5, 6>::save_dense(filename, depth, items64);
-        else if (width == 5 && height == 7) GameSolver::Connect4::OpeningBookBase<5, 7>::save_dense(filename, depth, items64);
-        else if (width == 5 && height == 8) GameSolver::Connect4::OpeningBookBase<5, 8>::save_dense(filename, depth, items64);
-        else if (width == 5 && height == 9) GameSolver::Connect4::OpeningBookBase<5, 9>::save_dense(filename, depth, items64);
-        else if (width == 5 && height == 10) GameSolver::Connect4::OpeningBookBase<5, 10>::save_dense(filename, depth, items64);
-        else if (width == 5 && height == 11) GameSolver::Connect4::OpeningBookBase<5, 11>::save_dense(filename, depth, items64);
-        else if (width == 5 && height == 12) GameSolver::Connect4::OpeningBookBase<5, 12>::save_dense(filename, depth, items128);
-        else if (width == 6 && height == 4) GameSolver::Connect4::OpeningBookBase<6, 4>::save_dense(filename, depth, items64);
-        else if (width == 6 && height == 7) GameSolver::Connect4::OpeningBookBase<6, 7>::save_dense(filename, depth, items64);
-        else if (width == 6 && height == 8) GameSolver::Connect4::OpeningBookBase<6, 8>::save_dense(filename, depth, items64);
-        else if (width == 6 && height == 9) GameSolver::Connect4::OpeningBookBase<6, 9>::save_dense(filename, depth, items64);
-        else if (width == 6 && height == 10) GameSolver::Connect4::OpeningBookBase<6, 10>::save_dense(filename, depth, items128);
-        else if (width == 6 && height == 11) GameSolver::Connect4::OpeningBookBase<6, 11>::save_dense(filename, depth, items128);
-        else if (width == 6 && height == 12) GameSolver::Connect4::OpeningBookBase<6, 12>::save_dense(filename, depth, items128);
-        else if (width == 7 && height == 4) GameSolver::Connect4::OpeningBookBase<7, 4>::save_dense(filename, depth, items64);
-        else if (width == 7 && height == 5) GameSolver::Connect4::OpeningBookBase<7, 5>::save_dense(filename, depth, items64);
-        else if (width == 7 && height == 8) GameSolver::Connect4::OpeningBookBase<7, 8>::save_dense(filename, depth, items64);
-        else if (width == 7 && height == 9) GameSolver::Connect4::OpeningBookBase<7, 9>::save_dense(filename, depth, items128);
-        else if (width == 7 && height == 10) GameSolver::Connect4::OpeningBookBase<7, 10>::save_dense(filename, depth, items128);
-        else if (width == 7 && height == 11) GameSolver::Connect4::OpeningBookBase<7, 11>::save_dense(filename, depth, items128);
-        else if (width == 7 && height == 12) GameSolver::Connect4::OpeningBookBase<7, 12>::save_dense(filename, depth, items128);
-        else if (width == 8 && height == 4) GameSolver::Connect4::OpeningBookBase<8, 4>::save_dense(filename, depth, items64);
-        else if (width == 8 && height == 5) GameSolver::Connect4::OpeningBookBase<8, 5>::save_dense(filename, depth, items64);
-        else if (width == 8 && height == 7) GameSolver::Connect4::OpeningBookBase<8, 7>::save_dense(filename, depth, items64);
-        else if (width == 8 && height == 9) GameSolver::Connect4::OpeningBookBase<8, 9>::save_dense(filename, depth, items128);
-        else if (width == 8 && height == 10) GameSolver::Connect4::OpeningBookBase<8, 10>::save_dense(filename, depth, items128);
-        else if (width == 8 && height == 11) GameSolver::Connect4::OpeningBookBase<8, 11>::save_dense(filename, depth, items128);
-        else if (width == 8 && height == 12) GameSolver::Connect4::OpeningBookBase<8, 12>::save_dense(filename, depth, items128);
-        else if (width == 9 && height == 4) GameSolver::Connect4::OpeningBookBase<9, 4>::save_dense(filename, depth, items64);
-        else if (width == 9 && height == 5) GameSolver::Connect4::OpeningBookBase<9, 5>::save_dense(filename, depth, items64);
-        else if (width == 9 && height == 8) GameSolver::Connect4::OpeningBookBase<9, 8>::save_dense(filename, depth, items128);
-        else if (width == 9 && height == 10) GameSolver::Connect4::OpeningBookBase<9, 10>::save_dense(filename, depth, items128);
-        else if (width == 9 && height == 11) GameSolver::Connect4::OpeningBookBase<9, 11>::save_dense(filename, depth, items128);
-        else if (width == 9 && height == 12) GameSolver::Connect4::OpeningBookBase<9, 12>::save_dense(filename, depth, items128);
-        else if (width == 10 && height == 4) GameSolver::Connect4::OpeningBookBase<10, 4>::save_dense(filename, depth, items64);
-        else if (width == 10 && height == 5) GameSolver::Connect4::OpeningBookBase<10, 5>::save_dense(filename, depth, items64);
-        else if (width == 10 && height == 6) GameSolver::Connect4::OpeningBookBase<10, 6>::save_dense(filename, depth, items128);
-        else if (width == 10 && height == 8) GameSolver::Connect4::OpeningBookBase<10, 8>::save_dense(filename, depth, items128);
-        else if (width == 10 && height == 9) GameSolver::Connect4::OpeningBookBase<10, 9>::save_dense(filename, depth, items128);
-        else if (width == 10 && height == 11) GameSolver::Connect4::OpeningBookBase<10, 11>::save_dense(filename, depth, items128);
-        else if (width == 11 && height == 5) GameSolver::Connect4::OpeningBookBase<11, 5>::save_dense(filename, depth, items128);
-        else if (width == 11 && height == 6) GameSolver::Connect4::OpeningBookBase<11, 6>::save_dense(filename, depth, items128);
-        else if (width == 11 && height == 7) GameSolver::Connect4::OpeningBookBase<11, 7>::save_dense(filename, depth, items128);
-        else if (width == 11 && height == 8) GameSolver::Connect4::OpeningBookBase<11, 8>::save_dense(filename, depth, items128);
-        else if (width == 11 && height == 9) GameSolver::Connect4::OpeningBookBase<11, 9>::save_dense(filename, depth, items128);
-        else if (width == 11 && height == 10) GameSolver::Connect4::OpeningBookBase<11, 10>::save_dense(filename, depth, items128);
-        else if (width == 12 && height == 4) GameSolver::Connect4::OpeningBookBase<12, 4>::save_dense(filename, depth, items64);
-        else if (width == 12 && height == 5) GameSolver::Connect4::OpeningBookBase<12, 5>::save_dense(filename, depth, items128);
-        else if (width == 12 && height == 6) GameSolver::Connect4::OpeningBookBase<12, 6>::save_dense(filename, depth, items128);
-        else if (width == 12 && height == 7) GameSolver::Connect4::OpeningBookBase<12, 7>::save_dense(filename, depth, items128);
-        else if (width == 12 && height == 8) GameSolver::Connect4::OpeningBookBase<12, 8>::save_dense(filename, depth, items128);
-        else if (width == 12 && height == 9) GameSolver::Connect4::OpeningBookBase<12, 9>::save_dense(filename, depth, items128);
-        else if (width == 8 && height == 8) GameSolver::Connect4::OpeningBookBase<8, 8>::save_dense(filename, depth, items128);
-        else if (width == 9 && height == 7) GameSolver::Connect4::OpeningBookBase<9, 7>::save_dense(filename, depth, items128);
-        else if (width == 9 && height == 6) GameSolver::Connect4::OpeningBookBase<9, 6>::save_dense(filename, depth, items64);
-        else if (width == 11 && height == 4) GameSolver::Connect4::OpeningBookBase<11, 4>::save_dense(filename, depth, items64);
+        if (width == 6 && height == 5) GameSolver::Connect4::OpeningBookBase<6, 5>::save_dense(filename, depth, items64, bkind);
+        else if (width == 6 && height == 6) GameSolver::Connect4::OpeningBookBase<6, 6>::save_dense(filename, depth, items64, bkind);
+        else if (width == 7 && height == 6) GameSolver::Connect4::OpeningBookBase<7, 6>::save_dense(filename, depth, items64, bkind);
+        else if (width == 7 && height == 7) GameSolver::Connect4::OpeningBookBase<7, 7>::save_dense(filename, depth, items64, bkind);
+        else if (width == 8 && height == 6) GameSolver::Connect4::OpeningBookBase<8, 6>::save_dense(filename, depth, items64, bkind);
+        else if (width == 4 && height == 4) GameSolver::Connect4::OpeningBookBase<4, 4>::save_dense(filename, depth, items64, bkind);
+        else if (width == 4 && height == 5) GameSolver::Connect4::OpeningBookBase<4, 5>::save_dense(filename, depth, items64, bkind);
+        else if (width == 4 && height == 6) GameSolver::Connect4::OpeningBookBase<4, 6>::save_dense(filename, depth, items64, bkind);
+        else if (width == 4 && height == 7) GameSolver::Connect4::OpeningBookBase<4, 7>::save_dense(filename, depth, items64, bkind);
+        else if (width == 4 && height == 8) GameSolver::Connect4::OpeningBookBase<4, 8>::save_dense(filename, depth, items64, bkind);
+        else if (width == 4 && height == 9) GameSolver::Connect4::OpeningBookBase<4, 9>::save_dense(filename, depth, items64, bkind);
+        else if (width == 4 && height == 10) GameSolver::Connect4::OpeningBookBase<4, 10>::save_dense(filename, depth, items64, bkind);
+        else if (width == 4 && height == 11) GameSolver::Connect4::OpeningBookBase<4, 11>::save_dense(filename, depth, items64, bkind);
+        else if (width == 4 && height == 12) GameSolver::Connect4::OpeningBookBase<4, 12>::save_dense(filename, depth, items64, bkind);
+        else if (width == 5 && height == 4) GameSolver::Connect4::OpeningBookBase<5, 4>::save_dense(filename, depth, items64, bkind);
+        else if (width == 5 && height == 5) GameSolver::Connect4::OpeningBookBase<5, 5>::save_dense(filename, depth, items64, bkind);
+        else if (width == 5 && height == 6) GameSolver::Connect4::OpeningBookBase<5, 6>::save_dense(filename, depth, items64, bkind);
+        else if (width == 5 && height == 7) GameSolver::Connect4::OpeningBookBase<5, 7>::save_dense(filename, depth, items64, bkind);
+        else if (width == 5 && height == 8) GameSolver::Connect4::OpeningBookBase<5, 8>::save_dense(filename, depth, items64, bkind);
+        else if (width == 5 && height == 9) GameSolver::Connect4::OpeningBookBase<5, 9>::save_dense(filename, depth, items64, bkind);
+        else if (width == 5 && height == 10) GameSolver::Connect4::OpeningBookBase<5, 10>::save_dense(filename, depth, items64, bkind);
+        else if (width == 5 && height == 11) GameSolver::Connect4::OpeningBookBase<5, 11>::save_dense(filename, depth, items64, bkind);
+        else if (width == 5 && height == 12) GameSolver::Connect4::OpeningBookBase<5, 12>::save_dense(filename, depth, items128, bkind);
+        else if (width == 6 && height == 4) GameSolver::Connect4::OpeningBookBase<6, 4>::save_dense(filename, depth, items64, bkind);
+        else if (width == 6 && height == 7) GameSolver::Connect4::OpeningBookBase<6, 7>::save_dense(filename, depth, items64, bkind);
+        else if (width == 6 && height == 8) GameSolver::Connect4::OpeningBookBase<6, 8>::save_dense(filename, depth, items64, bkind);
+        else if (width == 6 && height == 9) GameSolver::Connect4::OpeningBookBase<6, 9>::save_dense(filename, depth, items64, bkind);
+        else if (width == 6 && height == 10) GameSolver::Connect4::OpeningBookBase<6, 10>::save_dense(filename, depth, items128, bkind);
+        else if (width == 6 && height == 11) GameSolver::Connect4::OpeningBookBase<6, 11>::save_dense(filename, depth, items128, bkind);
+        else if (width == 6 && height == 12) GameSolver::Connect4::OpeningBookBase<6, 12>::save_dense(filename, depth, items128, bkind);
+        else if (width == 7 && height == 4) GameSolver::Connect4::OpeningBookBase<7, 4>::save_dense(filename, depth, items64, bkind);
+        else if (width == 7 && height == 5) GameSolver::Connect4::OpeningBookBase<7, 5>::save_dense(filename, depth, items64, bkind);
+        else if (width == 7 && height == 8) GameSolver::Connect4::OpeningBookBase<7, 8>::save_dense(filename, depth, items64, bkind);
+        else if (width == 7 && height == 9) GameSolver::Connect4::OpeningBookBase<7, 9>::save_dense(filename, depth, items128, bkind);
+        else if (width == 7 && height == 10) GameSolver::Connect4::OpeningBookBase<7, 10>::save_dense(filename, depth, items128, bkind);
+        else if (width == 7 && height == 11) GameSolver::Connect4::OpeningBookBase<7, 11>::save_dense(filename, depth, items128, bkind);
+        else if (width == 7 && height == 12) GameSolver::Connect4::OpeningBookBase<7, 12>::save_dense(filename, depth, items128, bkind);
+        else if (width == 8 && height == 4) GameSolver::Connect4::OpeningBookBase<8, 4>::save_dense(filename, depth, items64, bkind);
+        else if (width == 8 && height == 5) GameSolver::Connect4::OpeningBookBase<8, 5>::save_dense(filename, depth, items64, bkind);
+        else if (width == 8 && height == 7) GameSolver::Connect4::OpeningBookBase<8, 7>::save_dense(filename, depth, items64, bkind);
+        else if (width == 8 && height == 9) GameSolver::Connect4::OpeningBookBase<8, 9>::save_dense(filename, depth, items128, bkind);
+        else if (width == 8 && height == 10) GameSolver::Connect4::OpeningBookBase<8, 10>::save_dense(filename, depth, items128, bkind);
+        else if (width == 8 && height == 11) GameSolver::Connect4::OpeningBookBase<8, 11>::save_dense(filename, depth, items128, bkind);
+        else if (width == 8 && height == 12) GameSolver::Connect4::OpeningBookBase<8, 12>::save_dense(filename, depth, items128, bkind);
+        else if (width == 9 && height == 4) GameSolver::Connect4::OpeningBookBase<9, 4>::save_dense(filename, depth, items64, bkind);
+        else if (width == 9 && height == 5) GameSolver::Connect4::OpeningBookBase<9, 5>::save_dense(filename, depth, items64, bkind);
+        else if (width == 9 && height == 8) GameSolver::Connect4::OpeningBookBase<9, 8>::save_dense(filename, depth, items128, bkind);
+        else if (width == 9 && height == 10) GameSolver::Connect4::OpeningBookBase<9, 10>::save_dense(filename, depth, items128, bkind);
+        else if (width == 9 && height == 11) GameSolver::Connect4::OpeningBookBase<9, 11>::save_dense(filename, depth, items128, bkind);
+        else if (width == 9 && height == 12) GameSolver::Connect4::OpeningBookBase<9, 12>::save_dense(filename, depth, items128, bkind);
+        else if (width == 10 && height == 4) GameSolver::Connect4::OpeningBookBase<10, 4>::save_dense(filename, depth, items64, bkind);
+        else if (width == 10 && height == 5) GameSolver::Connect4::OpeningBookBase<10, 5>::save_dense(filename, depth, items64, bkind);
+        else if (width == 10 && height == 6) GameSolver::Connect4::OpeningBookBase<10, 6>::save_dense(filename, depth, items128, bkind);
+        else if (width == 10 && height == 8) GameSolver::Connect4::OpeningBookBase<10, 8>::save_dense(filename, depth, items128, bkind);
+        else if (width == 10 && height == 9) GameSolver::Connect4::OpeningBookBase<10, 9>::save_dense(filename, depth, items128, bkind);
+        else if (width == 10 && height == 11) GameSolver::Connect4::OpeningBookBase<10, 11>::save_dense(filename, depth, items128, bkind);
+        else if (width == 11 && height == 5) GameSolver::Connect4::OpeningBookBase<11, 5>::save_dense(filename, depth, items128, bkind);
+        else if (width == 11 && height == 6) GameSolver::Connect4::OpeningBookBase<11, 6>::save_dense(filename, depth, items128, bkind);
+        else if (width == 11 && height == 7) GameSolver::Connect4::OpeningBookBase<11, 7>::save_dense(filename, depth, items128, bkind);
+        else if (width == 11 && height == 8) GameSolver::Connect4::OpeningBookBase<11, 8>::save_dense(filename, depth, items128, bkind);
+        else if (width == 11 && height == 9) GameSolver::Connect4::OpeningBookBase<11, 9>::save_dense(filename, depth, items128, bkind);
+        else if (width == 11 && height == 10) GameSolver::Connect4::OpeningBookBase<11, 10>::save_dense(filename, depth, items128, bkind);
+        else if (width == 12 && height == 4) GameSolver::Connect4::OpeningBookBase<12, 4>::save_dense(filename, depth, items64, bkind);
+        else if (width == 12 && height == 5) GameSolver::Connect4::OpeningBookBase<12, 5>::save_dense(filename, depth, items128, bkind);
+        else if (width == 12 && height == 6) GameSolver::Connect4::OpeningBookBase<12, 6>::save_dense(filename, depth, items128, bkind);
+        else if (width == 12 && height == 7) GameSolver::Connect4::OpeningBookBase<12, 7>::save_dense(filename, depth, items128, bkind);
+        else if (width == 12 && height == 8) GameSolver::Connect4::OpeningBookBase<12, 8>::save_dense(filename, depth, items128, bkind);
+        else if (width == 12 && height == 9) GameSolver::Connect4::OpeningBookBase<12, 9>::save_dense(filename, depth, items128, bkind);
+        else if (width == 8 && height == 8) GameSolver::Connect4::OpeningBookBase<8, 8>::save_dense(filename, depth, items128, bkind);
+        else if (width == 9 && height == 7) GameSolver::Connect4::OpeningBookBase<9, 7>::save_dense(filename, depth, items128, bkind);
+        else if (width == 9 && height == 6) GameSolver::Connect4::OpeningBookBase<9, 6>::save_dense(filename, depth, items64, bkind);
+        else if (width == 11 && height == 4) GameSolver::Connect4::OpeningBookBase<11, 4>::save_dense(filename, depth, items64, bkind);
         return info.Env().Undefined();
     }
 
     Napi::Value GetDenseBuffer(const CallbackInfo& info) {
         std::vector<uint8_t> buf;
-        if (width == 6 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<6, 5>::serialize_dense(depth, items64);
-        else if (width == 6 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<6, 6>::serialize_dense(depth, items64);
-        else if (width == 7 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<7, 6>::serialize_dense(depth, items64);
-        else if (width == 7 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<7, 7>::serialize_dense(depth, items64);
-        else if (width == 8 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<8, 6>::serialize_dense(depth, items64);
-        else if (width == 4 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<4, 4>::serialize_dense(depth, items64);
-        else if (width == 4 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<4, 5>::serialize_dense(depth, items64);
-        else if (width == 4 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<4, 6>::serialize_dense(depth, items64);
-        else if (width == 4 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<4, 7>::serialize_dense(depth, items64);
-        else if (width == 4 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<4, 8>::serialize_dense(depth, items64);
-        else if (width == 4 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<4, 9>::serialize_dense(depth, items64);
-        else if (width == 4 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<4, 10>::serialize_dense(depth, items64);
-        else if (width == 4 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<4, 11>::serialize_dense(depth, items64);
-        else if (width == 4 && height == 12) buf = GameSolver::Connect4::OpeningBookBase<4, 12>::serialize_dense(depth, items64);
-        else if (width == 5 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<5, 4>::serialize_dense(depth, items64);
-        else if (width == 5 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<5, 5>::serialize_dense(depth, items64);
-        else if (width == 5 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<5, 6>::serialize_dense(depth, items64);
-        else if (width == 5 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<5, 7>::serialize_dense(depth, items64);
-        else if (width == 5 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<5, 8>::serialize_dense(depth, items64);
-        else if (width == 5 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<5, 9>::serialize_dense(depth, items64);
-        else if (width == 5 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<5, 10>::serialize_dense(depth, items64);
-        else if (width == 5 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<5, 11>::serialize_dense(depth, items64);
-        else if (width == 5 && height == 12) buf = GameSolver::Connect4::OpeningBookBase<5, 12>::serialize_dense(depth, items128);
-        else if (width == 6 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<6, 4>::serialize_dense(depth, items64);
-        else if (width == 6 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<6, 7>::serialize_dense(depth, items64);
-        else if (width == 6 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<6, 8>::serialize_dense(depth, items64);
-        else if (width == 6 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<6, 9>::serialize_dense(depth, items64);
-        else if (width == 6 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<6, 10>::serialize_dense(depth, items128);
-        else if (width == 6 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<6, 11>::serialize_dense(depth, items128);
-        else if (width == 6 && height == 12) buf = GameSolver::Connect4::OpeningBookBase<6, 12>::serialize_dense(depth, items128);
-        else if (width == 7 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<7, 4>::serialize_dense(depth, items64);
-        else if (width == 7 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<7, 5>::serialize_dense(depth, items64);
-        else if (width == 7 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<7, 8>::serialize_dense(depth, items64);
-        else if (width == 7 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<7, 9>::serialize_dense(depth, items128);
-        else if (width == 7 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<7, 10>::serialize_dense(depth, items128);
-        else if (width == 7 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<7, 11>::serialize_dense(depth, items128);
-        else if (width == 7 && height == 12) buf = GameSolver::Connect4::OpeningBookBase<7, 12>::serialize_dense(depth, items128);
-        else if (width == 8 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<8, 4>::serialize_dense(depth, items64);
-        else if (width == 8 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<8, 5>::serialize_dense(depth, items64);
-        else if (width == 8 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<8, 7>::serialize_dense(depth, items64);
-        else if (width == 8 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<8, 9>::serialize_dense(depth, items128);
-        else if (width == 8 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<8, 10>::serialize_dense(depth, items128);
-        else if (width == 8 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<8, 11>::serialize_dense(depth, items128);
-        else if (width == 8 && height == 12) buf = GameSolver::Connect4::OpeningBookBase<8, 12>::serialize_dense(depth, items128);
-        else if (width == 9 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<9, 4>::serialize_dense(depth, items64);
-        else if (width == 9 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<9, 5>::serialize_dense(depth, items64);
-        else if (width == 9 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<9, 8>::serialize_dense(depth, items128);
-        else if (width == 9 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<9, 10>::serialize_dense(depth, items128);
-        else if (width == 9 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<9, 11>::serialize_dense(depth, items128);
-        else if (width == 9 && height == 12) buf = GameSolver::Connect4::OpeningBookBase<9, 12>::serialize_dense(depth, items128);
-        else if (width == 10 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<10, 4>::serialize_dense(depth, items64);
-        else if (width == 10 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<10, 5>::serialize_dense(depth, items64);
-        else if (width == 10 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<10, 6>::serialize_dense(depth, items128);
-        else if (width == 10 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<10, 8>::serialize_dense(depth, items128);
-        else if (width == 10 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<10, 9>::serialize_dense(depth, items128);
-        else if (width == 10 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<10, 11>::serialize_dense(depth, items128);
-        else if (width == 11 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<11, 5>::serialize_dense(depth, items128);
-        else if (width == 11 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<11, 6>::serialize_dense(depth, items128);
-        else if (width == 11 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<11, 7>::serialize_dense(depth, items128);
-        else if (width == 11 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<11, 8>::serialize_dense(depth, items128);
-        else if (width == 11 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<11, 9>::serialize_dense(depth, items128);
-        else if (width == 11 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<11, 10>::serialize_dense(depth, items128);
-        else if (width == 12 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<12, 4>::serialize_dense(depth, items64);
-        else if (width == 12 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<12, 5>::serialize_dense(depth, items128);
-        else if (width == 12 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<12, 6>::serialize_dense(depth, items128);
-        else if (width == 12 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<12, 7>::serialize_dense(depth, items128);
-        else if (width == 12 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<12, 8>::serialize_dense(depth, items128);
-        else if (width == 12 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<12, 9>::serialize_dense(depth, items128);
-        else if (width == 8 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<8, 8>::serialize_dense(depth, items128);
-        else if (width == 9 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<9, 7>::serialize_dense(depth, items128);
-        else if (width == 9 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<9, 6>::serialize_dense(depth, items64);
-        else if (width == 11 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<11, 4>::serialize_dense(depth, items64);
+        if (width == 6 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<6, 5>::serialize_dense(depth, items64, bkind);
+        else if (width == 6 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<6, 6>::serialize_dense(depth, items64, bkind);
+        else if (width == 7 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<7, 6>::serialize_dense(depth, items64, bkind);
+        else if (width == 7 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<7, 7>::serialize_dense(depth, items64, bkind);
+        else if (width == 8 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<8, 6>::serialize_dense(depth, items64, bkind);
+        else if (width == 4 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<4, 4>::serialize_dense(depth, items64, bkind);
+        else if (width == 4 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<4, 5>::serialize_dense(depth, items64, bkind);
+        else if (width == 4 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<4, 6>::serialize_dense(depth, items64, bkind);
+        else if (width == 4 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<4, 7>::serialize_dense(depth, items64, bkind);
+        else if (width == 4 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<4, 8>::serialize_dense(depth, items64, bkind);
+        else if (width == 4 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<4, 9>::serialize_dense(depth, items64, bkind);
+        else if (width == 4 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<4, 10>::serialize_dense(depth, items64, bkind);
+        else if (width == 4 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<4, 11>::serialize_dense(depth, items64, bkind);
+        else if (width == 4 && height == 12) buf = GameSolver::Connect4::OpeningBookBase<4, 12>::serialize_dense(depth, items64, bkind);
+        else if (width == 5 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<5, 4>::serialize_dense(depth, items64, bkind);
+        else if (width == 5 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<5, 5>::serialize_dense(depth, items64, bkind);
+        else if (width == 5 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<5, 6>::serialize_dense(depth, items64, bkind);
+        else if (width == 5 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<5, 7>::serialize_dense(depth, items64, bkind);
+        else if (width == 5 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<5, 8>::serialize_dense(depth, items64, bkind);
+        else if (width == 5 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<5, 9>::serialize_dense(depth, items64, bkind);
+        else if (width == 5 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<5, 10>::serialize_dense(depth, items64, bkind);
+        else if (width == 5 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<5, 11>::serialize_dense(depth, items64, bkind);
+        else if (width == 5 && height == 12) buf = GameSolver::Connect4::OpeningBookBase<5, 12>::serialize_dense(depth, items128, bkind);
+        else if (width == 6 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<6, 4>::serialize_dense(depth, items64, bkind);
+        else if (width == 6 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<6, 7>::serialize_dense(depth, items64, bkind);
+        else if (width == 6 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<6, 8>::serialize_dense(depth, items64, bkind);
+        else if (width == 6 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<6, 9>::serialize_dense(depth, items64, bkind);
+        else if (width == 6 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<6, 10>::serialize_dense(depth, items128, bkind);
+        else if (width == 6 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<6, 11>::serialize_dense(depth, items128, bkind);
+        else if (width == 6 && height == 12) buf = GameSolver::Connect4::OpeningBookBase<6, 12>::serialize_dense(depth, items128, bkind);
+        else if (width == 7 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<7, 4>::serialize_dense(depth, items64, bkind);
+        else if (width == 7 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<7, 5>::serialize_dense(depth, items64, bkind);
+        else if (width == 7 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<7, 8>::serialize_dense(depth, items64, bkind);
+        else if (width == 7 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<7, 9>::serialize_dense(depth, items128, bkind);
+        else if (width == 7 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<7, 10>::serialize_dense(depth, items128, bkind);
+        else if (width == 7 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<7, 11>::serialize_dense(depth, items128, bkind);
+        else if (width == 7 && height == 12) buf = GameSolver::Connect4::OpeningBookBase<7, 12>::serialize_dense(depth, items128, bkind);
+        else if (width == 8 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<8, 4>::serialize_dense(depth, items64, bkind);
+        else if (width == 8 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<8, 5>::serialize_dense(depth, items64, bkind);
+        else if (width == 8 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<8, 7>::serialize_dense(depth, items64, bkind);
+        else if (width == 8 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<8, 9>::serialize_dense(depth, items128, bkind);
+        else if (width == 8 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<8, 10>::serialize_dense(depth, items128, bkind);
+        else if (width == 8 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<8, 11>::serialize_dense(depth, items128, bkind);
+        else if (width == 8 && height == 12) buf = GameSolver::Connect4::OpeningBookBase<8, 12>::serialize_dense(depth, items128, bkind);
+        else if (width == 9 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<9, 4>::serialize_dense(depth, items64, bkind);
+        else if (width == 9 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<9, 5>::serialize_dense(depth, items64, bkind);
+        else if (width == 9 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<9, 8>::serialize_dense(depth, items128, bkind);
+        else if (width == 9 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<9, 10>::serialize_dense(depth, items128, bkind);
+        else if (width == 9 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<9, 11>::serialize_dense(depth, items128, bkind);
+        else if (width == 9 && height == 12) buf = GameSolver::Connect4::OpeningBookBase<9, 12>::serialize_dense(depth, items128, bkind);
+        else if (width == 10 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<10, 4>::serialize_dense(depth, items64, bkind);
+        else if (width == 10 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<10, 5>::serialize_dense(depth, items64, bkind);
+        else if (width == 10 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<10, 6>::serialize_dense(depth, items128, bkind);
+        else if (width == 10 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<10, 8>::serialize_dense(depth, items128, bkind);
+        else if (width == 10 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<10, 9>::serialize_dense(depth, items128, bkind);
+        else if (width == 10 && height == 11) buf = GameSolver::Connect4::OpeningBookBase<10, 11>::serialize_dense(depth, items128, bkind);
+        else if (width == 11 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<11, 5>::serialize_dense(depth, items128, bkind);
+        else if (width == 11 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<11, 6>::serialize_dense(depth, items128, bkind);
+        else if (width == 11 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<11, 7>::serialize_dense(depth, items128, bkind);
+        else if (width == 11 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<11, 8>::serialize_dense(depth, items128, bkind);
+        else if (width == 11 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<11, 9>::serialize_dense(depth, items128, bkind);
+        else if (width == 11 && height == 10) buf = GameSolver::Connect4::OpeningBookBase<11, 10>::serialize_dense(depth, items128, bkind);
+        else if (width == 12 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<12, 4>::serialize_dense(depth, items64, bkind);
+        else if (width == 12 && height == 5) buf = GameSolver::Connect4::OpeningBookBase<12, 5>::serialize_dense(depth, items128, bkind);
+        else if (width == 12 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<12, 6>::serialize_dense(depth, items128, bkind);
+        else if (width == 12 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<12, 7>::serialize_dense(depth, items128, bkind);
+        else if (width == 12 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<12, 8>::serialize_dense(depth, items128, bkind);
+        else if (width == 12 && height == 9) buf = GameSolver::Connect4::OpeningBookBase<12, 9>::serialize_dense(depth, items128, bkind);
+        else if (width == 8 && height == 8) buf = GameSolver::Connect4::OpeningBookBase<8, 8>::serialize_dense(depth, items128, bkind);
+        else if (width == 9 && height == 7) buf = GameSolver::Connect4::OpeningBookBase<9, 7>::serialize_dense(depth, items128, bkind);
+        else if (width == 9 && height == 6) buf = GameSolver::Connect4::OpeningBookBase<9, 6>::serialize_dense(depth, items64, bkind);
+        else if (width == 11 && height == 4) buf = GameSolver::Connect4::OpeningBookBase<11, 4>::serialize_dense(depth, items64, bkind);
 
         return Napi::Buffer<uint8_t>::Copy(info.Env(), buf.data(), buf.size());
     }
 
     Napi::Value SaveEliasFano(const CallbackInfo& info) {
         std::string filename = info[0].As<String>().Utf8Value();
-        if (width == 6 && height == 5) GameSolver::Connect4::OpeningBookBase<6, 5>::save_elias_fano(filename, depth, items64);
-        else if (width == 6 && height == 6) GameSolver::Connect4::OpeningBookBase<6, 6>::save_elias_fano(filename, depth, items64);
-        else if (width == 7 && height == 6) GameSolver::Connect4::OpeningBookBase<7, 6>::save_elias_fano(filename, depth, items64);
-        else if (width == 7 && height == 7) GameSolver::Connect4::OpeningBookBase<7, 7>::save_elias_fano(filename, depth, items64);
-        else if (width == 8 && height == 6) GameSolver::Connect4::OpeningBookBase<8, 6>::save_elias_fano(filename, depth, items64);
-        else if (width == 4 && height == 4) GameSolver::Connect4::OpeningBookBase<4, 4>::save_elias_fano(filename, depth, items64);
-        else if (width == 4 && height == 5) GameSolver::Connect4::OpeningBookBase<4, 5>::save_elias_fano(filename, depth, items64);
-        else if (width == 4 && height == 6) GameSolver::Connect4::OpeningBookBase<4, 6>::save_elias_fano(filename, depth, items64);
-        else if (width == 4 && height == 7) GameSolver::Connect4::OpeningBookBase<4, 7>::save_elias_fano(filename, depth, items64);
-        else if (width == 4 && height == 8) GameSolver::Connect4::OpeningBookBase<4, 8>::save_elias_fano(filename, depth, items64);
-        else if (width == 4 && height == 9) GameSolver::Connect4::OpeningBookBase<4, 9>::save_elias_fano(filename, depth, items64);
-        else if (width == 4 && height == 10) GameSolver::Connect4::OpeningBookBase<4, 10>::save_elias_fano(filename, depth, items64);
-        else if (width == 4 && height == 11) GameSolver::Connect4::OpeningBookBase<4, 11>::save_elias_fano(filename, depth, items64);
-        else if (width == 4 && height == 12) GameSolver::Connect4::OpeningBookBase<4, 12>::save_elias_fano(filename, depth, items64);
-        else if (width == 5 && height == 4) GameSolver::Connect4::OpeningBookBase<5, 4>::save_elias_fano(filename, depth, items64);
-        else if (width == 5 && height == 5) GameSolver::Connect4::OpeningBookBase<5, 5>::save_elias_fano(filename, depth, items64);
-        else if (width == 5 && height == 6) GameSolver::Connect4::OpeningBookBase<5, 6>::save_elias_fano(filename, depth, items64);
-        else if (width == 5 && height == 7) GameSolver::Connect4::OpeningBookBase<5, 7>::save_elias_fano(filename, depth, items64);
-        else if (width == 5 && height == 8) GameSolver::Connect4::OpeningBookBase<5, 8>::save_elias_fano(filename, depth, items64);
-        else if (width == 5 && height == 9) GameSolver::Connect4::OpeningBookBase<5, 9>::save_elias_fano(filename, depth, items64);
-        else if (width == 5 && height == 10) GameSolver::Connect4::OpeningBookBase<5, 10>::save_elias_fano(filename, depth, items64);
-        else if (width == 5 && height == 11) GameSolver::Connect4::OpeningBookBase<5, 11>::save_elias_fano(filename, depth, items64);
-        else if (width == 5 && height == 12) GameSolver::Connect4::OpeningBookBase<5, 12>::save_elias_fano(filename, depth, items128);
-        else if (width == 6 && height == 4) GameSolver::Connect4::OpeningBookBase<6, 4>::save_elias_fano(filename, depth, items64);
-        else if (width == 6 && height == 7) GameSolver::Connect4::OpeningBookBase<6, 7>::save_elias_fano(filename, depth, items64);
-        else if (width == 6 && height == 8) GameSolver::Connect4::OpeningBookBase<6, 8>::save_elias_fano(filename, depth, items64);
-        else if (width == 6 && height == 9) GameSolver::Connect4::OpeningBookBase<6, 9>::save_elias_fano(filename, depth, items64);
-        else if (width == 6 && height == 10) GameSolver::Connect4::OpeningBookBase<6, 10>::save_elias_fano(filename, depth, items128);
-        else if (width == 6 && height == 11) GameSolver::Connect4::OpeningBookBase<6, 11>::save_elias_fano(filename, depth, items128);
-        else if (width == 6 && height == 12) GameSolver::Connect4::OpeningBookBase<6, 12>::save_elias_fano(filename, depth, items128);
-        else if (width == 7 && height == 4) GameSolver::Connect4::OpeningBookBase<7, 4>::save_elias_fano(filename, depth, items64);
-        else if (width == 7 && height == 5) GameSolver::Connect4::OpeningBookBase<7, 5>::save_elias_fano(filename, depth, items64);
-        else if (width == 7 && height == 8) GameSolver::Connect4::OpeningBookBase<7, 8>::save_elias_fano(filename, depth, items64);
-        else if (width == 7 && height == 9) GameSolver::Connect4::OpeningBookBase<7, 9>::save_elias_fano(filename, depth, items128);
-        else if (width == 7 && height == 10) GameSolver::Connect4::OpeningBookBase<7, 10>::save_elias_fano(filename, depth, items128);
-        else if (width == 7 && height == 11) GameSolver::Connect4::OpeningBookBase<7, 11>::save_elias_fano(filename, depth, items128);
-        else if (width == 7 && height == 12) GameSolver::Connect4::OpeningBookBase<7, 12>::save_elias_fano(filename, depth, items128);
-        else if (width == 8 && height == 4) GameSolver::Connect4::OpeningBookBase<8, 4>::save_elias_fano(filename, depth, items64);
-        else if (width == 8 && height == 5) GameSolver::Connect4::OpeningBookBase<8, 5>::save_elias_fano(filename, depth, items64);
-        else if (width == 8 && height == 7) GameSolver::Connect4::OpeningBookBase<8, 7>::save_elias_fano(filename, depth, items64);
-        else if (width == 8 && height == 9) GameSolver::Connect4::OpeningBookBase<8, 9>::save_elias_fano(filename, depth, items128);
-        else if (width == 8 && height == 10) GameSolver::Connect4::OpeningBookBase<8, 10>::save_elias_fano(filename, depth, items128);
-        else if (width == 8 && height == 11) GameSolver::Connect4::OpeningBookBase<8, 11>::save_elias_fano(filename, depth, items128);
-        else if (width == 8 && height == 12) GameSolver::Connect4::OpeningBookBase<8, 12>::save_elias_fano(filename, depth, items128);
-        else if (width == 9 && height == 4) GameSolver::Connect4::OpeningBookBase<9, 4>::save_elias_fano(filename, depth, items64);
-        else if (width == 9 && height == 5) GameSolver::Connect4::OpeningBookBase<9, 5>::save_elias_fano(filename, depth, items64);
-        else if (width == 9 && height == 8) GameSolver::Connect4::OpeningBookBase<9, 8>::save_elias_fano(filename, depth, items128);
-        else if (width == 9 && height == 10) GameSolver::Connect4::OpeningBookBase<9, 10>::save_elias_fano(filename, depth, items128);
-        else if (width == 9 && height == 11) GameSolver::Connect4::OpeningBookBase<9, 11>::save_elias_fano(filename, depth, items128);
-        else if (width == 9 && height == 12) GameSolver::Connect4::OpeningBookBase<9, 12>::save_elias_fano(filename, depth, items128);
-        else if (width == 10 && height == 4) GameSolver::Connect4::OpeningBookBase<10, 4>::save_elias_fano(filename, depth, items64);
-        else if (width == 10 && height == 5) GameSolver::Connect4::OpeningBookBase<10, 5>::save_elias_fano(filename, depth, items64);
-        else if (width == 10 && height == 6) GameSolver::Connect4::OpeningBookBase<10, 6>::save_elias_fano(filename, depth, items128);
-        else if (width == 10 && height == 8) GameSolver::Connect4::OpeningBookBase<10, 8>::save_elias_fano(filename, depth, items128);
-        else if (width == 10 && height == 9) GameSolver::Connect4::OpeningBookBase<10, 9>::save_elias_fano(filename, depth, items128);
-        else if (width == 10 && height == 11) GameSolver::Connect4::OpeningBookBase<10, 11>::save_elias_fano(filename, depth, items128);
-        else if (width == 11 && height == 5) GameSolver::Connect4::OpeningBookBase<11, 5>::save_elias_fano(filename, depth, items128);
-        else if (width == 11 && height == 6) GameSolver::Connect4::OpeningBookBase<11, 6>::save_elias_fano(filename, depth, items128);
-        else if (width == 11 && height == 7) GameSolver::Connect4::OpeningBookBase<11, 7>::save_elias_fano(filename, depth, items128);
-        else if (width == 11 && height == 8) GameSolver::Connect4::OpeningBookBase<11, 8>::save_elias_fano(filename, depth, items128);
-        else if (width == 11 && height == 9) GameSolver::Connect4::OpeningBookBase<11, 9>::save_elias_fano(filename, depth, items128);
-        else if (width == 11 && height == 10) GameSolver::Connect4::OpeningBookBase<11, 10>::save_elias_fano(filename, depth, items128);
-        else if (width == 12 && height == 4) GameSolver::Connect4::OpeningBookBase<12, 4>::save_elias_fano(filename, depth, items64);
-        else if (width == 12 && height == 5) GameSolver::Connect4::OpeningBookBase<12, 5>::save_elias_fano(filename, depth, items128);
-        else if (width == 12 && height == 6) GameSolver::Connect4::OpeningBookBase<12, 6>::save_elias_fano(filename, depth, items128);
-        else if (width == 12 && height == 7) GameSolver::Connect4::OpeningBookBase<12, 7>::save_elias_fano(filename, depth, items128);
-        else if (width == 12 && height == 8) GameSolver::Connect4::OpeningBookBase<12, 8>::save_elias_fano(filename, depth, items128);
-        else if (width == 12 && height == 9) GameSolver::Connect4::OpeningBookBase<12, 9>::save_elias_fano(filename, depth, items128);
-        else if (width == 8 && height == 8) GameSolver::Connect4::OpeningBookBase<8, 8>::save_elias_fano(filename, depth, items128);
-        else if (width == 9 && height == 7) GameSolver::Connect4::OpeningBookBase<9, 7>::save_elias_fano(filename, depth, items128);
-        else if (width == 9 && height == 6) GameSolver::Connect4::OpeningBookBase<9, 6>::save_elias_fano(filename, depth, items64);
-        else if (width == 11 && height == 4) GameSolver::Connect4::OpeningBookBase<11, 4>::save_elias_fano(filename, depth, items64);
+        if (width == 6 && height == 5) GameSolver::Connect4::OpeningBookBase<6, 5>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 6 && height == 6) GameSolver::Connect4::OpeningBookBase<6, 6>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 7 && height == 6) GameSolver::Connect4::OpeningBookBase<7, 6>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 7 && height == 7) GameSolver::Connect4::OpeningBookBase<7, 7>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 8 && height == 6) GameSolver::Connect4::OpeningBookBase<8, 6>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 4 && height == 4) GameSolver::Connect4::OpeningBookBase<4, 4>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 4 && height == 5) GameSolver::Connect4::OpeningBookBase<4, 5>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 4 && height == 6) GameSolver::Connect4::OpeningBookBase<4, 6>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 4 && height == 7) GameSolver::Connect4::OpeningBookBase<4, 7>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 4 && height == 8) GameSolver::Connect4::OpeningBookBase<4, 8>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 4 && height == 9) GameSolver::Connect4::OpeningBookBase<4, 9>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 4 && height == 10) GameSolver::Connect4::OpeningBookBase<4, 10>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 4 && height == 11) GameSolver::Connect4::OpeningBookBase<4, 11>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 4 && height == 12) GameSolver::Connect4::OpeningBookBase<4, 12>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 5 && height == 4) GameSolver::Connect4::OpeningBookBase<5, 4>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 5 && height == 5) GameSolver::Connect4::OpeningBookBase<5, 5>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 5 && height == 6) GameSolver::Connect4::OpeningBookBase<5, 6>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 5 && height == 7) GameSolver::Connect4::OpeningBookBase<5, 7>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 5 && height == 8) GameSolver::Connect4::OpeningBookBase<5, 8>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 5 && height == 9) GameSolver::Connect4::OpeningBookBase<5, 9>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 5 && height == 10) GameSolver::Connect4::OpeningBookBase<5, 10>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 5 && height == 11) GameSolver::Connect4::OpeningBookBase<5, 11>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 5 && height == 12) GameSolver::Connect4::OpeningBookBase<5, 12>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 6 && height == 4) GameSolver::Connect4::OpeningBookBase<6, 4>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 6 && height == 7) GameSolver::Connect4::OpeningBookBase<6, 7>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 6 && height == 8) GameSolver::Connect4::OpeningBookBase<6, 8>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 6 && height == 9) GameSolver::Connect4::OpeningBookBase<6, 9>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 6 && height == 10) GameSolver::Connect4::OpeningBookBase<6, 10>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 6 && height == 11) GameSolver::Connect4::OpeningBookBase<6, 11>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 6 && height == 12) GameSolver::Connect4::OpeningBookBase<6, 12>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 7 && height == 4) GameSolver::Connect4::OpeningBookBase<7, 4>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 7 && height == 5) GameSolver::Connect4::OpeningBookBase<7, 5>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 7 && height == 8) GameSolver::Connect4::OpeningBookBase<7, 8>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 7 && height == 9) GameSolver::Connect4::OpeningBookBase<7, 9>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 7 && height == 10) GameSolver::Connect4::OpeningBookBase<7, 10>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 7 && height == 11) GameSolver::Connect4::OpeningBookBase<7, 11>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 7 && height == 12) GameSolver::Connect4::OpeningBookBase<7, 12>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 8 && height == 4) GameSolver::Connect4::OpeningBookBase<8, 4>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 8 && height == 5) GameSolver::Connect4::OpeningBookBase<8, 5>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 8 && height == 7) GameSolver::Connect4::OpeningBookBase<8, 7>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 8 && height == 9) GameSolver::Connect4::OpeningBookBase<8, 9>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 8 && height == 10) GameSolver::Connect4::OpeningBookBase<8, 10>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 8 && height == 11) GameSolver::Connect4::OpeningBookBase<8, 11>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 8 && height == 12) GameSolver::Connect4::OpeningBookBase<8, 12>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 9 && height == 4) GameSolver::Connect4::OpeningBookBase<9, 4>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 9 && height == 5) GameSolver::Connect4::OpeningBookBase<9, 5>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 9 && height == 8) GameSolver::Connect4::OpeningBookBase<9, 8>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 9 && height == 10) GameSolver::Connect4::OpeningBookBase<9, 10>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 9 && height == 11) GameSolver::Connect4::OpeningBookBase<9, 11>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 9 && height == 12) GameSolver::Connect4::OpeningBookBase<9, 12>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 10 && height == 4) GameSolver::Connect4::OpeningBookBase<10, 4>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 10 && height == 5) GameSolver::Connect4::OpeningBookBase<10, 5>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 10 && height == 6) GameSolver::Connect4::OpeningBookBase<10, 6>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 10 && height == 8) GameSolver::Connect4::OpeningBookBase<10, 8>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 10 && height == 9) GameSolver::Connect4::OpeningBookBase<10, 9>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 10 && height == 11) GameSolver::Connect4::OpeningBookBase<10, 11>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 11 && height == 5) GameSolver::Connect4::OpeningBookBase<11, 5>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 11 && height == 6) GameSolver::Connect4::OpeningBookBase<11, 6>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 11 && height == 7) GameSolver::Connect4::OpeningBookBase<11, 7>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 11 && height == 8) GameSolver::Connect4::OpeningBookBase<11, 8>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 11 && height == 9) GameSolver::Connect4::OpeningBookBase<11, 9>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 11 && height == 10) GameSolver::Connect4::OpeningBookBase<11, 10>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 12 && height == 4) GameSolver::Connect4::OpeningBookBase<12, 4>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 12 && height == 5) GameSolver::Connect4::OpeningBookBase<12, 5>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 12 && height == 6) GameSolver::Connect4::OpeningBookBase<12, 6>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 12 && height == 7) GameSolver::Connect4::OpeningBookBase<12, 7>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 12 && height == 8) GameSolver::Connect4::OpeningBookBase<12, 8>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 12 && height == 9) GameSolver::Connect4::OpeningBookBase<12, 9>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 8 && height == 8) GameSolver::Connect4::OpeningBookBase<8, 8>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 9 && height == 7) GameSolver::Connect4::OpeningBookBase<9, 7>::save_elias_fano(filename, depth, items128, bkind);
+        else if (width == 9 && height == 6) GameSolver::Connect4::OpeningBookBase<9, 6>::save_elias_fano(filename, depth, items64, bkind);
+        else if (width == 11 && height == 4) GameSolver::Connect4::OpeningBookBase<11, 4>::save_elias_fano(filename, depth, items64, bkind);
         return info.Env().Undefined();
     }
 };
@@ -1252,7 +1275,7 @@ Object Init(Env env, Object exports) {
     exports.Set(String::New(env, "_convertBookToEF"), Function::New(env, ConvertBookToEF));
     exports.Set(String::New(env, "_saveBookToFile"), Function::New(env, SaveBookToFile));
     exports.Set(String::New(env, "_getBookFormat"), Function::New(env, GetBookFormat));
-    exports.Set(String::New(env, "_getBookScore"), Function::New(env, GetBookScore));
+    exports.Set(String::New(env, "_getBookLookup"), Function::New(env, GetBookLookup));
     exports.Set(String::New(env, "_getBookBuffer"), Function::New(env, GetBookBuffer));
     exports.Set(String::New(env, "_destroyBook"), Function::New(env, DestroyBook));
     exports.Set(String::New(env, "_stopSolver"), Function::New(env, StopSolver));

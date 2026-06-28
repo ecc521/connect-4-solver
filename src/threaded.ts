@@ -14,7 +14,8 @@ type CreateModule = (options: {
 }) => Promise<SolverModule>;
 
 const baseUrl =
-  typeof import.meta !== "undefined" && import.meta && import.meta.url
+  // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
+  typeof import.meta !== "undefined" && import.meta?.url
     ? import.meta.url
     : typeof location !== "undefined"
       ? location.href
@@ -32,10 +33,12 @@ export function getThreadedModuleInitPromise(): Promise<void> {
     "../build/analyze_threaded.worker.js",
     baseUrl,
   );
+  const wasm = wasmUrl;
+  const worker = workerUrl;
   _threadedInitPromise ??= (createModule as unknown as CreateModule)({
     locateFile: (path: string) => {
-      if (path.endsWith(".wasm")) return wasmUrl!.href;
-      if (path.endsWith(".worker.js")) return workerUrl!.href;
+      if (path.endsWith(".wasm")) return wasm.href;
+      if (path.endsWith(".worker.js")) return worker.href;
       return path;
     },
   }).then((mod: SolverModule) => {
@@ -163,6 +166,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
           `The book data may be invalid or the wrong format for this board size.`,
       );
     }
+    this._bookKind = SyncWasmConnect4Solver.parseBookHeaderKind(_data);
     return Promise.resolve();
   }
 
@@ -188,6 +192,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     if (this._bookPtr) {
       mod._destroyBook(this.width, this.height, this._bookPtr as number);
       this._bookPtr = 0;
+      this._bookKind = null;
     }
     this._solverPtr = 0;
     this._cachePtr = 0;
