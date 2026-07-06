@@ -106,6 +106,7 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::negamax(const GenericPosit
   const int h_val = H_CONST != -1 ? H_CONST : P.height();
 
   int min = -((w_val * h_val) - 2 - P.nbMoves()) / 2;	// lower bound of score as opponent cannot win next move
+  int alpha_proven = min;
   if(alpha < min) {
     alpha = min;                     // there is no need to keep alpha below our max possible score.
     if(alpha >= beta) return alpha;  // prune the exploration if the [alpha;beta] window is empty.
@@ -153,6 +154,7 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::negamax(const GenericPosit
     if(val > P.max_score() - P.min_score() + 1) { // we have an lower bound
       min = val + 2 * P.min_score() - P.max_score() - 2;
       alpha = std::max(alpha, min);
+      alpha_proven = std::max(alpha_proven, min);
       if(alpha >= beta) return alpha;
     } else { // we have an upper bound
       max = val + P.min_score() - 1;
@@ -192,6 +194,7 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::negamax(const GenericPosit
             int child_max = child_val + P.min_score() - 1;
             int our_min = -child_max;
               alpha = std::max(alpha, our_min);
+              alpha_proven = std::max(alpha_proven, our_min);
               if (alpha >= beta) return alpha;
           }
         }
@@ -208,6 +211,7 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::negamax(const GenericPosit
         if (lo >= beta)  return lo;
         if (hi <= alpha) return hi;
         alpha = std::max(alpha, lo);
+        alpha_proven = std::max(alpha_proven, lo);
         beta  = std::min(beta,  hi);
         // bounds didn't close the window — fall through with tightened alpha/beta
       }
@@ -272,6 +276,7 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::negamax(const GenericPosit
 #endif
 
   int best_score = -P.max_score();
+  const int alpha_orig = alpha;
   uint8_t best_move = w_val;
 
   while(typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t next = moves.getNext()) {
@@ -290,6 +295,12 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::negamax(const GenericPosit
       uint8_t stored_move = best_move;
       if (stored_move < w_val && is_reverse) stored_move = w_val - 1 - stored_move;
       transTable->put(key, best_score + P.max_score() - 2 * P.min_score() + 2, w_val * h_val - P.nbMoves(), stored_move);
+#ifndef NO_COLLECT_HOOKS
+      if (collect_book)
+        collect_book->narrow(P,
+          (uint8_t)(best_score - P.min_score() + 1),
+          (uint8_t)(max - P.min_score() + 1));
+#endif
       return best_score;
     }
     alpha = std::max(alpha, best_score);
@@ -299,6 +310,16 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::negamax(const GenericPosit
   uint8_t stored_move = best_move;
   if (stored_move < w_val && is_reverse) stored_move = w_val - 1 - stored_move;
   transTable->put(key, best_score - P.min_score() + 1, work, stored_move);
+#ifndef NO_COLLECT_HOOKS
+  if (collect_book) {
+    const uint8_t enc    = (uint8_t)(best_score - P.min_score() + 1);
+    const uint8_t lo_enc = (uint8_t)(alpha_proven - P.min_score() + 1);
+    if (best_score > alpha_orig || (best_score == alpha_orig && alpha_proven >= alpha_orig))
+      collect_book->store(P, enc, 0);
+    else
+      collect_book->narrow(P, lo_enc, enc);
+  }
+#endif
   return best_score;
 }
 
@@ -339,21 +360,21 @@ template <bool HasBook>
 
   int min = -((P.width() * P.height()) - P.nbMoves()) / 2;
   int max = ((P.width() * P.height()) + 1 - P.nbMoves()) / 2;
+  int score = 0;
 
   if constexpr (HasBook) {
     if (P.nbMoves() <= book_depth) {
       if (auto lu = book->query(P); lu.found()) {
-        if (lu.lower == lu.upper) return {lu.lower + P.min_score() - 1, -1, (int)P.nbMoves(), getNodeCount()};
+        if (lu.lower == lu.upper) { score = lu.lower + P.min_score() - 1; goto find_move; }
         int blo = lu.lower + P.min_score() - 1;
         int bhi = lu.upper + P.min_score() - 1;
         min = std::max(min, blo);
         max = std::min(max, bhi);
-        if (min >= max) return {min, -1, (int)P.nbMoves(), getNodeCount()};
+        if (min >= max) { score = min; goto find_move; }
         // bounds narrowed the window — fall through with tightened min/max
       }
     }
   }
-  int score = 0;
   if (weak) {
     min = -1;
     max = 1;
@@ -415,11 +436,15 @@ flush:
     return {score, -1, (int)P.nbMoves(), getNodeCount(), true};
   }
 
+find_move:
   int bestMove = -1;
 
   // PHASE 1: Try to find a move using ONLY the Opening Book (Shortcut for Sparse Books)
+  // Children sit one ply past P, so this can only hit when they're still within
+  // book_depth — i.e. P.nbMoves() < book_depth. At P.nbMoves() == book_depth every
+  // child query is guaranteed to miss the depth guard, so skip straight to PHASE 2.
   if constexpr (HasBook) {
-    if (P.nbMoves() <= book_depth) {
+    if (P.nbMoves() < book_depth) {
       for (int i = 0; i < P.width(); i++) {
           int col = this->COLUMN_ORDER[i];
           if (P.canPlay(col)) {
@@ -496,6 +521,13 @@ template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
   }
 
   const OpeningBookBase<WIDTH, HEIGHT>* active_book = book ? book : this->book;
+
+  // MutableBook's query()/dump() are unlocked reads; store()/narrow() write under
+  // a lock. Using the same instance as both the oracle and the collection target
+  // is only safe single-threaded — reject it once threads spawn concurrently.
+  if (threads > 1 && collect_book && active_book == static_cast<const OpeningBookBase<WIDTH, HEIGHT>*>(collect_book)) {
+    throw std::runtime_error("solve(): the same MutableBook cannot be used as both the query oracle and the collect_book target in a multi-threaded solve.");
+  }
 
   if (threads <= 1) {
     if (active_book) return solve_single<true>(P, weak, active_book, active_book->getDepth());
@@ -582,6 +614,14 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::analyze(const
     endTime.store(now + timeout_ms, std::memory_order_relaxed);
   } else {
     endTime.store(0.0, std::memory_order_relaxed);
+  }
+
+  // See solve(): same-instance oracle+collector is only safe single-threaded.
+  {
+    const OpeningBookBase<WIDTH, HEIGHT>* active_book = book ? book : this->book;
+    if (threads > 1 && collect_book && active_book == static_cast<const OpeningBookBase<WIDTH, HEIGHT>*>(collect_book)) {
+      throw std::runtime_error("analyze(): the same MutableBook cannot be used as both the query oracle and the collect_book target in a multi-threaded analyze.");
+    }
   }
 
   (void)threads;

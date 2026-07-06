@@ -2,6 +2,7 @@ module.exports = {
   preset: "ts-jest/presets/default-esm",
   testEnvironment: "node",
   testMatch: ["**/*.test.ts"],
+  testPathIgnorePatterns: ["/node_modules/", "/\\.claude/worktrees/"],
   extensionsToTreatAsEsm: [".ts"],
   moduleNameMapper: {
     "^(\\.{1,2}/(?!build/).*)\\.js$": "$1",

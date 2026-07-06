@@ -165,6 +165,28 @@ struct wasm_uint128_t {
     constexpr bool operator>(const wasm_uint128_t& o) const { return !(*this <= o); }
     constexpr bool operator>=(const wasm_uint128_t& o) const { return !(*this < o); }
 };
+
+} // namespace Connect4
+} // namespace GameSolver
+
+// phmap's generic Hash<T> fallback calls std::hash<T>(), which has no
+// specialization for this hand-rolled 128-bit type (unlike unsigned __int128
+// on native builds, which libc++/libstdc++ already specialize) — required for
+// MutableBook's phmap::flat_hash_map<pos_t, uint16_t> to compile under Emscripten.
+namespace std {
+template <>
+struct hash<GameSolver::Connect4::wasm_uint128_t> {
+    size_t operator()(const GameSolver::Connect4::wasm_uint128_t& v) const noexcept {
+        size_t h1 = hash<uint64_t>{}(v.low);
+        size_t h2 = hash<uint64_t>{}(v.high);
+        return h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2));
+    }
+};
+} // namespace std
+
+namespace GameSolver {
+namespace Connect4 {
+
 #endif
 
 template <int W, int H, int ALIGN = 4, bool WRAP = false>

@@ -68,6 +68,7 @@ class Solver {
   virtual bool isAborted() const = 0;
   virtual void loadBook(const OpeningBookBase<WIDTH, HEIGHT>* b) = 0;
   virtual void setTimeout(double end_time_ms) = 0;
+  virtual void setCollectBook(MutableBook<WIDTH, HEIGHT>* /*b*/) {}
 
   static std::unique_ptr<::GameSolver::Connect4::Cache> createCache(size_t table_bytes, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT);
   static std::unique_ptr<Solver<WIDTH, HEIGHT, ALIGN, WRAP>> createWithCache(::GameSolver::Connect4::Cache* cache, int w = WIDTH == -1 ? 7 : WIDTH, int h = HEIGHT == -1 ? 6 : HEIGHT);
@@ -89,6 +90,12 @@ class SolverImpl : public Solver<WIDTH, HEIGHT, ALIGN, WRAP> {
   std::atomic<double> endTime{0.0};
   std::unique_ptr<::GameSolver::Connect4::ThreadPool> pool;
   const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr;
+
+  MutableBook<WIDTH, HEIGHT>* collect_book = nullptr;
+
+  void setCollectBook(MutableBook<WIDTH, HEIGHT>* b) override {
+    collect_book = b;
+  }
 
  private:
   using TrompWeightsT = typename std::conditional<WIDTH == -1, std::vector<int32_t>, std::array<int32_t, WIDTH == -1 ? 1 : WIDTH * (HEIGHT + 1)>>::type;

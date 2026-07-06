@@ -26,7 +26,14 @@
 #include <algorithm>
 #include <stdexcept>
 #include <memory>
+#include <atomic>
 #include <cmath>
+#include <mutex>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#include "vendor/phmap.h"
+#pragma GCC diagnostic pop
 
 namespace GameSolver {
 namespace Connect4 {
@@ -364,6 +371,142 @@ public:
             });
         }
         return res;
+    }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * MutableBook — an in-memory book that accumulates entries during a solve.
+ *
+ * It implements OpeningBookBase so it can be passed directly to the solver as
+ * the oracle, giving previously computed positions back as fast O(1) hints.
+ *
+ * Two write operations:
+ *   store(P, lo, hi)  — unconditional overwrite; caller owns correctness.
+ *   narrow(P, lo, hi) — tightens existing bounds (raises floor, lowers ceiling).
+ *                        On first write for a key behaves like store().
+ *
+ * Encoding convention (same as the rest of OpeningBook):
+ *   stored_byte = score - min_score + 1   (0 = sentinel, never a valid score)
+ *   uint16_t slot: lo_enc | (hi_enc << 8). When hi_enc = 0, decodeVal() treats
+ *   the entry as exact (hi = lo). This matches how 1-byte exact books behave
+ *   when loaded into the 2-byte slot — the high byte is naturally zero.
+ *
+ * Serialise with save_dense() or save_elias_fano() once the solve is done.
+ */
+template<int W, int H>
+class MutableBook : public OpeningBookBase<W, H> {
+public:
+    using pos_t     = typename GenericPosition<W, H>::position_t;
+    using EntryList = typename OpeningBookBase<W, H>::EntryList;
+
+    explicit MutableBook(int max_depth) : max_depth_(max_depth) {
+        entries_.reserve(1 << 20);
+    }
+
+    // Seed a MutableBook from any existing book so it can be extended.
+    // src must not be concurrently written during this constructor.
+    explicit MutableBook(const OpeningBookBase<W, H>& src)
+        : max_depth_(src.getDepth()) {
+        auto entries = src.dump();
+        entries_.reserve(entries.size());
+        for (const auto& [k, v] : entries)
+            entries_[k] = v;
+    }
+
+    // std::mutex is not copyable; define copy explicitly.
+    MutableBook(const MutableBook& other) : max_depth_(0) {
+        std::lock_guard<std::mutex> lk(other.mutex_);
+        max_depth_.store(other.max_depth_.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        entries_ = other.entries_;
+    }
+
+    // ── OpeningBookBase interface ────────────────────────────────────────────
+    BookKind kind()     const override { return BookKind::Bounded; }
+    int      getDepth() const override { return max_depth_.load(std::memory_order_relaxed); }
+
+    BookLookup query(const GenericPosition<W, H>& P) const override {
+        if (P.nbMoves() > max_depth_.load(std::memory_order_relaxed)) return {0, 0};
+        auto it = entries_.find(P.key3());
+        if (it == entries_.end()) return {0, 0};
+        return OpeningBookBase<W, H>::decodeVal(it->second);
+    }
+
+    EntryList dump() const override {
+        EntryList out;
+        out.reserve(entries_.size());
+        for (const auto& [k, v] : entries_) out.push_back({k, v});
+        return out;
+    }
+
+    // ── Write interface ──────────────────────────────────────────────────────
+
+    // Unconditional overwrite. lo_enc and hi_enc are raw book-encoded bytes.
+    // Pass hi_enc = 0 to store an exact score — decodeVal() treats hi=0 as hi=lo.
+    void store(const GenericPosition<W, H>& P, uint8_t lo_enc, uint8_t hi_enc) {
+        if (P.nbMoves() > max_depth_.load(std::memory_order_relaxed)) return;
+        std::lock_guard<std::mutex> lk(mutex_);
+        entries_[P.key3()] = (uint16_t)lo_enc | ((uint16_t)hi_enc << 8);
+    }
+
+    // Tighten existing bounds: raises lo, lowers hi.
+    // A no-op when the incoming bounds are looser than what's already stored.
+    // On first write behaves like store().
+    void narrow(const GenericPosition<W, H>& P, uint8_t lo_enc, uint8_t hi_enc) {
+        if (P.nbMoves() > max_depth_.load(std::memory_order_relaxed)) return;
+        std::lock_guard<std::mutex> lk(mutex_);
+        narrow_raw(P.key3(), (uint16_t)lo_enc | ((uint16_t)hi_enc << 8));
+    }
+
+    // Merge all entries from another book into this one, tightening bounds on
+    // overlapping keys. Extends max_depth_ if the source is deeper.
+    // Safe to call from a single thread after collection completes.
+    void merge(const OpeningBookBase<W, H>& other) {
+        auto entries = other.dump();
+        std::lock_guard<std::mutex> lk(mutex_);
+        for (const auto& [k, v] : entries)
+            narrow_raw(k, v);
+        if (other.getDepth() > max_depth_.load(std::memory_order_relaxed))
+            max_depth_.store(other.getDepth(), std::memory_order_relaxed);
+    }
+
+    // ── Accessors ────────────────────────────────────────────────────────────
+    size_t size() const { return entries_.size(); }
+
+    // ── Serialisation ────────────────────────────────────────────────────────
+    // align/wrap must match the solver config the entries were collected from
+    // (e.g. a wrap-board or non-default-align variant) so the saved header can
+    // be loaded back against that same config — see OpeningBookBase::load().
+    void save_dense(const std::string& path, int align = 4, bool wrap = false) const {
+        OpeningBookBase<W, H>::save_dense(path, max_depth_.load(), dump(), BookKind::Bounded, align, wrap);
+    }
+
+    void save_elias_fano(const std::string& path, int align = 4, bool wrap = false) const {
+        OpeningBookBase<W, H>::save_elias_fano(path, max_depth_.load(), dump(), BookKind::Bounded, align, wrap);
+    }
+
+private:
+    std::atomic<int> max_depth_;
+    mutable std::mutex mutex_;
+    phmap::flat_hash_map<pos_t, uint16_t> entries_;
+
+    // Narrow a raw slot without acquiring the lock. Caller must hold mutex_.
+    void narrow_raw(pos_t key, uint16_t incoming) {
+        auto& slot = entries_[key];
+        if (slot == 0) { slot = incoming; return; }
+
+        uint8_t in_lo     = (uint8_t)(incoming & 0xFF);
+        uint8_t in_hi_raw = (uint8_t)(incoming >> 8);
+        uint8_t in_hi     = in_hi_raw ? in_hi_raw : in_lo;
+
+        uint8_t old_lo     = (uint8_t)(slot & 0xFF);
+        uint8_t old_hi_raw = (uint8_t)(slot >> 8);
+        uint8_t old_hi     = old_hi_raw ? old_hi_raw : old_lo;
+
+        uint8_t new_lo = std::max(old_lo, in_lo);
+        uint8_t new_hi = std::min(old_hi, in_hi);
+        slot = (uint16_t)new_lo | ((uint16_t)(new_lo == new_hi ? 0 : new_hi) << 8);
     }
 };
 
