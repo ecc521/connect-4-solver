@@ -42,8 +42,6 @@ static std::vector<BenchPos> load_positions(const std::string &path) {
     std::string pos; int score = 0;
     ss >> pos >> score;
     if (pos.empty()) continue;
-    if (score >= 31000) score -= 31000;
-    else if (score <= -31000) score += 31000;
     positions.push_back({pos, score});
   }
   return positions;

@@ -236,16 +236,7 @@ async function run() {
       }
 
       if (analysis.evaluation) {
-        // addPosition expects the RAW solver score (e.g. -21..21 for 7x6), not
-        // the SCORE_FORCED_WIN_BASE-transformed user-facing evaluation.score.
-        const evalScore = analysis.evaluation.score;
-        const rawScore =
-          evalScore > 0
-            ? evalScore - 31000  // Win: undo SCORE_FORCED_WIN_BASE offset
-            : evalScore < 0
-              ? evalScore + 31000  // Loss: undo SCORE_FORCED_WIN_BASE offset
-              : 0;                  // Draw
-        builder.addPosition(pos, rawScore);
+        builder.addPosition(pos, analysis.evaluation.score);
       }
 
       processed++;

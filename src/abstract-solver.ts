@@ -9,7 +9,6 @@ import {
   Connect4SolverOptions,
   SolverModule,
 } from "./core.js";
-import { SCORE_FORCED_WIN_BASE } from "./constants.js";
 
 export const STATUS_WIN = 1;
 export const STATUS_INVALID = 2;
@@ -63,20 +62,14 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         outcome: Outcome.Win,
         winner: currentPlayer,
         movesToEnd: halfMovesRemaining - score + 1,
-        score:
-          score >= SCORE_FORCED_WIN_BASE
-            ? score
-            : SCORE_FORCED_WIN_BASE + score,
+        score,
       };
     } else {
       return {
         outcome: Outcome.Loss,
         winner: opponent,
         movesToEnd: halfMovesRemaining + score + 1,
-        score:
-          score <= -SCORE_FORCED_WIN_BASE
-            ? score
-            : -SCORE_FORCED_WIN_BASE + score,
+        score,
       };
     }
   }
@@ -106,7 +99,7 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
         outcome: Outcome.Win,
         winner,
         movesToEnd: 0,
-        score: SCORE_FORCED_WIN_BASE + baseScore,
+        score: baseScore,
       };
     } else {
       for (let i = 0; i < this.width; i++) {
@@ -179,12 +172,11 @@ export abstract class AbstractSyncSolver extends BaseConnect4Solver {
       currentPosition = positionStr.slice(0, nbMoves + 1);
       const winner = nbMoves % 2 === 0 ? Player.P1 : Player.P2;
       const baseScore = Math.floor((this.width * this.height - nbMoves) / 2);
-      const adjustedScore = SCORE_FORCED_WIN_BASE + baseScore;
       evaluation = {
         outcome: winner === currentPlayer ? Outcome.Win : Outcome.Loss,
         winner,
         movesToEnd: positionStr.length - (nbMoves + 1),
-        score: winner === currentPlayer ? adjustedScore : -adjustedScore,
+        score: winner === currentPlayer ? baseScore : -baseScore,
       };
     } else {
       const score = resArr[2];
