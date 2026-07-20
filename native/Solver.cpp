@@ -5,6 +5,22 @@
 #define MOVE_ORDER_STRATEGY 1
 #endif
 
+// Multithreaded solve() strategy (override with -DSOLVE_PARALLEL_PROBES=N)
+// 2 = two-ply root-parallel probes: each probe fans out over GRANDCHILDREN
+//     (~width^2 work units, max-min resolution), straggler-help on the tail [DEFAULT]
+// 1 = one-ply root-parallel probes: fan out over children (~width units)
+// 0 = legacy Lazy SMP: N racing whole-position copies, first one wins
+#ifndef SOLVE_PARALLEL_PROBES
+#define SOLVE_PARALLEL_PROBES 2
+#endif
+
+// Tail strategy for the 2-ply path: 1 = idle workers race the whole probe
+// (legacy-style, shared TT) once every task has a searcher; 0 = pile a second
+// helper onto the least-searched task instead.
+#ifndef SOLVE_TAIL_RACERS
+#define SOLVE_TAIL_RACERS 1
+#endif
+
 /*
  * This file is part of Connect4 Game Solver <http://connect4.gamesolver.org>
  * Copyright (C) 2017-2019 Pascal Pons <contact@gamesolver.org>
@@ -344,12 +360,887 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak(const 
 }
 
 /**
+ * Root-decomposed counterpart of dispatch_solve_weak. One null-window probe
+ * (beta == alpha + 1 always) fanned out across P's legal children on the
+ * shared ThreadPool, instead of walking the whole tree on a single thread.
+ *
+ * Parent value = max over children of -child_value, and the window is fixed
+ * and identical for every child, so unlike classic PVS/YBWC there is no
+ * "search the first child to get a bound" dependency — all children can be
+ * dispatched in true parallel immediately. A child proving the parent fails
+ * high aborts every other in-flight child; a fail-low from one child must
+ * NEVER do that (it only proves that one child doesn't resolve the probe) —
+ * this asymmetry is the entire correctness argument.
+ *
+ * The serial prologue below replicates negamax's own root fast paths
+ * (terminal checks, window clamps, evens strategy, TT peek, 1-ply child TT
+ * lookahead) and the TT store on completion, so a parallel probe resolves
+ * as cheaply as a serial one whenever the answer is already known — the
+ * exact-mode linear scans depend on exactly this root-TT short-circuit.
+ *
+ * Result validity: each searcher's abort flag is its child's done-flag.
+ * Those flags are monotonic (never reset within a probe), so a searcher
+ * whose child's flag is still unset at completion provably never observed
+ * an abort — its fail-soft value is a genuinely completed search. Anything
+ * else is discarded. Global timeout (stopSearch) is checked by every caller
+ * immediately after each probe, so a timeout-tainted return value is never
+ * consumed.
+ *
+ * Precondition (not defensively checked — private helper, single call site):
+ * threads > 1. solve_single()'s probe() helper only calls this when threads>1.
+ */
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
+template <bool HasBook>
+int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak_parallel(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, int threads, std::atomic<bool>* abort_flag) {
+  using pos_t = typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t;
+  const int w_val = P.width();
+  const int h_val = P.height();
+  constexpr int MAX_W = 16;
+
+  // --- Serial prologue: mirror negamax's cheap root resolutions ---
+  if (P.canWinNext()) return ((w_val * h_val) + 1 - P.nbMoves()) / 2;
+
+  pos_t possible = static_cast<pos_t>(P.possibleNonLosingMoves());
+  if (possible == 0)     // no non-losing move: opponent wins next move
+    return -((w_val * h_val) - P.nbMoves()) / 2;
+
+  if (P.nbMoves() >= (w_val * h_val) - 2)   // draw
+    return 0;
+
+  if ((possible & (possible - 1)) == 0 || w_val > MAX_W)  // forced move: nothing to fan out
+    return dispatch_solve_weak<HasBook>(P, alpha, beta, book, book_depth, abort_flag, nullptr);
+
+  int min = -((w_val * h_val) - 2 - P.nbMoves()) / 2;
+  if (alpha < min) {
+    alpha = min;
+    if (alpha >= beta) return alpha;
+  }
+  int max = ((w_val * h_val) - 1 - P.nbMoves()) / 2;
+  if (beta > max) {
+    beta = max;
+    if (alpha >= beta) return beta;
+  }
+
+  if (h_val % 2 == 0 && P.nbMoves() % 2 == 0) {
+    int evens = P.computeEvensStrategy();
+    if (evens < 0) {
+      if (beta > evens) {
+        beta = evens;
+        if (alpha >= beta) return beta;
+      }
+    } else if (evens == 0) {
+      if (beta > 0) {
+        beta = 0;
+        if (alpha >= beta) return beta;
+      }
+    }
+  }
+
+  constexpr int TT_PROBE_DEPTH = 15;
+  bool is_reverse = false;
+  pos_t key;
+  if ((w_val * h_val) - P.nbMoves() <= TT_PROBE_DEPTH) {
+    key = P.key();
+  } else {
+    key = P.symmetric_key(is_reverse);
+  }
+
+  if (auto packed = transTable->getPacked(key); packed.value) {
+    uint8_t val = packed.value;
+    if (val > P.max_score() - P.min_score() + 1) { // lower bound
+      min = val + 2 * P.min_score() - P.max_score() - 2;
+      alpha = std::max(alpha, min);
+      if (alpha >= beta) return alpha;
+    } else { // upper bound
+      max = val + P.min_score() - 1;
+      beta = std::min(beta, max);
+      if (alpha >= beta) return beta;
+    }
+  }
+
+  // Mirror-symmetric roots: the mirrored twin of each column is a
+  // transposition, and searching both concurrently is pure duplicated work
+  // (the serial path avoids it via the symmetric TT key — the second twin
+  // TT-hits instantly, but two parallel workers would both start cold).
+  // Enumerate only one column of each mirrored pair.
+  const bool symmetric = P.mirror_key(P.key()) == P.key();
+
+  int child_cols[MAX_W];
+  GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> child_pos[MAX_W];
+  int num_children = 0;
+
+  for (int i = 0; i < w_val; i++) {
+    int col = this->COLUMN_ORDER[i];
+    pos_t move = possible & static_cast<pos_t>(P.column_mask(col));
+    if (!move) continue;
+    if (symmetric && col > w_val - 1 - col) continue;   // mirror twin covered
+    GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
+    P2.play(move);
+    // 1-ply TT lookahead (negamax's child probing): a cached child upper
+    // bound can prove our fail-high without dispatching anything.
+    pos_t child_key;
+    if ((w_val * h_val) - P2.nbMoves() <= TT_PROBE_DEPTH) {
+      child_key = P2.key();
+    } else {
+      child_key = P2.symmetric_key();
+    }
+    if (auto cp = transTable->getPacked(child_key); cp.value) {
+      if (cp.value <= P.max_score() - P.min_score() + 1) {
+        int our_min = -(cp.value + P.min_score() - 1);
+        if (our_min >= beta) return our_min;
+      }
+    }
+    child_cols[num_children] = col;
+    child_pos[num_children] = P2;
+    num_children++;
+  }
+
+  if (num_children <= 1) {   // nothing to fan out after dedup/pruning
+    return dispatch_solve_weak<HasBook>(P, alpha, beta, book, book_depth, abort_flag, nullptr);
+  }
+
+  nodeCount.fetch_add(1, std::memory_order_relaxed);
+
+  // Cap the fan-out: each child gets at most ~2 concurrent searchers even at
+  // high thread counts — beyond that, Lazy-SMP duplication stops paying.
+  const int worker_count = std::min(threads, num_children * 2);
+  pool->ensureCapacity(worker_count - 1);
+
+  std::atomic<bool> cutoff{false};          // probe resolved fail-high (or umbrella abort)
+  std::atomic<bool> have_winner{false};
+  int winning_value = 0;                    // written only by the have_winner winner
+  int winning_col = w_val;
+  std::atomic<int> best_seen{-P.max_score()};
+  std::atomic<int> next_child{0};
+  std::atomic<int> children_left{num_children};
+  std::array<std::atomic<bool>, MAX_W> child_done{};  // done-flag == per-child abort flag
+  std::array<std::atomic<int>, MAX_W> searchers{};
+  std::atomic<int> helper_seq{0};
+
+  std::atomic<int> remaining(worker_count - 1);
+  std::promise<void> prom;
+  auto fut = prom.get_future();
+
+  auto handle_result = [&](int idx, int contribution) {
+    // child_done[idx] is monotonic: if it is still unset now, our search never
+    // observed an abort, so `contribution` is from a genuinely completed search.
+    if (contribution >= beta) {
+      if (child_done[idx].load(std::memory_order_acquire)) return;  // tainted
+      if (!have_winner.exchange(true, std::memory_order_acq_rel)) {
+        winning_value = contribution;
+        winning_col = child_cols[idx];
+        cutoff.store(true, std::memory_order_release);
+        for (int j = 0; j < num_children; j++)
+          child_done[j].store(true, std::memory_order_relaxed);
+      }
+      return;
+    }
+    // Fail-low: does NOT resolve the probe — fold into the fail-soft max.
+    // exchange doubles as the taint check and the first-completer election.
+    if (!child_done[idx].exchange(true, std::memory_order_acq_rel)) {
+      int prev = best_seen.load(std::memory_order_relaxed);
+      while (contribution > prev && !best_seen.compare_exchange_weak(prev, contribution, std::memory_order_relaxed)) {}
+      children_left.fetch_sub(1, std::memory_order_acq_rel);
+    }
+  };
+
+  auto run_search = [&](int idx, int32_t* hist) {
+    searchers[idx].fetch_add(1, std::memory_order_relaxed);
+    solverTlNodeCount = 0;
+    int child_r = dispatch_solve_weak<HasBook>(child_pos[idx], -beta, -alpha, book, book_depth, &child_done[idx], hist);
+    nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+    solverTlNodeCount = 0;
+    searchers[idx].fetch_sub(1, std::memory_order_relaxed);
+    handle_result(idx, -child_r);
+  };
+
+  auto worker = [&]() {
+    // Phase 1: own a fresh child.
+    while (!cutoff.load(std::memory_order_acquire) && !shouldAbort(abort_flag)) {
+      int i = next_child.fetch_add(1, std::memory_order_relaxed);
+      if (i >= num_children) break;
+      run_search(i, nullptr);
+    }
+    // Phase 2: straggler help — Lazy-SMP-duplicate the least-helped
+    // unfinished child with a perturbed private history (same diversity
+    // trick as the legacy whole-tree Lazy SMP, scoped to one child).
+    int32_t local_history[MAX_W * (MAX_W + 1)];
+    const int hist_len = w_val * (h_val + 1);
+    while (!cutoff.load(std::memory_order_acquire) && !shouldAbort(abort_flag) &&
+           children_left.load(std::memory_order_acquire) > 0) {
+      int pick = -1, pick_load = INT_MAX;
+      for (int j = 0; j < num_children; j++) {
+        if (child_done[j].load(std::memory_order_relaxed)) continue;
+        int s = searchers[j].load(std::memory_order_relaxed);
+        if (s < pick_load) { pick_load = s; pick = j; }
+      }
+      if (pick < 0) break;
+      int t = helper_seq.fetch_add(1, std::memory_order_relaxed) + 1;
+      for (int k = 0; k < hist_len; k++)
+        local_history[k] = this->TROMP_WEIGHTS[k] + (t * 7 + k * 3) % 5;
+      run_search(pick, local_history);
+    }
+  };
+
+  for (int i = 0; i < worker_count - 1; i++) {
+    pool->enqueue([&]() {
+      worker();
+      if (remaining.fetch_sub(1) == 1) prom.set_value();
+    });
+  }
+  worker();
+
+  // Wait for the pool workers (their lambdas reference this stack frame, so
+  // we must not return until every one has exited). Poll rather than block so
+  // the caller's own abort_flag can force an early unwind: reuse the done
+  // flags as the umbrella "everyone stop" signal.
+  while (worker_count > 1 && fut.wait_for(std::chrono::microseconds(200)) != std::future_status::ready) {
+    if (shouldAbort(abort_flag)) {
+      for (int j = 0; j < num_children; j++)
+        child_done[j].store(true, std::memory_order_relaxed);
+      cutoff.store(true, std::memory_order_release);
+    }
+  }
+
+  if (shouldAbort(abort_flag)) return alpha;  // caller re-checks and discards
+
+  if (have_winner.load(std::memory_order_acquire)) {
+    uint8_t stored_move = (uint8_t)winning_col;
+    if (stored_move < w_val && is_reverse) stored_move = w_val - 1 - stored_move;
+    transTable->put(key, winning_value + P.max_score() - 2 * P.min_score() + 2, (w_val * h_val) - P.nbMoves(), stored_move);
+#ifndef NO_COLLECT_HOOKS
+    if (collect_book)
+      collect_book->narrow(P,
+        (uint8_t)(winning_value - P.min_score() + 1),
+        (uint8_t)(max - P.min_score() + 1));
+#endif
+    return winning_value;
+  }
+
+  // Every child completed and failed low: genuine fail-soft upper bound.
+  int ub = best_seen.load(std::memory_order_relaxed);
+  transTable->put(key, ub - P.min_score() + 1, (w_val * h_val) - P.nbMoves(), (uint8_t)w_val);
+#ifndef NO_COLLECT_HOOKS
+  if (collect_book)
+    collect_book->narrow(P,
+      (uint8_t)(min - P.min_score() + 1),
+      (uint8_t)(ub - P.min_score() + 1));
+#endif
+  return ub;
+}
+
+/**
+ * Two-ply variant of dispatch_solve_weak_parallel: tasks are GRANDCHILDREN.
+ *
+ * With a null window, the algebra collapses beautifully: parent window is
+ * (a, a+1), each child is searched at (-a-1, -a), so each grandchild is
+ * searched at (a, a+1) — the parent's own window. The probe becomes a pure
+ * max-min: parent value = max over children i of min over grandchildren g
+ * of value(g). Therefore:
+ *   - grandchild fails LOW  (<= a)  → its child can never prove fail-high:
+ *     kill the group, fold the value as a fail-soft upper-bound contribution.
+ *   - ALL grandchildren of one child fail HIGH (>= a+1) → parent fails high
+ *     with value min(grandchild values).
+ *   - every group killed → parent fails low, value max(folded group bounds).
+ *
+ * Compared to the 1-ply version this yields ~width^2 work units instead of
+ * ~width, so the tail is a single grandchild subtree instead of a child
+ * subtree, and straggler-help duplication happens at far finer granularity.
+ * Child- and grandchild-level TT peeks pre-resolve units the serial search
+ * would have short-circuited, and resolved groups store child-level TT
+ * bounds so subsequent probes keep the serial path's TT richness.
+ */
+template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
+template <bool HasBook>
+int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak_parallel2(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, int threads, std::atomic<bool>* abort_flag) {
+  using pos_t = typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t;
+  const int w_val = P.width();
+  const int h_val = P.height();
+  constexpr int MAX_W = 16;
+  constexpr int MAX_TASKS = MAX_W * MAX_W * 2;   // gc tasks + expanded ggc tasks
+
+  // --- Parent prologue: identical to the 1-ply version ---
+  if (P.canWinNext()) return ((w_val * h_val) + 1 - P.nbMoves()) / 2;
+
+  pos_t possible = static_cast<pos_t>(P.possibleNonLosingMoves());
+  if (possible == 0)
+    return -((w_val * h_val) - P.nbMoves()) / 2;
+
+  if (P.nbMoves() >= (w_val * h_val) - 2)
+    return 0;
+
+  if ((possible & (possible - 1)) == 0 || w_val > MAX_W)
+    return dispatch_solve_weak<HasBook>(P, alpha, beta, book, book_depth, abort_flag, nullptr);
+
+  int min = -((w_val * h_val) - 2 - P.nbMoves()) / 2;
+  if (alpha < min) {
+    alpha = min;
+    if (alpha >= beta) return alpha;
+  }
+  int max = ((w_val * h_val) - 1 - P.nbMoves()) / 2;
+  if (beta > max) {
+    beta = max;
+    if (alpha >= beta) return beta;
+  }
+
+  if (h_val % 2 == 0 && P.nbMoves() % 2 == 0) {
+    int evens = P.computeEvensStrategy();
+    if (evens < 0) {
+      if (beta > evens) {
+        beta = evens;
+        if (alpha >= beta) return beta;
+      }
+    } else if (evens == 0) {
+      if (beta > 0) {
+        beta = 0;
+        if (alpha >= beta) return beta;
+      }
+    }
+  }
+
+  constexpr int TT_PROBE_DEPTH = 15;
+  bool is_reverse = false;
+  pos_t key;
+  if ((w_val * h_val) - P.nbMoves() <= TT_PROBE_DEPTH) {
+    key = P.key();
+  } else {
+    key = P.symmetric_key(is_reverse);
+  }
+
+  if (auto packed = transTable->getPacked(key); packed.value) {
+    uint8_t val = packed.value;
+    if (val > P.max_score() - P.min_score() + 1) { // lower bound
+      min = val + 2 * P.min_score() - P.max_score() - 2;
+      alpha = std::max(alpha, min);
+      if (alpha >= beta) return alpha;
+    } else { // upper bound
+      max = val + P.min_score() - 1;
+      beta = std::min(beta, max);
+      if (alpha >= beta) return beta;
+    }
+  }
+
+  const bool symmetric = P.mirror_key(P.key()) == P.key();
+  auto tt_key_for = [&](const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& X) {
+    return ((w_val * h_val) - X.nbMoves() <= TT_PROBE_DEPTH) ? X.key() : X.symmetric_key();
+  };
+
+  // --- Group construction: one group per child, one task per grandchild ---
+  int group_col[MAX_W];
+  GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> group_child[MAX_W];
+  pos_t group_child_key[MAX_W];
+  int group_minv_init[MAX_W];      // min over TT-pre-resolved fail-high grandchildren
+  int group_task_count[MAX_W];
+  int num_groups = 0;
+
+  GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> gc_pos[MAX_TASKS];
+  int gc_group[MAX_TASKS];
+  bool task_is_ggc[MAX_TASKS];      // true: great-grandchild task under the group's first gc
+  int num_tasks = 0;
+
+  // First-grandchild expansion state (see below): the group's best-ordered
+  // grandchild is decomposed into its own children instead of being one task.
+  bool group_expanded[MAX_W];
+  bool group_gc0_done_init[MAX_W];  // first gc resolved inline at enumeration
+  int group_sub_count[MAX_W];       // ggc task count under the expanded first gc
+  GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> group_gc0[MAX_W];
+  pos_t group_gc0_key[MAX_W];
+
+  int fold_max = -P.max_score();   // fail-soft max of pre-resolved group upper bounds
+  bool any_fold = false;
+
+  for (int i = 0; i < w_val; i++) {
+    int col = this->COLUMN_ORDER[i];
+    pos_t move = possible & static_cast<pos_t>(P.column_mask(col));
+    if (!move) continue;
+    if (symmetric && col > w_val - 1 - col) continue;
+    GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> child(P);
+    child.play(move);
+
+    // Child TT peek: an upper bound proves our fail-high; a lower bound can
+    // rule the whole group out (contribution = -child <= -lb <= alpha).
+    pos_t child_key = tt_key_for(child);
+    if (auto cp = transTable->getPacked(child_key); cp.value) {
+      if (cp.value <= P.max_score() - P.min_score() + 1) {
+        int child_ub = cp.value + P.min_score() - 1;
+        int contrib_lb = -child_ub;
+        if (contrib_lb >= beta) return contrib_lb;
+      } else {
+        int child_lb = cp.value + 2 * P.min_score() - P.max_score() - 2;
+        int contrib_ub = -child_lb;
+        if (contrib_ub <= alpha) {   // group can never fail high
+          fold_max = std::max(fold_max, contrib_ub);
+          any_fold = true;
+          continue;
+        }
+      }
+    }
+
+    // Child-level terminal shortcuts (child.canWinNext() is impossible: the
+    // move came from possibleNonLosingMoves).
+    pos_t child_possible = static_cast<pos_t>(child.possibleNonLosingMoves());
+    if (child_possible == 0) {   // opponent has no non-losing reply: we win
+      int contrib = ((w_val * h_val) - child.nbMoves()) / 2;
+      if (contrib >= beta) return contrib;
+      fold_max = std::max(fold_max, contrib);
+      any_fold = true;
+      continue;
+    }
+    if (child.nbMoves() >= (w_val * h_val) - 2) {   // draw after child
+      if (0 >= beta) return 0;
+      fold_max = std::max(fold_max, 0);
+      any_fold = true;
+      continue;
+    }
+    if (h_val % 2 == 0 && child.nbMoves() % 2 == 0) {
+      int evens = child.computeEvensStrategy();
+      // child <= bound → contribution >= -bound: a fail-high proof for us.
+      if (evens < 0 && -evens >= beta) return -evens;
+      if (evens == 0 && 0 >= beta) return 0;
+    }
+
+    // Grandchild enumeration with TT pre-resolution.
+    int minv = INT_MAX;
+    bool group_skipped = false;
+    GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> live_gc[MAX_W];
+    int num_live_gc = 0;
+    for (int j = 0; j < w_val && !group_skipped; j++) {
+      int gcol = this->COLUMN_ORDER[j];
+      pos_t gmove = child_possible & static_cast<pos_t>(child.column_mask(gcol));
+      if (!gmove) continue;
+      GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> gc(child);
+      gc.play(gmove);
+      if (auto gp = transTable->getPacked(tt_key_for(gc)); gp.value) {
+        if (gp.value <= P.max_score() - P.min_score() + 1) {
+          int gc_ub = gp.value + P.min_score() - 1;
+          if (gc_ub <= alpha) {   // this grandchild already fails low → group dead
+            fold_max = std::max(fold_max, gc_ub);
+            any_fold = true;
+            group_skipped = true;
+            break;
+          }
+        } else {
+          int gc_lb = gp.value + 2 * P.min_score() - P.max_score() - 2;
+          if (gc_lb >= beta) {    // pre-resolved fail-high: fold, don't enqueue
+            minv = std::min(minv, gc_lb);
+            continue;
+          }
+        }
+      }
+      live_gc[num_live_gc++] = gc;
+    }
+    if (group_skipped) continue;
+    if (num_live_gc == 0) {
+      // every grandchild pre-resolved fail-high → parent fails high now
+      return minv;
+    }
+
+    // First-grandchild expansion: live_gc[0] is the best-ordered grandchild —
+    // under the fail-low hypothesis it is the one that kills this group, and
+    // its OWN search is an AND node (it fails low iff every one of its
+    // children fails high vs (-beta,-alpha)). Decomposing it into ggc tasks
+    // parallelizes exactly the work the serial search would do, instead of
+    // leaving each group's kill search single-threaded.
+    int first_task = num_tasks;
+    int gc_level_unresolved = num_live_gc;   // counts live_gc entries (gc0 included)
+    bool expanded = false;
+    bool gc0_inline_done = false;
+    int sub_count = 0;
+    {
+      const auto& gc0 = live_gc[0];
+      if (gc0.canWinNext()) {
+        // gc0's mover mates: gc0 >= mate >= beta — gc0 resolved fail-high.
+        int mate = ((w_val * h_val) + 1 - gc0.nbMoves()) / 2;
+        minv = std::min(minv, mate);
+        gc_level_unresolved--;
+        gc0_inline_done = true;
+      } else {
+        pos_t gc0_possible = static_cast<pos_t>(gc0.possibleNonLosingMoves());
+        if (gc0_possible == 0) {
+          int gc0_val = -((w_val * h_val) - gc0.nbMoves()) / 2;
+          if (gc0_val <= alpha) {   // exact value kills the group
+            fold_max = std::max(fold_max, gc0_val);
+            any_fold = true;
+            continue;               // group resolved fail-low
+          }
+          minv = std::min(minv, gc0_val);
+          gc_level_unresolved--;
+          gc0_inline_done = true;
+        } else if (gc0.nbMoves() >= (w_val * h_val) - 2) {
+          if (0 <= alpha) {
+            fold_max = std::max(fold_max, 0);
+            any_fold = true;
+            continue;
+          }
+          minv = std::min(minv, 0);
+          gc_level_unresolved--;
+          gc0_inline_done = true;
+        } else if ((gc0_possible & (gc0_possible - 1)) != 0) {
+          // >= 2 replies: expand into ggc tasks (all eligible from the start).
+          for (int j = 0; j < w_val; j++) {
+            int gcol = this->COLUMN_ORDER[j];
+            pos_t gmove = gc0_possible & static_cast<pos_t>(gc0.column_mask(gcol));
+            if (!gmove) continue;
+            GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> ggc(gc0);
+            ggc.play(gmove);
+            gc_pos[num_tasks] = ggc;
+            gc_group[num_tasks] = num_groups;
+            task_is_ggc[num_tasks] = true;
+            num_tasks++;
+            sub_count++;
+          }
+          expanded = true;
+          group_gc0[num_groups] = gc0;
+          group_gc0_key[num_groups] = tt_key_for(gc0);
+        }
+      }
+    }
+    if (gc_level_unresolved == 0) {
+      // gc0 was the only live grandchild and it resolved fail-high.
+      num_tasks = first_task;
+      return minv;
+    }
+    // Enqueue the remaining grandchildren as ordinary (staged) gc tasks.
+    for (int j = (expanded || gc0_inline_done) ? 1 : 0; j < num_live_gc; j++) {
+      gc_pos[num_tasks] = live_gc[j];
+      gc_group[num_tasks] = num_groups;
+      task_is_ggc[num_tasks] = false;
+      num_tasks++;
+    }
+    if (num_tasks == first_task) continue;   // nothing searchable (defensive)
+    group_col[num_groups] = col;
+    group_child[num_groups] = child;
+    group_child_key[num_groups] = child_key;
+    group_minv_init[num_groups] = minv;
+    group_task_count[num_groups] = gc_level_unresolved;
+    group_expanded[num_groups] = expanded;
+    group_gc0_done_init[num_groups] = gc0_inline_done;
+    group_sub_count[num_groups] = sub_count;
+    num_groups++;
+  }
+
+  if (num_groups == 0) {   // everything pre-resolved as fail-low
+    return any_fold ? fold_max : alpha;
+  }
+  if (num_tasks <= 1) {    // nothing meaningful to fan out
+    return dispatch_solve_weak<HasBook>(P, alpha, beta, book, book_depth, abort_flag, nullptr);
+  }
+
+  nodeCount.fetch_add(1, std::memory_order_relaxed);
+
+  const int worker_count = std::min(threads, num_tasks);
+  pool->ensureCapacity(worker_count - 1);
+
+  std::atomic<bool> cutoff{false};
+  std::atomic<bool> have_winner{false};
+  int winning_value = 0;             // written only by the have_winner winner
+  int winning_col = w_val;
+  std::atomic<int> best_seen{any_fold ? fold_max : -P.max_score()};
+  std::atomic<int> groups_left{num_groups};
+  std::array<std::atomic<bool>, MAX_W> group_dead{};
+  std::array<std::atomic<int>, MAX_W> group_left{};
+  std::array<std::atomic<int>, MAX_W> group_minv{};
+  std::array<std::atomic<bool>, MAX_TASKS> gc_done{};   // abort + taint + resolution, monotonic
+  std::array<std::atomic<bool>, MAX_TASKS> gc_claimed{};
+  std::array<std::atomic<int>, MAX_TASKS> gc_searchers{};
+  // Staged (YBWC-style) eligibility: initially only each group's FIRST
+  // (best-ordered, most-likely-refuting) grandchild is dispatched. If the
+  // parent is going to fail low, that one task kills its group and the
+  // siblings were never needed — exactly like the serial beta cutoff. Only
+  // when a first grandchild FAILS HIGH (so its child is now a genuine
+  // fail-high candidate whose proof needs every grandchild) do the siblings
+  // become eligible and fan out.
+  std::array<std::atomic<bool>, MAX_TASKS> gc_eligible{};
+  // Duplication budgets: at most one speculative sibling per group and two
+  // whole-probe racers at a time. Uncapped duplication measurably HURTS at
+  // high thread counts — perturbed-history duplicates overwrite shared TT
+  // move hints and slow the primary searchers; an idle core is cheaper.
+  std::array<std::atomic<int>, MAX_W> spec_claims{};
+  // Sub-group state for expanded first grandchildren.
+  std::array<std::atomic<int>, MAX_W> sub_left{};
+  std::array<std::atomic<int>, MAX_W> sub_minv{};
+  std::array<std::atomic<bool>, MAX_W> gc0_resolved{};
+  std::atomic<int> racer_count{0};
+  std::atomic<int> helper_seq{0};
+  for (int i = 0; i < num_groups; i++) {
+    group_left[i].store(group_task_count[i], std::memory_order_relaxed);
+    group_minv[i].store(group_minv_init[i], std::memory_order_relaxed);
+    sub_left[i].store(group_sub_count[i], std::memory_order_relaxed);
+    sub_minv[i].store(INT_MAX, std::memory_order_relaxed);
+    if (group_gc0_done_init[i]) gc0_resolved[i].store(true, std::memory_order_relaxed);
+  }
+  {
+    bool first_plain_seen[MAX_W] = {};
+    for (int t = 0; t < num_tasks; t++) {
+      int g = gc_group[t];
+      if (task_is_ggc[t]) {
+        // Expanded first gc: every one of its children is needed under the
+        // fail-low hypothesis — all eligible immediately.
+        gc_eligible[t].store(true, std::memory_order_relaxed);
+      } else if (group_gc0_done_init[g]) {
+        // First gc already proved fail-high at enumeration: the group is a
+        // fail-high candidate, all siblings eligible immediately.
+        gc_eligible[t].store(true, std::memory_order_relaxed);
+      } else if (!group_expanded[g] && !first_plain_seen[g]) {
+        // Unexpanded group: its first plain task IS the first gc.
+        gc_eligible[t].store(true, std::memory_order_relaxed);
+      }
+      if (!task_is_ggc[t]) first_plain_seen[g] = true;
+    }
+  }
+
+  std::atomic<int> remaining(worker_count - 1);
+  std::promise<void> prom;
+  auto fut = prom.get_future();
+
+  auto kill_group = [&](int g) {   // mark every task in group g aborted
+    for (int t = 0; t < num_tasks; t++)
+      if (gc_group[t] == g) gc_done[t].store(true, std::memory_order_relaxed);
+  };
+
+  auto store_child_tt = [&](int g, int child_bound, bool is_lower) {
+    // Preserve the TT entry the serial search would have left at the child.
+    const auto& C = group_child[g];
+    if (is_lower)
+      transTable->put(group_child_key[g], child_bound + C.max_score() - 2 * C.min_score() + 2, (w_val * h_val) - C.nbMoves(), (uint8_t)w_val);
+    else
+      transTable->put(group_child_key[g], child_bound - C.min_score() + 1, (w_val * h_val) - C.nbMoves(), (uint8_t)w_val);
+  };
+
+  auto store_gc0_tt = [&](int g, int bound, bool is_lower) {
+    // Preserve the TT entry the serial search would have left at the first gc.
+    const auto& G = group_gc0[g];
+    if (is_lower)
+      transTable->put(group_gc0_key[g], bound + G.max_score() - 2 * G.min_score() + 2, (w_val * h_val) - G.nbMoves(), (uint8_t)w_val);
+    else
+      transTable->put(group_gc0_key[g], bound - G.min_score() + 1, (w_val * h_val) - G.nbMoves(), (uint8_t)w_val);
+  };
+
+  // gc-level fail-high resolution shared by plain gc tasks and the expanded
+  // first gc (when one of its ggc children fails low): fold the gc's lower
+  // bound into the group min, open the siblings, and complete the group if
+  // it was the last unresolved gc.
+  auto resolve_gc_fail_high = [&](int g, int gc_lb) {
+    for (int j = 0; j < num_tasks; j++)
+      if (gc_group[j] == g && !task_is_ggc[j]) gc_eligible[j].store(true, std::memory_order_relaxed);
+    int prev = group_minv[g].load(std::memory_order_relaxed);
+    while (gc_lb < prev && !group_minv[g].compare_exchange_weak(prev, gc_lb, std::memory_order_relaxed)) {}
+    if (group_left[g].fetch_sub(1, std::memory_order_acq_rel) == 1 &&
+        !group_dead[g].load(std::memory_order_acquire)) {
+      // Whole group failed high → parent fails high.
+      if (!have_winner.exchange(true, std::memory_order_acq_rel)) {
+        winning_value = group_minv[g].load(std::memory_order_relaxed);
+        winning_col = group_col[g];
+        cutoff.store(true, std::memory_order_release);
+        for (int j = 0; j < num_tasks; j++)
+          gc_done[j].store(true, std::memory_order_relaxed);
+        store_child_tt(g, -winning_value, false);   // child <= -winning_value
+      }
+    }
+  };
+
+  // gc-level fail-low: the group can never prove the parent fails high.
+  auto kill_group_with = [&](int g, int contrib_ub) {
+    if (!group_dead[g].exchange(true, std::memory_order_acq_rel)) {
+      int prev = best_seen.load(std::memory_order_relaxed);
+      while (contrib_ub > prev && !best_seen.compare_exchange_weak(prev, contrib_ub, std::memory_order_relaxed)) {}
+      kill_group(g);
+      store_child_tt(g, -contrib_ub, true);   // child >= -contrib_ub
+      if (groups_left.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+        // Parent fail-low fully resolved — stop the whole-probe racers too.
+        cutoff.store(true, std::memory_order_release);
+      }
+    }
+  };
+
+  auto handle_result = [&](int t, int val) {
+    int g = gc_group[t];
+    // gc_done[t] is monotonic: still unset ⟹ our search never observed an
+    // abort ⟹ `val` is from a genuinely completed search.
+    if (task_is_ggc[t]) {
+      // Great-grandchild under the group's expanded first gc, searched at
+      // (-beta, -alpha). gc0 = max over ggc of -ggc_val.
+      if (val <= -beta) {
+        // ggc fails low → gc0 >= -val >= beta: gc0 fails high, group survives.
+        if (!gc_done[t].exchange(true, std::memory_order_acq_rel)) {
+          if (!gc0_resolved[g].exchange(true, std::memory_order_acq_rel)) {
+            for (int j = 0; j < num_tasks; j++)
+              if (gc_group[j] == g && task_is_ggc[j]) gc_done[j].store(true, std::memory_order_relaxed);
+            store_gc0_tt(g, -val, true);        // gc0 >= -val
+            resolve_gc_fail_high(g, -val);
+          }
+        }
+        return;
+      }
+      // ggc fails high (>= -alpha) → contributes an upper-bound piece to gc0.
+      if (!gc_done[t].exchange(true, std::memory_order_acq_rel)) {
+        int prev = sub_minv[g].load(std::memory_order_relaxed);
+        while (val < prev && !sub_minv[g].compare_exchange_weak(prev, val, std::memory_order_relaxed)) {}
+        if (sub_left[g].fetch_sub(1, std::memory_order_acq_rel) == 1 &&
+            !gc0_resolved[g].exchange(true, std::memory_order_acq_rel)) {
+          // Every ggc failed high → gc0 <= -min(ggc) <= alpha: gc0 fails low
+          // and kills the whole group, exactly like a serial beta cutoff.
+          int gc0_ub = -sub_minv[g].load(std::memory_order_relaxed);
+          store_gc0_tt(g, gc0_ub, false);       // gc0 <= gc0_ub
+          kill_group_with(g, gc0_ub);
+        }
+      }
+      return;
+    }
+    if (val >= beta) {
+      // Grandchild fails high: this child is now a fail-high candidate.
+      if (!gc_done[t].exchange(true, std::memory_order_acq_rel)) {
+        resolve_gc_fail_high(g, val);
+      }
+      return;
+    }
+    // Grandchild fails low: its child can never prove fail-high — kill the group.
+    if (!gc_done[t].exchange(true, std::memory_order_acq_rel)) {
+      kill_group_with(g, val);
+    }
+  };
+
+  // Whole-probe racer (legacy Lazy-SMP mechanism, scoped to the probe tail):
+  // when every unresolved grandchild already has a searcher, an idle worker
+  // re-searches the WHOLE probe serially with perturbed history. It TT-hits
+  // everything the decomposition already resolved (including the child-level
+  // bounds stored above), so it effectively focuses on the remainder — and a
+  // completed racer resolves the entire probe by itself. `cutoff` is its
+  // abort flag AND taint flag (monotonic, same argument as gc_done).
+  std::atomic<bool> parent_raced{false};
+  int raced_value = 0;   // written only by the parent_raced winner
+  auto run_racer = [&](int32_t* hist) {
+    solverTlNodeCount = 0;
+    int r = dispatch_solve_weak<HasBook>(P, alpha, beta, book, book_depth, &cutoff, hist);
+    nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+    solverTlNodeCount = 0;
+    if (cutoff.load(std::memory_order_acquire)) return;   // tainted or already resolved
+    if (!parent_raced.exchange(true, std::memory_order_acq_rel)) {
+      raced_value = r;
+      cutoff.store(true, std::memory_order_release);
+      for (int j = 0; j < num_tasks; j++)
+        gc_done[j].store(true, std::memory_order_relaxed);
+    }
+  };
+
+  auto run_search = [&](int t, int32_t* hist) {
+    gc_searchers[t].fetch_add(1, std::memory_order_relaxed);
+    solverTlNodeCount = 0;
+    int val = task_is_ggc[t]
+      ? dispatch_solve_weak<HasBook>(gc_pos[t], -beta, -alpha, book, book_depth, &gc_done[t], hist)
+      : dispatch_solve_weak<HasBook>(gc_pos[t], alpha, beta, book, book_depth, &gc_done[t], hist);
+    nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+    solverTlNodeCount = 0;
+    gc_searchers[t].fetch_sub(1, std::memory_order_relaxed);
+    handle_result(t, val);
+  };
+
+  auto worker = [&]() {
+    int32_t local_history[MAX_W * (MAX_W + 1)];
+    const int hist_len = w_val * (h_val + 1);
+    while (!cutoff.load(std::memory_order_acquire) && !shouldAbort(abort_flag) &&
+           groups_left.load(std::memory_order_acquire) > 0) {
+      // 1) Fresh eligible task (unclaimed).
+      int pick = -1;
+      for (int t = 0; t < num_tasks; t++) {
+        if (!gc_eligible[t].load(std::memory_order_relaxed)) continue;
+        if (gc_done[t].load(std::memory_order_relaxed)) continue;
+        if (gc_claimed[t].load(std::memory_order_relaxed)) continue;
+        if (!gc_claimed[t].exchange(true, std::memory_order_acq_rel)) { pick = t; break; }
+      }
+      if (pick >= 0) { run_search(pick, nullptr); continue; }
+      // 2) Speculative sibling: an unclaimed not-yet-eligible grandchild,
+      //    at most one in flight per group. Useful iff its group survives
+      //    (its first task fails high); wasted iff the group dies.
+      for (int t = 0; t < num_tasks; t++) {
+        if (gc_eligible[t].load(std::memory_order_relaxed)) continue;
+        if (gc_done[t].load(std::memory_order_relaxed)) continue;
+        if (gc_claimed[t].load(std::memory_order_relaxed)) continue;
+        int g = gc_group[t];
+        if (spec_claims[g].load(std::memory_order_relaxed) > 0) continue;
+        if (!gc_claimed[t].exchange(true, std::memory_order_acq_rel)) {
+          spec_claims[g].fetch_add(1, std::memory_order_relaxed);
+          pick = t;
+          break;
+        }
+      }
+      if (pick >= 0) { run_search(pick, nullptr); continue; }
+      // 3) Race the whole probe with perturbed history (legacy Lazy-SMP
+      //    mechanism — it TT-hits all resolved subtrees, so it effectively
+      //    works on whatever remains and can finish the probe alone), capped
+      //    at two concurrent racers.
+#if SOLVE_TAIL_RACERS
+      if (racer_count.fetch_add(1, std::memory_order_relaxed) < 2) {
+        int seq = helper_seq.fetch_add(1, std::memory_order_relaxed) + 1;
+        for (int k = 0; k < hist_len; k++)
+          local_history[k] = this->TROMP_WEIGHTS[k] + (seq * 7 + k * 3) % 5;
+        run_racer(local_history);
+        racer_count.fetch_sub(1, std::memory_order_relaxed);
+        continue;
+      }
+      racer_count.fetch_sub(1, std::memory_order_relaxed);
+#endif
+      // 4) Budgets exhausted: idle briefly. An idle core costs nothing;
+      //    another duplicate search costs everyone.
+      std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+  };
+
+  for (int i = 0; i < worker_count - 1; i++) {
+    pool->enqueue([&]() {
+      worker();
+      if (remaining.fetch_sub(1) == 1) prom.set_value();
+    });
+  }
+  worker();
+
+  while (worker_count > 1 && fut.wait_for(std::chrono::microseconds(200)) != std::future_status::ready) {
+    if (shouldAbort(abort_flag)) {
+      for (int j = 0; j < num_tasks; j++)
+        gc_done[j].store(true, std::memory_order_relaxed);
+      cutoff.store(true, std::memory_order_release);
+    }
+  }
+
+  if (shouldAbort(abort_flag)) return alpha;  // caller re-checks and discards
+
+  if (have_winner.load(std::memory_order_acquire)) {
+    uint8_t stored_move = (uint8_t)winning_col;
+    if (stored_move < w_val && is_reverse) stored_move = w_val - 1 - stored_move;
+    transTable->put(key, winning_value + P.max_score() - 2 * P.min_score() + 2, (w_val * h_val) - P.nbMoves(), stored_move);
+#ifndef NO_COLLECT_HOOKS
+    if (collect_book)
+      collect_book->narrow(P,
+        (uint8_t)(winning_value - P.min_score() + 1),
+        (uint8_t)(max - P.min_score() + 1));
+#endif
+    return winning_value;
+  }
+
+  if (parent_raced.load(std::memory_order_acquire)) {
+    // A whole-probe racer finished first: its serial search already did the
+    // TT store and collect hooks internally (it IS a plain negamax call).
+    return raced_value;
+  }
+
+  int ub = best_seen.load(std::memory_order_relaxed);
+  transTable->put(key, ub - P.min_score() + 1, (w_val * h_val) - P.nbMoves(), (uint8_t)w_val);
+#ifndef NO_COLLECT_HOOKS
+  if (collect_book)
+    collect_book->narrow(P,
+      (uint8_t)(min - P.min_score() + 1),
+      (uint8_t)(ub - P.min_score() + 1));
+#endif
+  return ub;
+}
+
+/**
  * Serial solve implementation. Can be called with an abort_flag for Lazy SMP
  * and an optional private history table for search diversity.
  */
 template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
 template <bool HasBook>
-::GameSolver::Connect4::SolverResult SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::solve_single(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history) {
+::GameSolver::Connect4::SolverResult SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::solve_single(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history, int threads) {
   if(P.canWinNext()) {
     int score = ((P.width() * P.height()) + 1 - P.nbMoves()) / 2;
     for (int i = 0; i < P.width(); i++) {
@@ -361,6 +1252,21 @@ template <bool HasBook>
   int min = -((P.width() * P.height()) - P.nbMoves()) / 2;
   int max = ((P.width() * P.height()) + 1 - P.nbMoves()) / 2;
   int score = 0;
+
+  // Every probe below is a fixed null window (hi == lo + 1). When threads > 1,
+  // root-decompose the probe across the shared pool instead of walking the
+  // whole tree on this one thread; threads == 1 keeps the exact existing
+  // single-threaded behavior unchanged.
+  auto probe = [&](int lo, int hi) {
+    if (threads > 1) {
+#if SOLVE_PARALLEL_PROBES >= 2
+      return dispatch_solve_weak_parallel2<HasBook>(P, lo, hi, book, book_depth, threads, abort_flag);
+#else
+      return dispatch_solve_weak_parallel<HasBook>(P, lo, hi, book, book_depth, threads, abort_flag);
+#endif
+    }
+    return dispatch_solve_weak<HasBook>(P, lo, hi, book, book_depth, abort_flag, thread_history);
+  };
 
   if constexpr (HasBook) {
     if (P.nbMoves() <= book_depth) {
@@ -383,20 +1289,20 @@ template <bool HasBook>
       int med = min + (max - min) / 2;
       if(med <= 0 && min / 2 < med) med = min / 2;
       else if(med >= 0 && max / 2 > med) med = max / 2;
-      int r = dispatch_solve_weak<HasBook>(P, med, med + 1, book, book_depth, abort_flag, thread_history);
+      int r = probe(med, med + 1);
       if (shouldAbort(abort_flag)) { score = min; break; }
       if(r <= med) max = r;
       else min = r;
     }
     score = min;
   } else {
-    int r = dispatch_solve_weak<HasBook>(P, -1, 0, book, book_depth, abort_flag, thread_history);
+    int r = probe(-1, 0);
     if (shouldAbort(abort_flag)) goto flush;
     if (r <= -1) {
       max = -1;
       for (int i = -2; i >= min; i--) {
         if (shouldAbort(abort_flag)) { score = max; goto flush; }
-        if (dispatch_solve_weak<HasBook>(P, i, i + 1, book, book_depth, abort_flag, thread_history) > i) {
+        if (probe(i, i + 1) > i) {
           min = max = i + 1;
           break;
         }
@@ -407,7 +1313,7 @@ template <bool HasBook>
       }
       score = max;
     } else {
-      r = negamax<HasBook>(P, 0, 1, book, book_depth, abort_flag, thread_history);
+      r = probe(0, 1);
       if (shouldAbort(abort_flag)) { score = 0; goto flush; }
       if (r <= 0) {
         score = 0;
@@ -415,7 +1321,7 @@ template <bool HasBook>
         min = 1;
         for (int i = 1; i < max; i++) {
           if (shouldAbort(abort_flag)) { score = min; goto flush; }
-          if (dispatch_solve_weak<HasBook>(P, i, i + 1, book, book_depth, abort_flag, thread_history) <= i) {
+          if (probe(i, i + 1) <= i) {
             min = max = i;
             break;
           }
@@ -480,7 +1386,23 @@ find_move:
           if (possible & P.column_mask(col)) {
               GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
               P2.playCol(col);
-              if (dispatch_solve_weak<HasBook>(P2, -score, -score + 1, book, book_depth, abort_flag, thread_history) == -score) {
+              // Null-window verification probe; route through the parallel
+              // dispatch like the main probes — this scan is otherwise a
+              // fully serial tail after the score is already known. The
+              // `== -score` test is fail-soft-safe: any child satisfies
+              // child >= -score, so a fail-low upper bound is forced to
+              // exactly -score, and a fail-high return is >= -score + 1.
+              int vr;
+              if (threads > 1) {
+#if SOLVE_PARALLEL_PROBES >= 2
+                vr = dispatch_solve_weak_parallel2<HasBook>(P2, -score, -score + 1, book, book_depth, threads, abort_flag);
+#else
+                vr = dispatch_solve_weak_parallel<HasBook>(P2, -score, -score + 1, book, book_depth, threads, abort_flag);
+#endif
+              } else {
+                vr = dispatch_solve_weak<HasBook>(P2, -score, -score + 1, book, book_depth, abort_flag, thread_history);
+              }
+              if (vr == -score) {
                   bestMove = col;
                   break;
               }
@@ -534,9 +1456,28 @@ template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
     else return solve_single<false>(P, weak, nullptr, 0);
   }
 
-  // --- True Lazy SMP ---
+#if SOLVE_PARALLEL_PROBES
+  // --- Root-parallel null-window probes (see dispatch_solve_weak_parallel) ---
+  // One logical solve_single() call whose internal probes fan out across the
+  // pool, instead of `threads` racing whole-position copies. The old Lazy-SMP
+  // path below visits ~3x redundant nodes at 12 threads for ~1.2x wall-clock
+  // speedup (measured); this path decomposes each probe at the root instead
+  // of duplicating the whole search per thread.
   pool->ensureCapacity(threads - 1);
-  
+  solverTlNodeCount = 0;
+  ::GameSolver::Connect4::SolverResult final_result;
+  if (active_book) final_result = solve_single<true>(P, weak, active_book, active_book->getDepth(), nullptr, nullptr, threads);
+  else final_result = solve_single<false>(P, weak, nullptr, 0, nullptr, nullptr, threads);
+  nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+  solverTlNodeCount = 0;
+
+  final_result.nodes = getNodeCount();
+  final_result.aborted = isAborted();
+  return final_result;
+#else
+  // --- Legacy Lazy SMP (A/B reference; build with -DSOLVE_PARALLEL_PROBES=0) ---
+  pool->ensureCapacity(threads - 1);
+
   std::atomic<bool> done{false};
   ::GameSolver::Connect4::SolverResult final_result{0, -1, (int)P.nbMoves(), 0};
   std::mutex result_mutex;
@@ -592,6 +1533,7 @@ template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
   final_result.aborted = isAborted();
 
   return final_result;
+#endif
 }
 
 template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
@@ -712,7 +1654,19 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::analyze(const
     }
   };
 
+#ifndef ANALYZE_WIDTH_CLAMP
+#define ANALYZE_WIDTH_CLAMP 1
+#endif
+  // Historically clamped to column count because wider fan-out didn't scale well in
+  // testing (confirmed empirically: unclamped peaks ~4-8 threads then degrades —
+  // threads beyond board width have no Phase-1 column of their own and immediately
+  // duplicate-search the slowest column via Phase-2). Tunable, not a correctness
+  // requirement; build with -DANALYZE_WIDTH_CLAMP=0 to test uncapped fan-out.
+#if ANALYZE_WIDTH_CLAMP
   unsigned int num_threads = std::min((unsigned int)P.width(), (unsigned int)threads);
+#else
+  unsigned int num_threads = (unsigned int)threads;
+#endif
   if (num_threads <= 1) {
     worker();
   } else {

@@ -153,10 +153,32 @@ class SolverImpl : public Solver<WIDTH, HEIGHT, ALIGN, WRAP> {
 
  private:
   template <bool HasBook>
-  ::GameSolver::Connect4::SolverResult solve_single(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
+  ::GameSolver::Connect4::SolverResult solve_single(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr, int threads = 1);
 
   template <bool HasBook>
   int dispatch_solve_weak(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int min, int max, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history);
+
+  // Root-decomposed counterpart of dispatch_solve_weak: one null-window probe
+  // (beta == alpha + 1 always) fanned out across P's legal children on the
+  // shared ThreadPool instead of walking the whole tree on one thread. Every
+  // child tests against the SAME fixed window, so unlike PVS/YBWC there is no
+  // "wait for the first child" dependency — all children start in parallel.
+  // A child proving fail-high aborts the rest; workers with no fresh child
+  // left Lazy-SMP-duplicate the unfinished children (perturbed history) so
+  // the probe tail is never single-threaded on the hardest child.
+  template <bool HasBook>
+  int dispatch_solve_weak_parallel(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, int threads, std::atomic<bool>* abort_flag);
+
+  // Two-ply variant of dispatch_solve_weak_parallel: tasks are GRANDCHILDREN,
+  // not children, giving ~width^2 work units instead of ~width. Because the
+  // window is null at every level, grandchildren are searched with the exact
+  // same (alpha, beta) as the parent, and the probe is a pure max-min:
+  // parent value = max over children of min over that child's grandchildren.
+  // A grandchild failing low kills its group (that child can no longer prove
+  // fail-high); a group whose grandchildren all fail high proves the parent
+  // fails high with value min(grandchild values).
+  template <bool HasBook>
+  int dispatch_solve_weak_parallel2(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, int threads, std::atomic<bool>* abort_flag);
 
  public:
 
