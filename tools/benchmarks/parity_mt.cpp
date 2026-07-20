@@ -52,10 +52,12 @@ int main(int argc, char* argv[]) {
   std::string pos_file = "test-data/positions_7x6.txt";
   std::vector<int> thread_counts = {1, 2, 4, 6, 8, 12};
   int limit = 0;
+  bool do_analyze = false;
 
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
     if (arg.find("--file=") == 0) pos_file = arg.substr(7);
+    else if (arg == "--analyze") do_analyze = true;
     else if (arg == "--limit" && i + 1 < argc) limit = std::stoi(argv[++i]);
     else if (arg == "--threads" && i + 1 < argc) {
       thread_counts.clear();
@@ -79,6 +81,40 @@ int main(int argc, char* argv[]) {
   auto solver = Solver<W, H>::createWithCache(cache.get());
 
   int failures = 0, checked = 0;
+
+  if (do_analyze) {
+    // analyze() parity: per position, the score vector at every thread count
+    // must match the single-threaded vector, and max(scores) must equal the
+    // expected solve score.
+    for (auto &bp : positions) {
+      GenericPosition<W, H> p;
+      p.play(bp.pos);
+      cache->reset();
+      auto ref = solver->analyze(p, false, 1, nullptr);
+      int best = -1000;
+      for (int v : ref) best = std::max(best, v);
+      checked++;
+      if (best != bp.expected_score) {
+        failures++;
+        std::cerr << "ANALYZE FAIL ref pos=" << bp.pos << " max=" << best
+                  << " want=" << bp.expected_score << "\n";
+      }
+      for (int threads : thread_counts) {
+        if (threads == 1) continue;
+        cache->reset();
+        auto got = solver->analyze(p, false, threads, nullptr);
+        checked++;
+        if (got != ref) {
+          failures++;
+          std::cerr << "ANALYZE FAIL t=" << threads << " pos=" << bp.pos << " vectors differ\n";
+        }
+      }
+    }
+    std::cout << (failures == 0 ? "PARITY OK" : "PARITY FAILURES") << " (" << checked
+              << " analyze checks, " << failures << " failures)\n";
+    return failures == 0 ? 0 : 1;
+  }
+
   for (int threads : thread_counts) {
     cache->reset();
     for (auto &bp : positions) {

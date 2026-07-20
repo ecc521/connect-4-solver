@@ -1576,12 +1576,19 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::analyze(const
   std::vector<GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>> col_positions(P.width(), GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>(P.width(), P.height()));
   std::vector<bool> col_valid(P.width());
 
+  // Mirror-symmetric positions: mirrored columns are pure transpositions —
+  // solve one of each pair, copy the score afterwards.
+  const bool analyze_symmetric = P.mirror_key(P.key()) == P.key();
+
   for (int c = 0; c < P.width(); c++) {
     col_abort[c].store(false, std::memory_order_relaxed);
     if (P.canPlay(c)) {
       if (P.isWinningMove(c)) {
         scores[c] = ((P.width() * P.height()) + 1 - P.nbMoves()) / 2;
         col_done[c].store(true, std::memory_order_relaxed);
+        col_valid[c] = false;
+      } else if (analyze_symmetric && c > P.width() - 1 - c) {
+        col_done[c].store(true, std::memory_order_relaxed);   // copied from mirror below
         col_valid[c] = false;
       } else {
         GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
@@ -1596,6 +1603,36 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::analyze(const
     }
   }
 
+// Root-split (default) measured better than sequential-columns x parallel
+// probe engine for midgame analyze at 2-6 threads (independent columns
+// parallelize cleanly; per-solve probe decomposition caps lower). Build with
+// -DANALYZE_ROOT_SPLIT=0 to use the sequential variant.
+#ifndef ANALYZE_ROOT_SPLIT
+#define ANALYZE_ROOT_SPLIT 1
+#endif
+#if !ANALYZE_ROOT_SPLIT
+  // Sequential columns, each internally parallelized by the probe engine.
+  // Sibling columns transpose into each other heavily one ply down, so a
+  // column solved on a TT warmed by its predecessors is far cheaper than a
+  // cold concurrent solve — the old root-split paid that duplication cost N
+  // ways at once (and its whole-column Lazy-SMP stragglers stacked more on
+  // top). Mirrored columns of a symmetric position are pure transpositions:
+  // solve one, copy the score.
+  {
+    const OpeningBookBase<WIDTH, HEIGHT>* active_book = book ? book : this->book;
+    for (int i = 0; i < P.width(); i++) {
+      int col = this->COLUMN_ORDER[i];
+      if (!col_valid[col]) continue;
+      solverTlNodeCount = 0;
+      ::GameSolver::Connect4::SolverResult result;
+      if (active_book) result = solve_single<true>(col_positions[col], weak, active_book, active_book->getDepth(), nullptr, nullptr, threads);
+      else result = solve_single<false>(col_positions[col], weak, nullptr, 0, nullptr, nullptr, threads);
+      nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+      solverTlNodeCount = 0;
+      scores[col] = -result.score;
+    }
+  }
+#else
   std::atomic<int> next_col{0};
 
   auto worker = [&]() {
@@ -1684,8 +1721,16 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::analyze(const
         });
     }
     worker();
-    
+
     fut.wait();
+  }
+#endif  // ANALYZE_ROOT_SPLIT
+
+  if (analyze_symmetric) {
+    for (int c = 0; c < P.width(); c++) {
+      int m = P.width() - 1 - c;
+      if (c > m && P.canPlay(c) && !P.isWinningMove(c)) scores[c] = scores[m];
+    }
   }
 #else
   for (int i = 0; i < P.width(); i++) {
