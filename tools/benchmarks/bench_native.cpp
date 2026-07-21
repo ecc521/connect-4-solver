@@ -50,23 +50,35 @@ std::vector<BenchPos> load_positions(const std::string &path) {
   std::ifstream file(path);
   std::vector<BenchPos> positions;
   std::string line;
+  int line_no = 0;
   while (std::getline(file, line)) {
+    line_no++;
     if (line.empty() || line[0] == '\r')
       continue;
     std::stringstream ss(line);
     std::string pos;
-    int score = 0;
-    ss >> pos >> score;
+    ss >> pos;
     if (pos.empty())
       continue;
+    int score = 0;
+    bool has_score = static_cast<bool>(ss >> score);
     bool pos_is_number =
-        !pos.empty() && std::all_of(pos.begin(), pos.end(), ::isdigit);
-    if (pos_is_number && score == 0) {
+        std::all_of(pos.begin(), pos.end(), ::isdigit);
+    if (pos_is_number && !has_score) {
+      // Handle empty-board line: " 1" parses as pos="1" with no score token.
+      // The digits are actually the score for the (blank) position.
       size_t first_nonspace = line.find_first_not_of(" \t");
       if (first_nonspace > 0) {
         score = std::stoi(pos);
         pos = "";
+        positions.push_back({pos, score});
+        continue;
       }
+    }
+    if (!has_score) {
+      std::cerr << "warning: " << path << ":" << line_no
+                << ": missing score, skipping line: \"" << line << "\"\n";
+      continue;
     }
     positions.push_back({pos, score});
   }
@@ -244,6 +256,7 @@ void run_diag_solve(const std::vector<BenchPos> &positions, const std::vector<in
 
       std::vector<double> trial_times;
       uint64_t last_nodes = 0, last_drops = 0, last_retries = 0;
+      int last_score = 0;
       for (int r = 0; r < repeats; r++) {
         uint64_t nodes_before = 0, drops_before = 0, retries_before = 0;
         double wall_ms = run_clean_trial(threads, [&]() {
@@ -252,7 +265,7 @@ void run_diag_solve(const std::vector<BenchPos> &positions, const std::vector<in
           drops_before = cache->getDropCount();
           retries_before = cache->getRetryCount();
         }, [&]() {
-          solver->solve(p, weak, threads, nullptr);
+          last_score = solver->solve(p, weak, threads, nullptr).score;
         }, 5, max_deficit);
         if (wall_ms < 0) continue;
         trial_times.push_back(wall_ms);
@@ -262,7 +275,13 @@ void run_diag_solve(const std::vector<BenchPos> &positions, const std::vector<in
       }
       if (trial_times.empty()) { skipped++; continue; }
       std::sort(trial_times.begin(), trial_times.end());
-      total_time += trial_times[trial_times.size() / 2];
+      double med_ms = trial_times[trial_times.size() / 2];
+      bool mismatch = !weak && last_score != bp.expected_score;
+      std::cerr << "pos=" << bp.pos << " threads=" << threads << " score=" << last_score
+                << " expected=" << bp.expected_score << (mismatch ? " MISMATCH" : "")
+                << " time_ms=" << (long long)med_ms << " nodes=" << last_nodes << "\n";
+      if (mismatch) g_parity_failures++;
+      total_time += med_ms;
       total_nodes += last_nodes;
       total_drops += last_drops;
       total_retries += last_retries;
@@ -311,15 +330,9 @@ void run_diag_analyze(const std::vector<BenchPos> &positions, const std::vector<
   std::map<int, int> agg_skipped;
 
   for (int threads : thread_counts) {
-    // analyze() clamps to min(width, threads) by default (Solver.cpp:675, toggled by
-    // ANALYZE_WIDTH_CLAMP) — root-split can't use more threads than there are columns
-    // unless the clamp is compiled out. Match whichever behavior this binary was built
-    // with, or the noise check targets a CPU-time figure that's unreachable either way.
-#if ANALYZE_WIDTH_CLAMP
-    int effective_threads = std::min(W, threads);
-#else
+    // analyze() solves columns sequentially, each as a full `threads`-wide
+    // raced solve, so all thread counts are usable regardless of board width.
     int effective_threads = threads;
-#endif
     warn_if_loaded(effective_threads);
     double total_time = 0;
     uint64_t total_nodes = 0, total_drops = 0, total_retries = 0;
@@ -349,7 +362,10 @@ void run_diag_analyze(const std::vector<BenchPos> &positions, const std::vector<
       }
       if (trial_times.empty()) { skipped++; continue; }
       std::sort(trial_times.begin(), trial_times.end());
-      total_time += trial_times[trial_times.size() / 2];
+      double med_ms = trial_times[trial_times.size() / 2];
+      std::cerr << "pos=" << bp.pos << " threads=" << threads << " score=" << bp.expected_score
+                << " time_ms=" << (long long)med_ms << " nodes=" << last_nodes << "\n";
+      total_time += med_ms;
       total_nodes += last_nodes;
       total_drops += last_drops;
       total_retries += last_retries;
