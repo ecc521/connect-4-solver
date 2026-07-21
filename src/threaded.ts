@@ -7,7 +7,7 @@ import {
 import { AbstractSyncSolver } from "./abstract-solver.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import createModule from "../build/analyze_threaded.js";
+import createModule from "../wasm-out/analyze_threaded.js";
 
 type CreateModule = (options: {
   locateFile: (path: string) => string;
@@ -28,9 +28,9 @@ let ThreadedModule: SolverModule | null = null;
 let _threadedInitPromise: Promise<void> | null = null;
 
 export function getThreadedModuleInitPromise(): Promise<void> {
-  wasmUrl ??= new URL("../build/analyze_threaded.wasm", baseUrl);
+  wasmUrl ??= new URL("../wasm-out/analyze_threaded.wasm", baseUrl);
   workerUrl ??= new URL(
-    "../build/analyze_threaded.worker.js",
+    "../wasm-out/analyze_threaded.worker.js",
     baseUrl,
   );
   const wasm = wasmUrl;

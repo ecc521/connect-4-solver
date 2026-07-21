@@ -167,7 +167,7 @@ describe("Polymorphic Dense Book Packing", () => {
       | SyncWasmNoSABConnect4Solver
     )[] = [new NodeConnect4Solver()];
 
-    if (fs.existsSync(path.join(_dir, "..", "build", "analyze.wasm"))) {
+    if (fs.existsSync(path.join(_dir, "..", "wasm-out", "analyze.wasm"))) {
       solvers.push(new SyncWasmConnect4Solver());
       solvers.push(new SyncWasmNoSABConnect4Solver());
     }

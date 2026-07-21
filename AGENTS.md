@@ -20,7 +20,7 @@ This repository provides an extremely fast, high-performance, and "perfect" Conn
   Houses the highly-optimized `.cbook` (Compressed Book) and `.book` (Dense Book) opening books. These files are securely read and loaded by the solver to instantiate zero-latency early-game positional caches.
 
 - **`build.sh`**
-  The script responsible for running `emcc` (Emscripten) against the `native/` C++ files. It generates the `build/analyze.js` and `build/analyze_threaded.js` WASM bundles.
+  The script responsible for running `emcc` (Emscripten) against the `native/` C++ files. It generates the `wasm-out/analyze.js` and `wasm-out/analyze_threaded.js` WASM bundles. Kept separate from `build/`, which is node-gyp's native addon output directory (`npm run build:native` wipes it on every rebuild).
 
 - **`Dockerfile`**
   Provides an isolated environment for compiling the WebAssembly code. Useful for compiling the C++ to WASM without having Emscripten installed natively on the host machine.

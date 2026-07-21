@@ -7,7 +7,7 @@ import {
 import { AbstractSyncSolver } from "./abstract-solver.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import createModule from "../build/analyze.js";
+import createModule from "../wasm-out/analyze.js";
 
 type CreateModule = (options?: {
   locateFile?: (path: string) => string;
