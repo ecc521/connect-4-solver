@@ -369,8 +369,16 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak(const 
  * ~width, so the tail is a single grandchild subtree instead of a child
  * subtree, and straggler-help duplication happens at far finer granularity.
  * Child- and grandchild-level TT peeks pre-resolve units the serial search
- * would have short-circuited, and resolved groups store child-level TT
- * bounds so subsequent probes keep the serial path's TT richness.
+ * would have short-circuited.
+ *
+ * This dispatcher deliberately does NOT write TT entries for the probe
+ * root / children / first-grandchildren it resolves: its derivable bounds
+ * (min/max folds over task results) are systematically weaker than what a
+ * direct search of those nodes proves, and overwriting the strong entries
+ * the task searches leave behind measurably poisons subsequent probes
+ * (100x+ node blowups on high-score exact ladders at 2-4 threads). The
+ * negamax calls the tasks run store their own entries — that is the TT
+ * state later probes rely on.
  */
 template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
 template <bool HasBook>
@@ -720,24 +728,6 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak_parall
       if (gc_group[t] == g) gc_done[t].store(true, std::memory_order_relaxed);
   };
 
-  auto store_child_tt = [&](int g, int child_bound, bool is_lower) {
-    // Preserve the TT entry the serial search would have left at the child.
-    const auto& C = group_child[g];
-    if (is_lower)
-      transTable->put(group_child_key[g], child_bound + C.max_score() - 2 * C.min_score() + 2, (w_val * h_val) - C.nbMoves(), (uint8_t)w_val);
-    else
-      transTable->put(group_child_key[g], child_bound - C.min_score() + 1, (w_val * h_val) - C.nbMoves(), (uint8_t)w_val);
-  };
-
-  auto store_gc0_tt = [&](int g, int bound, bool is_lower) {
-    // Preserve the TT entry the serial search would have left at the first gc.
-    const auto& G = group_gc0[g];
-    if (is_lower)
-      transTable->put(group_gc0_key[g], bound + G.max_score() - 2 * G.min_score() + 2, (w_val * h_val) - G.nbMoves(), (uint8_t)w_val);
-    else
-      transTable->put(group_gc0_key[g], bound - G.min_score() + 1, (w_val * h_val) - G.nbMoves(), (uint8_t)w_val);
-  };
-
   // gc-level fail-high resolution shared by plain gc tasks and the expanded
   // first gc (when one of its ggc children fails low): fold the gc's lower
   // bound into the group min, open the siblings, and complete the group if
@@ -756,7 +746,6 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak_parall
         cutoff.store(true, std::memory_order_release);
         for (int j = 0; j < num_tasks; j++)
           gc_done[j].store(true, std::memory_order_relaxed);
-        store_child_tt(g, -winning_value, false);   // child <= -winning_value
       }
     }
   };
@@ -767,7 +756,6 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak_parall
       int prev = best_seen.load(std::memory_order_relaxed);
       while (contrib_ub > prev && !best_seen.compare_exchange_weak(prev, contrib_ub, std::memory_order_relaxed)) {}
       kill_group(g);
-      store_child_tt(g, -contrib_ub, true);   // child >= -contrib_ub
       if (groups_left.fetch_sub(1, std::memory_order_acq_rel) == 1) {
         // Parent fail-low fully resolved — stop the whole-probe racers too.
         cutoff.store(true, std::memory_order_release);
@@ -788,7 +776,6 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak_parall
           if (!gc0_resolved[g].exchange(true, std::memory_order_acq_rel)) {
             for (int j = 0; j < num_tasks; j++)
               if (gc_group[j] == g && task_is_ggc[j]) gc_done[j].store(true, std::memory_order_relaxed);
-            store_gc0_tt(g, -val, true);        // gc0 >= -val
             resolve_gc_fail_high(g, -val);
           }
         }
@@ -803,7 +790,6 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak_parall
           // Every ggc failed high → gc0 <= -min(ggc) <= alpha: gc0 fails low
           // and kills the whole group, exactly like a serial beta cutoff.
           int gc0_ub = -sub_minv[g].load(std::memory_order_relaxed);
-          store_gc0_tt(g, gc0_ub, false);       // gc0 <= gc0_ub
           kill_group_with(g, gc0_ub);
         }
       }
@@ -927,9 +913,7 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak_parall
   if (shouldAbort(abort_flag)) return alpha;  // caller re-checks and discards
 
   if (have_winner.load(std::memory_order_acquire)) {
-    uint8_t stored_move = (uint8_t)winning_col;
-    if (stored_move < w_val && is_reverse) stored_move = w_val - 1 - stored_move;
-    transTable->put(key, winning_value + P.max_score() - 2 * P.min_score() + 2, (w_val * h_val) - P.nbMoves(), stored_move);
+    (void)winning_col; (void)is_reverse;
 #ifndef NO_COLLECT_HOOKS
     if (collect_book)
       collect_book->narrow(P,
@@ -946,7 +930,6 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak_parall
   }
 
   int ub = best_seen.load(std::memory_order_relaxed);
-  transTable->put(key, ub - P.min_score() + 1, (w_val * h_val) - P.nbMoves(), (uint8_t)w_val);
 #ifndef NO_COLLECT_HOOKS
   if (collect_book)
     collect_book->narrow(P,
@@ -1038,7 +1021,14 @@ template <bool HasBook>
         min = 1;
         for (int i = 1; i < max; i++) {
           if (shouldAbort(abort_flag)) { score = min; goto flush; }
-          if (probe(i, i + 1) <= i) {
+          // High-score ladders: decomposed probes of expected-fail-high
+          // windows do ~width^2 speculative task searches where the serial
+          // search needs one refutation chain — measured 100x+ blowups at
+          // 2-4 threads on 8x8 exact. Parallelize only the first steps
+          // (covers the common small-score case); run long ladders serially
+          // on the task-search-warmed TT.
+          if ((i <= 2 ? probe(i, i + 1)
+                      : dispatch_solve_weak<HasBook>(P, i, i + 1, book, book_depth, abort_flag, thread_history)) <= i) {
             min = max = i;
             break;
           }
