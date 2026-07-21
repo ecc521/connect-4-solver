@@ -98,43 +98,21 @@ class SolverImpl : public Solver<WIDTH, HEIGHT, ALIGN, WRAP> {
   }
 
  private:
-  using TrompWeightsT = typename std::conditional<WIDTH == -1, std::vector<int32_t>, std::array<int32_t, WIDTH == -1 ? 1 : WIDTH * (HEIGHT + 1)>>::type;
   using ColumnOrderT = typename std::conditional<WIDTH == -1, std::vector<int>, std::array<int, WIDTH == -1 ? 1 : WIDTH>>::type;
-  using HistoryT = typename std::conditional<WIDTH == -1, std::vector<int32_t>, std::array<int32_t, WIDTH == -1 ? 1 : WIDTH * (HEIGHT + 1)>>::type;
 
-  TrompWeightsT TROMP_WEIGHTS;
   ColumnOrderT COLUMN_ORDER;
-  mutable HistoryT history;
 
   void init_tables(int w, int h) {
       if constexpr (WIDTH == -1) {
-          TROMP_WEIGHTS.resize(w * (h + 1));
           COLUMN_ORDER.resize(w);
-          history.resize(w * (h + 1));
       }
       for (int i = 0; i < w; i++) {
           COLUMN_ORDER[i] = w / 2 + (1 - 2 * (i % 2)) * (i + 1) / 2;
       }
-      for (int col = 0; col < w; col++) {
-        for (int row = 0; row < h; row++) {
-            int i = col < w / 2 ? col : w - 1 - col;
-            int hh = row < h / 2 ? row : h - 1 - row;
-            int min_3_i = i < 3 ? i : 3;
-            int min_3_h = hh < 3 ? hh : 3;
-            int max_0_3_i = (3 - i) > 0 ? (3 - i) : 0;
-            int diff = min_3_h - max_0_3_i;
-            int max_neg1_diff = diff > -1 ? diff : -1;
-            int min_i_h = i < hh ? i : hh;
-            int min_3_min_i_h = min_i_h < 3 ? min_i_h : 3;
-            int val = 4 + min_3_i + max_neg1_diff + min_3_min_i_h + min_3_h;
-            TROMP_WEIGHTS[col * (h + 1) + row] = val;
-            history[col * (h + 1) + row] = val;
-        }
-      }
   }
 
   template <bool HasBook, int W_CONST = WIDTH, int H_CONST = HEIGHT>
-  int negamax(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr);
+  int negamax(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr, int score_jitter = 0);
 
  public:
 
@@ -153,21 +131,19 @@ class SolverImpl : public Solver<WIDTH, HEIGHT, ALIGN, WRAP> {
 
  private:
   template <bool HasBook>
-  ::GameSolver::Connect4::SolverResult solve_single(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr, int threads = 1);
+  ::GameSolver::Connect4::SolverResult solve_single(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr, int threads = 1, int score_jitter = 0);
 
   template <bool HasBook>
-  int dispatch_solve_weak(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int min, int max, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history);
+  int dispatch_solve_weak(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int min, int max, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history, int score_jitter = 0);
 
-  // Two-ply variant of dispatch_solve_weak_parallel: tasks are GRANDCHILDREN,
-  // not children, giving ~width^2 work units instead of ~width. Because the
-  // window is null at every level, grandchildren are searched with the exact
-  // same (alpha, beta) as the parent, and the probe is a pure max-min:
-  // parent value = max over children of min over that child's grandchildren.
-  // A grandchild failing low kills its group (that child can no longer prove
-  // fail-high); a group whose grandchildren all fail high proves the parent
-  // fails high with value min(grandchild values).
+  // Multithreaded null-window probe: all `threads` workers race the SAME
+  // (alpha, beta) probe over the shared transposition table, each with a
+  // distinct per-ply move-ordering jitter schedule (worker 0 runs unjittered,
+  // so the worst case is the single-threaded search). First finisher wins and
+  // aborts the rest. See solve_single() for why this per-probe scope is what
+  // makes shared-TT racing effective.
   template <bool HasBook>
-  int dispatch_solve_weak_parallel2(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, int threads, std::atomic<bool>* abort_flag);
+  int raced_probe(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, int threads, std::atomic<bool>* abort_flag, int32_t* thread_history, int solo_jitter = 0);
 
  public:
 
@@ -178,9 +154,6 @@ class SolverImpl : public Solver<WIDTH, HEIGHT, ALIGN, WRAP> {
   void reset() override {
     nodeCount = 0;
     transTable->reset();
-    for (size_t i = 0; i < history.size(); i++) {
-      history[i] = TROMP_WEIGHTS[i];
-    }
   }
 
   void loadBook(const OpeningBookBase<WIDTH, HEIGHT>* b) override {

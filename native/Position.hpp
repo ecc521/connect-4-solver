@@ -19,6 +19,13 @@
 #ifndef POSITION_HPP
 #define POSITION_HPP
 
+// EXPERIMENTAL, off by default: fold dead-stone detection into the hash key
+// (see findDeadStones()/deadStonesInDirection() below). Not validated for
+// production use yet -- see tools/benchmarks/deadstone_validate.cpp.
+#ifndef EXPERIMENTAL_DEAD_STONE_HASH
+#define EXPERIMENTAL_DEAD_STONE_HASH 0
+#endif
+
 #include <string>
 #include <iostream>
 #include <cstdint>
@@ -259,7 +266,11 @@ class GenericPosition {
   }
 
   position_t key() const {
+#if EXPERIMENTAL_DEAD_STONE_HASH
+    return (current_position | findDeadStones()) + mask;
+#else
     return current_position + mask;
+#endif
   }
 
   template <int W_CONST, int H_CONST>
@@ -788,6 +799,81 @@ private:
           return -1;
         }
         return 0;
+    }
+  }
+
+  // --- Dead-stone detection (EXPERIMENTAL, gated by EXPERIMENTAL_DEAD_STONE_HASH) ---
+  // Ported from c4 (ChristopheSteininger/c4)'s Position::find_dead_stones: a stone
+  // is "dead" if it can be proven to never participate in any future 4-in-a-row,
+  // in ALL FOUR directions. Dead stones can be assigned to either color in the
+  // hash key without changing the position's game value, which lets otherwise-
+  // distinct positions (differing only in dead-stone ownership) share one TT
+  // entry. See tools/benchmarks/deadstone_validate.cpp for the correctness check
+  // (c4's own are_dead_stones_valid invariant) this was validated against before
+  // being wired in here — 0 invalid masks across 6260 real 7x6 positions.
+  // Geometric per-direction masks are position-independent: bake them at
+  // compile time (c4 does the same via constexpr; recomputing them per call
+  // was ~1/3 of the per-direction cost of the original port).
+  template <int shift, int W_CONST, int H_CONST>
+  static constexpr position_t deadBorderMask() {
+    position_t valid = PositionConstants<W_CONST, H_CONST>::board_mask();
+    position_t stones_right_of_border = (valid << shift) & valid;
+    position_t stones_left_of_border = (valid >> shift) & valid;
+    return ~(stones_right_of_border & stones_left_of_border);
+  }
+
+  template <int shift, int W_CONST, int H_CONST>
+  static constexpr position_t deadTooShortMask() {
+    position_t valid = PositionConstants<W_CONST, H_CONST>::board_mask();
+    position_t pairs_v = (valid >> shift) & valid;
+    position_t triples_v = (pairs_v >> shift) & valid;
+    position_t quads_v = (triples_v >> shift) & valid;
+    position_t quads_shifted = quads_v | (quads_v << shift);
+    position_t possible_wins = quads_shifted | (quads_shifted << (2 * shift));
+    return valid & ~possible_wins;
+  }
+
+  template <int shift, int W_CONST, int H_CONST>
+  position_t deadStonesInDirection(position_t b0, position_t b1, position_t valid) const {
+    constexpr position_t border = deadBorderMask<shift, W_CONST, H_CONST>();
+    constexpr position_t too_short = deadTooShortMask<shift, W_CONST, H_CONST>();
+    position_t played = b0 | b1;
+    position_t empty = valid & ~played;
+    position_t uncovered = ((empty >> shift) & played) | ((empty << shift) & played);
+    position_t covered_by_1 = ((uncovered >> shift) & played) | ((uncovered << shift) & played);
+    position_t pairs = ((b0 >> shift) & b0) | ((b1 >> shift) & b1);
+    position_t covered_by_pair = ((covered_by_1 >> shift) & (pairs >> shift))
+                                | ((covered_by_1 << shift) & (pairs << (2 * shift)));
+    position_t covered_stones = played & ~uncovered & ~covered_by_1 & ~covered_by_pair;
+    position_t between = ((b0 >> shift) & (b1 << shift)) | ((b1 >> shift) & (b0 << shift));
+    position_t pinned = border & played & ((between >> (2 * shift)) | (between << (2 * shift)));
+    return covered_stones | pinned | too_short;
+  }
+
+  template <int W_CONST, int H_CONST>
+  position_t findDeadStonesImpl() const {
+    position_t b0 = current_position;
+    position_t b1 = current_position ^ mask;
+    position_t valid = PositionConstants<W_CONST, H_CONST>::board_mask();
+    position_t vertical = deadStonesInDirection<1, W_CONST, H_CONST>(b0, b1, valid);
+    if (!vertical) return 0;
+    position_t horizontal = deadStonesInDirection<H_CONST + 1, W_CONST, H_CONST>(b0, b1, valid);
+    if (!horizontal) return 0;
+    position_t pos_diag = deadStonesInDirection<H_CONST + 2, W_CONST, H_CONST>(b0, b1, valid);
+    if (!pos_diag) return 0;
+    position_t neg_diag = deadStonesInDirection<H_CONST, W_CONST, H_CONST>(b0, b1, valid);
+    return vertical & horizontal & pos_diag & neg_diag;
+  }
+
+  position_t findDeadStones() const {
+    if constexpr (WRAP || ALIGN != 4) return 0;
+    if constexpr (W != -1) {
+      return findDeadStonesImpl<W, H>();
+    } else {
+      if (width() == 7 && height() == 6) return findDeadStonesImpl<7, 6>();
+      if (width() == 8 && height() == 6) return findDeadStonesImpl<8, 6>();
+      if (width() == 8 && height() == 8) return findDeadStonesImpl<8, 8>();
+      return 0; // dynamic sizes outside the specialized set: not wired up yet
     }
   }
 

@@ -26,7 +26,7 @@ describe("Polymorphic Dense Book Packing", () => {
     const positions = [
       "1 1",
       "12 -1",
-      "123 2",
+      "123 1",
       "1234 -2",
       "12345 3",
       "123456 -3",
@@ -141,14 +141,17 @@ describe("Polymorphic Dense Book Packing", () => {
     const book = new OpeningBook(solver.width, solver.height);
     await book.load(bookData);
 
-    // Evaluate a depth 2 position (12). The mock book has it scored as -1.
-    // We use `solve` so it hits the book at the root instantly.
+    // Evaluate a depth 2 position (12). The mock book has it scored as -1
+    // (intentionally not the true game value, to prove the score came from
+    // the book rather than a real search). "123" is scored 1 so it satisfies
+    // -childScore == score for "12" — this lets solve_single's book-only
+    // move lookup (Solver.cpp PHASE 1) resolve the best move instantly,
+    // instead of falling back to a real verification search per child.
     const result = await solver.solve("12", { book });
     expect(result.evaluation?.score).toBe(-1);
 
-    // Evaluate a depth 2 position (11) not in the book
-    // Wait, 11 is not in the book. If we solve it, the exact solver will search it fully!
-    // Let's test a position that IS in the book, like "1" (score 1)
+    // "1"'s only book child is "12" (-1), which already satisfies
+    // -childScore == score, so this also resolves via PHASE 1.
     const result2 = await solver.solve("1", { book });
     expect(result2.evaluation?.score).toBe(1);
 
