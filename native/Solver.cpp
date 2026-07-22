@@ -592,12 +592,19 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::raced_probe(const GenericP
     for (int i = 1; i < threads; i++) {
       const int jitter = jitterScheduleForWorker(i);
       pool->enqueue([&, jitter, jitter_step]() {
+        // Racer, not the driver -- this pool thread may have run a driver
+        // task last time and still be at raised priority from that.
+        lowerCurrentThreadPriority(10);
         solverTlNodeCount = 0;
         solverTlJitterStep = jitter_step;
         int r = dispatch_solve_weak<HasBook>(P, alpha, beta, book, book_depth, &done, nullptr, jitter);
         nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
         solverTlNodeCount = 0;
         try_publish(r);
+        // Restore this thread's own original priority before it goes back
+        // to the pool queue -- otherwise a thread that only ever draws
+        // racer tasks would stay niced down forever.
+        raiseCurrentThreadPriority();
         if (remaining.fetch_sub(1) == 1) prom.set_value();
       });
     }
@@ -1007,6 +1014,8 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::analyze(const
     std::atomic<int> helper_seq{0};
 
     auto driver = [&](int col) {
+      // Same priority as the top-level unjittered search. No priority call
+      // needed here -- see the racer closure's comment in raced_probe.
       solverTlNodeCount = 0;
       ::GameSolver::Connect4::SolverResult result;
       if (active_book) result = solve_single<true>(col_positions[col], weak, active_book, active_book->getDepth(), nullptr, nullptr, 1, 0, &slots[col]);
@@ -1019,6 +1028,9 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::analyze(const
 
     auto helper = [&](int prefer_idx) {
       if (disable_helpers) return;
+      // Jittered racer for whichever column it joins -- may need lowering
+      // if this pool thread previously ran a driver task.
+      lowerCurrentThreadPriority(10);
       int idx = prefer_idx;
       while (!shouldAbort()) {
         int found_col = -1;
@@ -1079,6 +1091,10 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::analyze(const
         slot.external_active.fetch_sub(1, std::memory_order_release);
         idx = -1;  // after the first join, just float to whatever's live
       }
+      // Restore this thread's own original priority before it goes back to
+      // the pool queue -- see the matching comment in raced_probe's racer
+      // closure.
+      raiseCurrentThreadPriority();
     };
 
     const int extra = threads - num_active;
