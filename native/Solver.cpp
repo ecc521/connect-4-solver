@@ -38,6 +38,7 @@
 #include <thread>
 #include <algorithm>
 #include <future>
+#include <utility>
 #include <new>
 
 using namespace GameSolver::Connect4;
@@ -536,10 +537,10 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::dispatch_solve_weak(const 
  */
 template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
 template <bool HasBook>
-int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::raced_probe(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, int threads, std::atomic<bool>* abort_flag, int32_t* thread_history, int solo_jitter) {
+int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::raced_probe(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, int threads, std::atomic<bool>* abort_flag, int32_t* thread_history, int solo_jitter, ColumnProbeSlot* my_slot) {
   assert(alpha < beta);
   assert(threads >= 1);
-  if (threads <= 1) {
+  if (threads <= 1 && !my_slot) {
     return dispatch_solve_weak<HasBook>(P, alpha, beta, book, book_depth, abort_flag, thread_history, solo_jitter);
   }
 
@@ -547,35 +548,59 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::raced_probe(const GenericP
   const uint64_t log_nodes0 = probe_log ? getNodeCount() + solverTlNodeCount : 0;
   const auto log_t0 = std::chrono::steady_clock::now();
 
-  pool->ensureCapacity(threads - 1);
+  const bool has_internal_racers = threads > 1;
+  if (has_internal_racers) pool->ensureCapacity(threads - 1);
 
   std::atomic<bool> done{false};
   std::atomic<int> result_val{0};
-  std::atomic<int> remaining{threads - 1};
+  std::atomic<int> remaining{has_internal_racers ? threads - 1 : 0};
   std::promise<void> prom;
   auto fut = prom.get_future();
+  if (!has_internal_racers) prom.set_value();  // nothing internal to wait for
 
   // A worker may claim the result only if it never observed an abort: `done`
   // is monotonic, so done==false after its search completed means the search
   // ran to completion. stopSearch/timeout aborts are checked by the caller.
+  // (analyze()'s external joiners inline this same two-line check themselves,
+  // since they run outside this call's scope -- see analyze()'s helper loop.)
   auto try_publish = [&](int r) {
     if (!this->shouldAbort(&done) && !done.exchange(true, std::memory_order_acq_rel)) {
       result_val.store(r, std::memory_order_relaxed);
     }
   };
 
+  // Publish this probe's live window so a thread freed up from another,
+  // already-finished column can join it as an extra racer. Must happen
+  // before any racer (internal or external) can observe `done`/`result_val`,
+  // and must be undone (drained) only after every internal racer AND this
+  // thread's own dispatch_solve_weak call below have both finished --
+  // external joiners are drained separately, right before returning.
+  if (my_slot) {
+    my_slot->alpha = alpha;
+    my_slot->beta = beta;
+    my_slot->book = book;
+    my_slot->book_depth = book_depth;
+    my_slot->P = &P;
+    my_slot->done = &done;
+    my_slot->result_val = &result_val;
+    my_slot->generation.fetch_add(1, std::memory_order_release);
+    my_slot->live.store(true, std::memory_order_release);
+  }
+
   const int jitter_step = 1000000;
-  for (int i = 1; i < threads; i++) {
-    const int jitter = jitterScheduleForWorker(i);
-    pool->enqueue([&, jitter, jitter_step]() {
-      solverTlNodeCount = 0;
-      solverTlJitterStep = jitter_step;
-      int r = dispatch_solve_weak<HasBook>(P, alpha, beta, book, book_depth, &done, nullptr, jitter);
-      nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
-      solverTlNodeCount = 0;
-      try_publish(r);
-      if (remaining.fetch_sub(1) == 1) prom.set_value();
-    });
+  if (has_internal_racers) {
+    for (int i = 1; i < threads; i++) {
+      const int jitter = jitterScheduleForWorker(i);
+      pool->enqueue([&, jitter, jitter_step]() {
+        solverTlNodeCount = 0;
+        solverTlJitterStep = jitter_step;
+        int r = dispatch_solve_weak<HasBook>(P, alpha, beta, book, book_depth, &done, nullptr, jitter);
+        nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+        solverTlNodeCount = 0;
+        try_publish(r);
+        if (remaining.fetch_sub(1) == 1) prom.set_value();
+      });
+    }
   }
 
   {
@@ -588,6 +613,16 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::raced_probe(const GenericP
   while (fut.wait_for(std::chrono::microseconds(200)) != std::future_status::ready) {
     if (this->shouldAbort(abort_flag)) {
       done.store(true, std::memory_order_release);
+    }
+  }
+
+  if (my_slot) {
+    // No new external joiner can start after this (they re-check `live`
+    // immediately after registering); drain any that got in before the flip
+    // so none is left holding a pointer into this frame once it returns.
+    my_slot->live.store(false, std::memory_order_release);
+    while (my_slot->external_active.load(std::memory_order_acquire) != 0) {
+      std::this_thread::yield();
     }
   }
 
@@ -604,7 +639,7 @@ int SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::raced_probe(const GenericP
 
 template <int WIDTH, int HEIGHT, int ALIGN, bool WRAP, typename SlotType>
 template <bool HasBook>
-::GameSolver::Connect4::SolverResult SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::solve_single(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history, int threads, int score_jitter) {
+::GameSolver::Connect4::SolverResult SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::solve_single(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history, int threads, int score_jitter, ColumnProbeSlot* my_slot) {
   if(P.canWinNext()) {
     int score = ((P.width() * P.height()) + 1 - P.nbMoves()) / 2;
     for (int i = 0; i < P.width(); i++) {
@@ -619,9 +654,11 @@ template <bool HasBook>
 
   // Every probe below is a fixed null window (hi == lo + 1). When threads > 1,
   // the probe is raced by jittered workers over the shared TT (see
-  // raced_probe); threads == 1 keeps the exact single-threaded behavior.
+  // raced_probe); threads == 1 keeps the exact single-threaded behavior
+  // unless my_slot is set (analyze()'s root-split), in which case it still
+  // publishes the window for other columns' freed-up threads to join.
   auto probe = [&](int lo, int hi) {
-    return raced_probe<HasBook>(P, lo, hi, book, book_depth, threads, abort_flag, thread_history, score_jitter);
+    return raced_probe<HasBook>(P, lo, hi, book, book_depth, threads, abort_flag, thread_history, score_jitter, my_slot);
   };
 
   if constexpr (HasBook) {
@@ -749,7 +786,7 @@ find_move:
               // `== -score` test is fail-soft-safe: any child satisfies
               // child >= -score, so a fail-low upper bound is forced to
               // exactly -score, and a fail-high return is >= -score + 1.
-              int vr = raced_probe<HasBook>(P2, -score, -score + 1, book, book_depth, threads, abort_flag, thread_history, score_jitter);
+              int vr = raced_probe<HasBook>(P2, -score, -score + 1, book, book_depth, threads, abort_flag, thread_history, score_jitter, my_slot);
               if (vr == -score) {
                   bestMove = col;
                   break;
@@ -857,24 +894,34 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::analyze(const
   const bool analyze_symmetric = P.mirror_key(P.key()) == P.key();
   const OpeningBookBase<WIDTH, HEIGHT>* active_book = book ? book : this->book;
 
-  // Strategy (measured on M5 Max, 7x6/7x7 corpora):
-  //  - threads <= width: root-split — each worker takes whole columns
-  //    (serial solves in parallel, zero racing duplication), idle workers
-  //    then join stragglers as jittered whole-solve racers. Clearly faster
-  //    when columns outnumber threads (-16..-23% vs sequential at 4T).
-  //  - threads > width: solve columns sequentially, each as a full
-  //    `threads`-wide raced solve — per-probe racing beats a long
-  //    whole-solve straggler tail once workers outnumber columns.
-  const bool use_root_split = threads > 1 && threads <= P.width();
-  if (use_root_split) {
+  // Strategy: every active column gets exactly one dedicated "driver"
+  // thread (solve_single at threads=1) -- zero-duplication, embarrassingly
+  // parallel across columns, the original root-split's whole advantage.
+  // Any threads left over (threads > active columns) become floating
+  // helpers with no column of their own: each one repeatedly scans for
+  // whichever column is CURRENTLY mid null-window-probe (raced_probe
+  // publishes that into a ColumnProbeSlot -- see Solver.hpp) and joins it
+  // as a genuine extra racer, sharing that probe's real done/result_val
+  // (winner-take-all, unlike the old discard-only stragglers), then
+  // re-scans once it resolves. A helper whose column finished simply finds
+  // a new live column next scan -- rebalancing falls out of the same
+  // mechanism as the initial assignment, no separate step needed. This
+  // degenerates cleanly at both ends: threads <= active columns collapses
+  // to a plain one-thread-per-column queue (no racing, no duplication,
+  // same as the original root-split); only one active column means every
+  // extra thread piles onto it (same as the original sequential-raced
+  // path). Helpers' initial column preference is ranked by Position.hpp's
+  // moveScore() threat-count heuristic (the same signal negamax's own move
+  // ordering uses) so the busiest-looking columns get first claim on the
+  // extra capacity -- an approximation, not a real difficulty measurement,
+  // but reuses a trusted signal instead of inventing a new one.
   const int w_cols = P.width();
   auto col_done = std::make_unique<std::atomic<bool>[]>(w_cols);
-  auto col_abort = std::make_unique<std::atomic<bool>[]>(w_cols);
   std::vector<GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>> col_positions(w_cols, GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>(P.width(), P.height()));
-  std::vector<bool> col_valid(w_cols, false);
+  auto slots = std::make_unique<ColumnProbeSlot[]>(w_cols);
 
+  std::vector<int> active_cols;
   for (int c = 0; c < w_cols; c++) {
-    col_abort[c].store(false, std::memory_order_relaxed);
     col_done[c].store(true, std::memory_order_relaxed);
     if (!P.canPlay(c)) continue;
     if (P.isWinningMove(c)) {
@@ -885,48 +932,59 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::analyze(const
     GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
     P2.playCol(c);
     col_positions[c] = P2;
-    col_valid[c] = true;
     col_done[c].store(false, std::memory_order_relaxed);
+    active_cols.push_back(c);
   }
 
-  std::atomic<int> next_col{0};
-  std::atomic<int> helper_seq{0};
-  auto worker = [&]() {
-    // Phase 1: grab whole columns.
-    while (true) {
-      int i = next_col.fetch_add(1);
-      if (i >= w_cols) break;
-      int col = this->COLUMN_ORDER[i];
-      if (!col_valid[col]) continue;
+  const int num_active = (int)active_cols.size();
+
+  if (num_active > 0) {
+    typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t possible = P.possibleNonLosingMoves();
+    std::vector<std::pair<int, int>> ranked;  // (score, col)
+    ranked.reserve(num_active);
+    for (int c : active_cols) {
+      auto move = possible & static_cast<typename GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>::position_t>(P.column_mask(c));
+      ranked.push_back({move ? P.moveScore(move) : 0, c});
+    }
+    std::stable_sort(ranked.begin(), ranked.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+    active_cols.clear();
+    for (auto &pr : ranked) active_cols.push_back(pr.second);
+  }
+
+  if (threads <= 1 || num_active == 0) {
+    for (int col : active_cols) {
       solverTlNodeCount = 0;
       ::GameSolver::Connect4::SolverResult result;
-      if (active_book) result = solve_single<true>(col_positions[col], weak, active_book, active_book->getDepth(), &col_abort[col]);
-      else result = solve_single<false>(col_positions[col], weak, nullptr, 0, &col_abort[col]);
+      if (active_book) result = solve_single<true>(col_positions[col], weak, active_book, active_book->getDepth(), nullptr);
+      else result = solve_single<false>(col_positions[col], weak, nullptr, 0, nullptr);
       nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
       solverTlNodeCount = 0;
-      if (!result.aborted) scores[col] = -result.score;
-      col_done[col].store(true, std::memory_order_release);
-      col_abort[col].store(true, std::memory_order_release);
+      if (shouldAbort()) break;  // aborted mid-column: keep -1000, stop
+      scores[col] = -result.score;
     }
-    // Phase 2: jittered whole-solve racing on stragglers.
-    while (!shouldAbort()) {
-      int straggler = -1;
-      for (int c = 0; c < w_cols; c++) {
-        if (col_valid[c] && !col_done[c].load(std::memory_order_acquire)) { straggler = c; break; }
+  } else if (threads <= num_active) {
+    // Not enough threads to give every column its own AND still have spare
+    // capacity: plain shared-queue, one column at a time per thread.
+    std::atomic<int> next_idx{0};
+    auto worker = [&]() {
+      // No jitter differentiation in this branch -- every thread here is a
+      // driver. No priority call needed: racer/helper tasks restore their
+      // own priority on exit, so any pool thread reaching here is already
+      // at its own baseline.
+      while (true) {
+        int i = next_idx.fetch_add(1);
+        if (i >= num_active) break;
+        int col = active_cols[i];
+        solverTlNodeCount = 0;
+        ::GameSolver::Connect4::SolverResult result;
+        if (active_book) result = solve_single<true>(col_positions[col], weak, active_book, active_book->getDepth(), nullptr);
+        else result = solve_single<false>(col_positions[col], weak, nullptr, 0, nullptr);
+        nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+        solverTlNodeCount = 0;
+        if (!result.aborted) scores[col] = -result.score;
+        col_done[col].store(true, std::memory_order_release);
       }
-      if (straggler < 0) break;
-      const int jitter = jitterScheduleForWorker(1 + (helper_seq.fetch_add(1) % 11));
-      solverTlNodeCount = 0;
-      if (active_book) solve_single<true>(col_positions[straggler], weak, active_book, active_book->getDepth(), &col_abort[straggler], nullptr, 1, jitter);
-      else solve_single<false>(col_positions[straggler], weak, nullptr, 0, &col_abort[straggler], nullptr, 1, jitter);
-      nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
-      solverTlNodeCount = 0;
-    }
-  };
-
-  if (threads <= 1) {
-    worker();
-  } else {
+    };
     pool->ensureCapacity(threads - 1);
     std::atomic<int> remaining(threads - 1);
     std::promise<void> prom;
@@ -939,33 +997,111 @@ std::vector<int> SolverImpl<WIDTH, HEIGHT, ALIGN, WRAP, SlotType>::analyze(const
     }
     worker();
     fut.wait();
-  }
   } else {
-  // Columns are solved one at a time, center-first; each column solve fans
-  // out internally across `threads` raced workers (see raced_probe), so
-  // analyze() scales exactly like solve() — no idle straggler tail, and
-  // sibling columns reuse each other's transposition-table work.
-  for (int i = 0; i < P.width(); i++) {
-    int col = this->COLUMN_ORDER[i];
-    if (!P.canPlay(col)) continue;
-    if (P.isWinningMove(col)) {
-      scores[col] = ((P.width() * P.height()) + 1 - P.nbMoves()) / 2;
-      continue;
-    }
-    if (analyze_symmetric && col > P.width() - 1 - col) continue;  // copied from mirror below
-    if (shouldAbort()) break;
+    // Every column gets a dedicated driver; the rest float as helpers.
+    // ANALYZE_DISABLE_HELPERS (debug/benchmark only): still spawns the
+    // driver-per-column grouping, but "extra" threads immediately return
+    // instead of joining a live probe -- isolates grouping's contribution
+    // from piling-on's, for A/B measurement. Off by default.
+    static const bool disable_helpers = std::getenv("ANALYZE_DISABLE_HELPERS") != nullptr;
+    std::atomic<int> helper_seq{0};
 
-    GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> P2(P);
-    P2.playCol(col);
-    solverTlNodeCount = 0;
-    ::GameSolver::Connect4::SolverResult result;
-    if (active_book) result = solve_single<true>(P2, weak, active_book, active_book->getDepth(), nullptr, nullptr, threads);
-    else result = solve_single<false>(P2, weak, nullptr, 0, nullptr, nullptr, threads);
-    nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
-    solverTlNodeCount = 0;
-    if (shouldAbort()) break;  // aborted mid-column: keep -1000, stop
-    scores[col] = -result.score;
-  }
+    auto driver = [&](int col) {
+      solverTlNodeCount = 0;
+      ::GameSolver::Connect4::SolverResult result;
+      if (active_book) result = solve_single<true>(col_positions[col], weak, active_book, active_book->getDepth(), nullptr, nullptr, 1, 0, &slots[col]);
+      else result = solve_single<false>(col_positions[col], weak, nullptr, 0, nullptr, nullptr, 1, 0, &slots[col]);
+      nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+      solverTlNodeCount = 0;
+      if (!result.aborted) scores[col] = -result.score;
+      col_done[col].store(true, std::memory_order_release);
+    };
+
+    auto helper = [&](int prefer_idx) {
+      if (disable_helpers) return;
+      int idx = prefer_idx;
+      while (!shouldAbort()) {
+        int found_col = -1;
+        if (idx >= 0 && idx < num_active) {
+          int c = active_cols[idx];
+          if (!col_done[c].load(std::memory_order_acquire) && slots[c].live.load(std::memory_order_acquire)) found_col = c;
+        }
+        if (found_col < 0) {
+          for (int c : active_cols) {
+            if (!col_done[c].load(std::memory_order_acquire) && slots[c].live.load(std::memory_order_acquire)) { found_col = c; break; }
+          }
+        }
+        if (found_col < 0) {
+          bool any_pending = false;
+          for (int c : active_cols) {
+            if (!col_done[c].load(std::memory_order_acquire)) { any_pending = true; break; }
+          }
+          if (!any_pending) break;
+          std::this_thread::yield();
+          idx = -1;
+          continue;
+        }
+
+        ColumnProbeSlot &slot = slots[found_col];
+        slot.external_active.fetch_add(1, std::memory_order_acquire);
+        if (!slot.live.load(std::memory_order_acquire)) {
+          slot.external_active.fetch_sub(1, std::memory_order_release);
+          idx = -1;
+          continue;
+        }
+
+        // Snapshot the published window: safe to read without further
+        // synchronization -- the owning raced_probe call cannot touch these
+        // fields again until external_active drains back to 0, which can't
+        // happen until this helper decrements it below.
+        const int local_alpha = slot.alpha, local_beta = slot.beta;
+        const OpeningBookBase<WIDTH, HEIGHT> *local_book = slot.book;
+        const int local_book_depth = slot.book_depth;
+        const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> *local_P = slot.P;
+        std::atomic<bool> *local_done = slot.done;
+        std::atomic<int> *local_result = slot.result_val;
+
+        const int jitter = jitterScheduleForWorker(1 + (helper_seq.fetch_add(1) % 11));
+        solverTlNodeCount = 0;
+        solverTlJitterStep = 1000000;
+        int r = local_book
+            ? dispatch_solve_weak<true>(*local_P, local_alpha, local_beta, local_book, local_book_depth, local_done, nullptr, jitter)
+            : dispatch_solve_weak<false>(*local_P, local_alpha, local_beta, nullptr, 0, local_done, nullptr, jitter);
+        nodeCount.fetch_add(solverTlNodeCount, std::memory_order_relaxed);
+        solverTlNodeCount = 0;
+
+        // Same winner-take-all publish raced_probe's try_publish does,
+        // inlined here since this call happens outside that function's scope.
+        if (!this->shouldAbort(local_done) && !local_done->exchange(true, std::memory_order_acq_rel)) {
+          local_result->store(r, std::memory_order_relaxed);
+        }
+
+        slot.external_active.fetch_sub(1, std::memory_order_release);
+        idx = -1;  // after the first join, just float to whatever's live
+      }
+    };
+
+    const int extra = threads - num_active;
+    struct Role { bool is_driver; int val; };  // val = column if driver, preferred rank-index if helper
+    std::vector<Role> roles;
+    roles.reserve(threads);
+    for (int col : active_cols) roles.push_back({true, col});
+    for (int h = 0; h < extra; h++) roles.push_back({false, h % num_active});
+
+    pool->ensureCapacity(threads - 1);
+    std::atomic<int> remaining(threads - 1);
+    std::promise<void> prom;
+    auto fut = prom.get_future();
+    for (int i = 0; i + 1 < (int)roles.size(); i++) {
+      const Role role = roles[i];
+      pool->enqueue([&, role]() {
+        if (role.is_driver) driver(role.val); else helper(role.val);
+        if (remaining.fetch_sub(1) == 1) prom.set_value();
+      });
+    }
+    const Role last = roles.back();
+    if (last.is_driver) driver(last.val); else helper(last.val);
+    fut.wait();
   }
 
   if (analyze_symmetric) {

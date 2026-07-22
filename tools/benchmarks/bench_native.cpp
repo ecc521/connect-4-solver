@@ -164,62 +164,124 @@ char encode_col(int col) {
 }
 
 // --- Corpus generation: random legal positions, duration-filtered ----------
-// Generates positions at a random ply within [min_ply, max_ply], solves each
-// fresh (single-threaded, real TT size — no shrinking, no pre-warming) and
-// keeps ones whose solve time lands in [dur_min_ms, dur_max_ms]. Also applies
-// the noise check above (single-threaded, so expected_cpu == wall_ms) so a
-// corpus position's "duration" isn't an artifact of the box being busy during
-// generation. Output uses the same "pos score" format as test-data/, so it
-// loads directly via load_positions() and works with the existing
+// Generates positions at an adaptively-chosen ply, solves each fresh
+// (single-threaded, real TT size — no shrinking, no pre-warming) and keeps
+// ones whose solve time lands in [dur_min_ms, dur_max_ms]. Also applies the
+// noise check above (single-threaded, so expected_cpu == wall_ms) so a
+// corpus position's "duration" isn't an artifact of the box being busy
+// during generation. Output uses the same "pos score" format as test-data/,
+// so it loads directly via load_positions() and works with the existing
 // independent-parallelism benchmarks (Control B) unmodified.
+//
+// min_ply/max_ply only seed the initial ply guess now, they aren't a hard
+// sampling range: solve duration vs. ply isn't a fixed relationship per
+// board (durations can swing by orders of magnitude a couple of plies
+// apart), so blindly resampling ply from a static range can have a near-zero
+// accept rate on some boards. Instead every miss nudges a running ply
+// estimate toward the target band (more plies played -> fewer empty cells
+// -> generally faster solves, so "too slow" means "increase ply" and vice
+// versa), with a log-scaled step so a wildly-off guess corrects in one jump
+// instead of creeping ply-by-ply.
+//
+// Parallelism here is ACROSS candidate positions (gen_threads independent
+// single-threaded pipelines, each with its own solver+cache), not within a
+// single solve: every candidate's accept/reject decision still has to be
+// measured single-threaded, because the whole point of the duration filter
+// is to select positions of a known SINGLE-THREADED difficulty for the
+// diag-solve/diag-analyze thread-scaling benchmarks that consume this
+// corpus. Solving candidates with real internal multithreading instead
+// would filter on N-thread duration, which silently biases the corpus
+// toward whatever happens to parallelize well/poorly at that N — exactly
+// the effect those benchmarks are trying to measure, so it can't also be
+// baked into corpus selection. Running many independent candidates at once
+// gets the same "use all cores, finish fast" result without that confound.
 template <int W, int H>
 void run_gen_corpus(int min_ply, int max_ply, int count, double dur_min_ms, double dur_max_ms,
-                     const std::string &out_path, int max_attempts, unsigned int seed) {
+                     const std::string &out_path, int max_attempts, unsigned int seed,
+                     int gen_threads = 0) {
+  if (gen_threads <= 0) gen_threads = (int)std::max(1u, std::thread::hardware_concurrency());
   size_t mem_size = get_cache_size();
-  std::mt19937 rng(seed);
   double gen_timeout_ms = dur_max_ms * 2.0;
 
   std::vector<std::pair<std::string, int>> accepted;
-  int attempts = 0, noise_discards = 0;
+  std::mutex accepted_mutex;
+  std::atomic<int> attempts{0};
+  int noise_discards = 0;
+  std::mutex noise_mutex;
 
-  while ((int)accepted.size() < count && attempts < max_attempts) {
-    attempts++;
-    int target_ply = min_ply + (max_ply > min_ply ? (int)(rng() % (unsigned)(max_ply - min_ply + 1)) : 0);
+  std::mutex ply_mutex;
+  double ply_estimate = min_ply + (max_ply - min_ply) / 2.0;
+  const double dur_target_mid = std::sqrt(dur_min_ms * dur_max_ms);
+  const int ply_floor = 1, ply_ceil = W * H - 2;
 
-    GenericPosition<W, H> p;
-    std::string seq;
-    bool ok = true;
-    for (int m = 0; m < target_ply; m++) {
-      std::vector<int> legal;
-      for (int c = 0; c < W; c++) {
-        if (p.canPlay(c) && !p.isWinningMove(c)) legal.push_back(c);
-      }
-      if (legal.empty()) { ok = false; break; }
-      int col = legal[rng() % legal.size()];
-      p.playCol(col);
-      seq += encode_col(col);
-    }
-    if (!ok || (int)seq.size() != target_ply) continue;
-
+  auto worker = [&](int tid) {
+    std::mt19937 rng(seed + (unsigned int)tid * 104729u);
     auto cache = Solver<W, H>::createCache(mem_size);
     auto solver = Solver<W, H>::createWithCache(cache.get());
-    ::GameSolver::Connect4::SolverResult res;
-    double wall_ms = run_clean_trial(1, [&]() { cache->reset(); }, [&]() {
-      res = solver->solve(p, false, 1, nullptr, gen_timeout_ms);
-    }, 3, 0.10);
 
-    if (wall_ms < 0) { noise_discards++; continue; }
-    if (wall_ms >= dur_min_ms && wall_ms <= dur_max_ms) {
-      accepted.push_back({seq, res.score});
-      std::cerr << "[corpus] accepted ply=" << target_ply << " dur=" << (int)wall_ms
-                << "ms (" << accepted.size() << "/" << count << ")\n";
+    while (true) {
+      {
+        std::lock_guard<std::mutex> lk(accepted_mutex);
+        if ((int)accepted.size() >= count) return;
+      }
+      if (attempts.fetch_add(1) >= max_attempts) return;
+
+      double local_ply_estimate;
+      { std::lock_guard<std::mutex> lk(ply_mutex); local_ply_estimate = ply_estimate; }
+      int target_ply = std::clamp((int)std::lround(local_ply_estimate), ply_floor, ply_ceil);
+
+      GenericPosition<W, H> p;
+      std::string seq;
+      bool ok = true;
+      for (int m = 0; m < target_ply; m++) {
+        std::vector<int> legal;
+        for (int c = 0; c < W; c++) {
+          if (p.canPlay(c) && !p.isWinningMove(c)) legal.push_back(c);
+        }
+        if (legal.empty()) { ok = false; break; }
+        int col = legal[rng() % legal.size()];
+        p.playCol(col);
+        seq += encode_col(col);
+      }
+      if (!ok || (int)seq.size() != target_ply) continue;
+
+      ::GameSolver::Connect4::SolverResult res;
+      double wall_ms = run_clean_trial(1, [&]() { cache->reset(); }, [&]() {
+        res = solver->solve(p, false, 1, nullptr, gen_timeout_ms);
+      }, 3, 0.10);
+
+      if (wall_ms < 0) {
+        std::lock_guard<std::mutex> lk(noise_mutex);
+        noise_discards++;
+        continue;
+      }
+
+      if (wall_ms >= dur_min_ms && wall_ms <= dur_max_ms) {
+        std::lock_guard<std::mutex> lk(accepted_mutex);
+        if ((int)accepted.size() < count) {
+          accepted.push_back({seq, res.score});
+          std::cerr << "[corpus] accepted ply=" << target_ply << " dur=" << (int)wall_ms
+                    << "ms (" << accepted.size() << "/" << count << ")\n";
+        }
+      } else {
+        double log_ratio = std::log2(wall_ms / dur_target_mid);
+        int step = (int)std::lround(std::clamp(log_ratio, -4.0, 4.0));
+        if (step == 0) step = (wall_ms > dur_target_mid) ? 1 : -1;
+        std::lock_guard<std::mutex> lk(ply_mutex);
+        ply_estimate = std::clamp(ply_estimate + step, (double)ply_floor, (double)ply_ceil);
+      }
     }
-  }
+  };
+
+  std::vector<std::thread> pool;
+  for (int t = 0; t < gen_threads; t++) pool.emplace_back(worker, t);
+  for (auto &th : pool) th.join();
 
   std::ofstream out(out_path);
   for (auto &entry : accepted) out << entry.first << " " << entry.second << "\n";
   std::cerr << "[corpus] wrote " << accepted.size() << "/" << count << " positions to " << out_path
-            << " (" << attempts << " attempts, " << noise_discards << " noise discards)\n";
+            << " (" << attempts.load() << " attempts, " << noise_discards << " noise discards, "
+            << gen_threads << " gen-threads)\n";
 }
 
 // --- Diagnostic mode ("Test A"): real in-search multithreading on ONE ------
@@ -658,6 +720,7 @@ int main(int argc, char* argv[]) {
   double dur_min_ms = 500.0, dur_max_ms = 1500.0;
   std::string corpus_out = "";
   unsigned int seed = 42;
+  int gen_threads = 0;  // 0 = auto (hardware_concurrency)
 
   // diag options
   std::vector<int> thread_counts = {1, 2, 4, 6, 12};
@@ -688,6 +751,7 @@ int main(int argc, char* argv[]) {
     else if (arg == "--dur-max" && i + 1 < argc) dur_max_ms = std::stod(argv[++i]);
     else if (arg == "--out" && i + 1 < argc) corpus_out = argv[++i];
     else if (arg == "--seed" && i + 1 < argc) seed = (unsigned int)std::stoul(argv[++i]);
+    else if (arg == "--gen-threads" && i + 1 < argc) gen_threads = std::stoi(argv[++i]);
     else if (arg == "--threads" && i + 1 < argc) thread_counts = parse_thread_list(argv[++i]);
     else if (arg == "--repeats" && i + 1 < argc) repeats = std::stoi(argv[++i]);
     else if (arg == "--max-deficit" && i + 1 < argc) max_deficit = std::stod(argv[++i]);
@@ -701,7 +765,7 @@ int main(int argc, char* argv[]) {
     std::string dim_str = std::to_string(BOARD_WIDTH_MACRO) + "x" + std::to_string(BOARD_HEIGHT_MACRO);
     if (corpus_out.empty()) corpus_out = "test-data/corpus_threading_" + dim_str + ".txt";
     run_gen_corpus<BOARD_WIDTH_MACRO, BOARD_HEIGHT_MACRO>(
-        min_ply, max_ply, corpus_count, dur_min_ms, dur_max_ms, corpus_out, max_attempts, seed);
+        min_ply, max_ply, corpus_count, dur_min_ms, dur_max_ms, corpus_out, max_attempts, seed, gen_threads);
     return 0;
   }
 

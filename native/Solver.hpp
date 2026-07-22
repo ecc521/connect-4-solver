@@ -97,6 +97,26 @@ class SolverImpl : public Solver<WIDTH, HEIGHT, ALIGN, WRAP> {
     collect_book = b;
   }
 
+ public:
+  // analyze()'s root-split: lets a thread whose own column already finished
+  // join whichever OTHER column is still mid-probe, at the same null-window
+  // granularity raced_probe already races at (not a whole-solve restart --
+  // see raced_probe's doc comment for why that distinction matters). The
+  // owning raced_probe call publishes its live window here before waiting
+  // and drains external_active back to 0 before it returns/tears down its
+  // stack frame, so a late joiner can never read through a dangling pointer.
+  struct ColumnProbeSlot {
+    std::atomic<bool> live{false};
+    std::atomic<uint64_t> generation{0};
+    std::atomic<int> external_active{0};
+    int alpha = 0, beta = 0;
+    const OpeningBookBase<WIDTH, HEIGHT>* book = nullptr;
+    int book_depth = 0;
+    std::atomic<bool>* done = nullptr;
+    std::atomic<int>* result_val = nullptr;
+    const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>* P = nullptr;
+  };
+
  private:
   using ColumnOrderT = typename std::conditional<WIDTH == -1, std::vector<int>, std::array<int, WIDTH == -1 ? 1 : WIDTH>>::type;
 
@@ -131,7 +151,7 @@ class SolverImpl : public Solver<WIDTH, HEIGHT, ALIGN, WRAP> {
 
  private:
   template <bool HasBook>
-  ::GameSolver::Connect4::SolverResult solve_single(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr, int threads = 1, int score_jitter = 0);
+  ::GameSolver::Connect4::SolverResult solve_single(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP> &P, bool weak, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag = nullptr, int32_t* thread_history = nullptr, int threads = 1, int score_jitter = 0, ColumnProbeSlot* my_slot = nullptr);
 
   template <bool HasBook>
   int dispatch_solve_weak(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int min, int max, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, std::atomic<bool>* abort_flag, int32_t* thread_history, int score_jitter = 0);
@@ -142,8 +162,14 @@ class SolverImpl : public Solver<WIDTH, HEIGHT, ALIGN, WRAP> {
   // so the worst case is the single-threaded search). First finisher wins and
   // aborts the rest. See solve_single() for why this per-probe scope is what
   // makes shared-TT racing effective.
+  //
+  // my_slot (analyze()'s root-split only): if non-null, this call publishes
+  // its live window into *my_slot before racing so a thread from another,
+  // already-finished column can join THIS exact probe as an extra racer, and
+  // drains any such joiners (external_active) before returning. See
+  // ColumnProbeSlot's doc comment.
   template <bool HasBook>
-  int raced_probe(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, int threads, std::atomic<bool>* abort_flag, int32_t* thread_history, int solo_jitter = 0);
+  int raced_probe(const GenericPosition<WIDTH, HEIGHT, ALIGN, WRAP>& P, int alpha, int beta, const OpeningBookBase<WIDTH, HEIGHT>* book, int book_depth, int threads, std::atomic<bool>* abort_flag, int32_t* thread_history, int solo_jitter = 0, ColumnProbeSlot* my_slot = nullptr);
 
  public:
 
