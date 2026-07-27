@@ -36,7 +36,6 @@
 #include "OpeningBook.hpp"
 #include "SolverResult.hpp"
 #include "ThreadPool.hpp"
-#include "ThreadPriority.hpp"
 
 namespace GameSolver {
 namespace Connect4 {
