@@ -7,18 +7,17 @@ import * as path from "path";
 import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _dir = path.dirname(fileURLToPath(import.meta.url));
 
 describe("Polymorphic Dense Book Packing", () => {
-  const mockTxt = path.join(__dirname, "mock_scored.txt");
-  const d5Path = path.join(__dirname, "..", "data", "7x6_dense5.book");
-  const d14Path = path.join(__dirname, "..", "data", "7x6_dense14.book");
-  const d20Path = path.join(__dirname, "..", "data", "7x6_dense20.book");
+  const mockTxt = path.join(_dir, "mock_scored.txt");
+  const d5Path = path.join(_dir, "..", "data", "7x6_dense5.book");
+  const d14Path = path.join(_dir, "..", "data", "7x6_dense14.book");
+  const d20Path = path.join(_dir, "..", "data", "7x6_dense20.book");
 
   beforeAll(() => {
     // Ensure data directory exists
-    const dataDir = path.join(__dirname, "..", "data");
+    const dataDir = path.join(_dir, "..", "data");
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
@@ -27,7 +26,7 @@ describe("Polymorphic Dense Book Packing", () => {
     const positions = [
       "1 1",
       "12 -1",
-      "123 2",
+      "123 1",
       "1234 -2",
       "12345 3",
       "123456 -3",
@@ -78,13 +77,13 @@ describe("Polymorphic Dense Book Packing", () => {
     const stat = fs.statSync(d5Path);
     const bookData = new Uint8Array(fs.readFileSync(d5Path));
 
-    // Check header for 3 byte keys
-    expect(bookData[3]).toBe(3); // key_bytes
+    // Check header for 2 byte keys (key_bytes is at offset 8 in v2 header)
+    expect(bookData[8]).toBe(2); // key_bytes
 
     // Depth 5 should only pack the first 5 positions
     const expectedCount = 5;
-    // Header (6) + entries (3 bytes key + 1 byte value)
-    expect(stat.size).toBe(6 + expectedCount * 4);
+    // Header (18) + keys section (2 bytes each) + values section (1 byte each)
+    expect(stat.size).toBe(18 + expectedCount * 2 + expectedCount * 1);
 
     const solver = new NodeConnect4Solver();
     await solver.init();
@@ -99,13 +98,13 @@ describe("Polymorphic Dense Book Packing", () => {
     const stat = fs.statSync(d14Path);
     const bookData = new Uint8Array(fs.readFileSync(d14Path));
 
-    // Depth 14 7x7 fits in 31.7 bits => 4 bytes
-    expect(bookData[3]).toBe(4);
+    // Depth 14 7x6 fits in 31.7 bits => 4 bytes (key_bytes at offset 8 in v2 header)
+    expect(bookData[8]).toBe(4);
 
     // Depth 14 means the first 14 positions should be packed
     const expectedCount = 14;
-    // Header (6) + entries (4 bytes key + 1 byte value)
-    expect(stat.size).toBe(6 + expectedCount * 5);
+    // Header (18) + keys section (4 bytes each) + values section (1 byte each)
+    expect(stat.size).toBe(18 + expectedCount * 4 + expectedCount * 1);
 
     const solver = new NodeConnect4Solver();
     await solver.init();
@@ -118,13 +117,13 @@ describe("Polymorphic Dense Book Packing", () => {
     const stat = fs.statSync(d20Path);
     const bookData = new Uint8Array(fs.readFileSync(d20Path));
 
-    // Depth 20 7x7: 26 digits -> 41.2 bits => 6 bytes
-    expect(bookData[3]).toBe(6);
+    // Depth 20 7x6: max key ~41.2 bits => 6 bytes (key_bytes at offset 8 in v2 header)
+    expect(bookData[8]).toBe(6);
 
     // Depth 20 means all 20 positions
     const expectedCount = 20;
-    // Header (6) + entries (6 bytes key + 1 byte value)
-    expect(stat.size).toBe(6 + expectedCount * 7);
+    // Header (18) + keys section (6 bytes each) + values section (1 byte each)
+    expect(stat.size).toBe(18 + expectedCount * 6 + expectedCount * 1);
 
     const solver = new NodeConnect4Solver();
     await solver.init();
@@ -142,41 +141,19 @@ describe("Polymorphic Dense Book Packing", () => {
     const book = new OpeningBook(solver.width, solver.height);
     await book.load(bookData);
 
-    // Evaluate a depth 2 position (12). The mock book has it scored as -1.
-    // We use `solve` so it hits the book at the root instantly.
+    // Evaluate a depth 2 position (12). The mock book has it scored as -1
+    // (intentionally not the true game value, to prove the score came from
+    // the book rather than a real search). "123" is scored 1 so it satisfies
+    // -childScore == score for "12" — this lets solve_single's book-only
+    // move lookup (Solver.cpp PHASE 1) resolve the best move instantly,
+    // instead of falling back to a real verification search per child.
     const result = await solver.solve("12", { book });
-    expect(result.evaluation?.score).toBe(-31001);
+    expect(result.evaluation?.score).toBe(-1);
 
-    // Evaluate a depth 2 position (11) not in the book
-    // Wait, 11 is not in the book. If we solve it, the exact solver will search it fully!
-    // Let's test a position that IS in the book, like "1" (score 1)
+    // "1"'s only book child is "12" (-1), which already satisfies
+    // -childScore == score, so this also resolves via PHASE 1.
     const result2 = await solver.solve("1", { book });
-    expect(result2.evaluation?.score).toBe(31001);
-
-    book.destroy();
-  });
-
-  test("should load the generated depth 5 book into heuristic solver and translate exact scores", async () => {
-    const bookData = new Uint8Array(fs.readFileSync(d5Path));
-
-    const solver = new NodeConnect4Solver({ heuristic: true });
-    await solver.init();
-
-    const book = new OpeningBook(solver.width, solver.height);
-    await book.load(bookData);
-
-    // Evaluate a depth 2 position (12)
-    // The exact score is cached in the book as -1 (Loss)
-    // The heuristic solver should translate this to -31001
-    // We use `solve` with a 1ms timeout. Without the book, 1ms would not find a deep loss.
-    const result = await solver.solve("12", { book, timeoutMs: 1 });
-
-    // Heuristic bounds translate exact Loss to <= -31000
-    expect(result.evaluation?.score).toBeLessThanOrEqual(-31000);
-
-    // Evaluate a depth 1 position (1) which is in the book with score 1
-    const result2 = await solver.solve("1", { book, timeoutMs: 1 });
-    expect(result2.evaluation?.score).toBeGreaterThanOrEqual(31000);
+    expect(result2.evaluation?.score).toBe(1);
 
     book.destroy();
   });
@@ -190,7 +167,7 @@ describe("Polymorphic Dense Book Packing", () => {
       | SyncWasmNoSABConnect4Solver
     )[] = [new NodeConnect4Solver()];
 
-    if (fs.existsSync(path.join(__dirname, "..", "build", "analyze.wasm"))) {
+    if (fs.existsSync(path.join(_dir, "..", "wasm-out", "analyze.wasm"))) {
       solvers.push(new SyncWasmConnect4Solver());
       solvers.push(new SyncWasmNoSABConnect4Solver());
     }
@@ -204,7 +181,7 @@ describe("Polymorphic Dense Book Packing", () => {
       // Evaluate a depth 2 position (12). The mock book has it scored as -1 (intentionally incorrect to verify cache hit).
       // We do not pass { book } here, the solver must use the internally managed pointer.
       const result = await solver.solve("12");
-      expect(result.evaluation?.score).toBe(-31001);
+      expect(result.evaluation?.score).toBe(-1);
 
       solver.release();
     }

@@ -1,8 +1,13 @@
-import { PositionAnalysis, AnalyzeOptions, SolverModule } from "./core.js";
+import {
+  PositionAnalysis,
+  AnalyzeOptions,
+  BookResult,
+  SolverModule,
+} from "./core.js";
 import { AbstractSyncSolver } from "./abstract-solver.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import createModule from "../build/analyze.js";
+import createModule from "../wasm-out/analyze.js";
 
 type CreateModule = (options?: {
   locateFile?: (path: string) => string;
@@ -42,7 +47,7 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         sizeMb * 1024 * 1024,
-        this.isHeuristic,
+        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -58,13 +63,13 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
       this.width,
       this.height,
       this._cachePtr,
-      this.isHeuristic,
+      false, // legacy is_heuristic slot (removed in v5)
       this.align,
       this.wrap,
     );
     if (this._solverPtr === 0) {
       throw new Error(
-        `Failed to create ${this.isHeuristic ? "heuristic" : "exact"} solver for ` +
+        `Failed to create exact solver for ` +
           `${this.width}x${this.height}. This board size may not be supported by the current WASM build.`,
       );
     }
@@ -114,6 +119,12 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
     return Promise.resolve();
   }
 
+  queryBook(positionStr: string): Promise<BookResult | null> {
+    return Promise.resolve(
+      this.queryBookWithModule(getNoSABModule(), positionStr),
+    );
+  }
+
   release(): void {
     if (!this.initialized) return;
     const mod = getNoSABModule();
@@ -122,7 +133,7 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         this._solverPtr,
-        this.isHeuristic,
+        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -158,7 +169,7 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
       this.width,
       this.height,
       this._solverPtr,
-      this.isHeuristic,
+      false, // legacy is_heuristic slot (removed in v5)
       this.align,
       this.wrap,
     );
@@ -172,7 +183,7 @@ export class SyncWasmNoSABConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         this._solverPtr,
-        this.isHeuristic,
+        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       ),

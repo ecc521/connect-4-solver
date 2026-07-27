@@ -8,7 +8,6 @@ describe("Extended Game Variants (Connect 5 & Wraparound)", () => {
       height: 8,
       align: 5,
       wrap: false,
-      heuristic: false,
     });
     await solver.init();
 
@@ -20,7 +19,7 @@ describe("Extended Game Variants (Connect 5 & Wraparound)", () => {
     // It should evaluate as a win in 0 moves
     expect(res.evaluation?.outcome).toBe("Win");
     // Moves played = 9. Spaces remaining = 55. Half spaces = 27 (Wait, base score = 64-9 = 55. floor(55/2) = 27).
-    expect(res.evaluation?.score).toBe(31028);
+    expect(res.evaluation?.score).toBe(28);
 
     solver.release();
   });
@@ -32,7 +31,6 @@ describe("Extended Game Variants (Connect 5 & Wraparound)", () => {
       height: 6,
       align: 4,
       wrap: true,
-      heuristic: false,
     });
     await solver.init();
 
@@ -46,7 +44,7 @@ describe("Extended Game Variants (Connect 5 & Wraparound)", () => {
     // It should be a Win in 0 moves.
     // Moves played = 7. Spaces remaining = 35. Half spaces = 17 (35/2 = 17).
     expect(res.evaluation?.outcome).toBe("Win");
-    expect(res.evaluation?.score).toBe(31018);
+    expect(res.evaluation?.score).toBe(18);
 
     solver.release();
   });
@@ -58,7 +56,6 @@ describe("Extended Game Variants (Connect 5 & Wraparound)", () => {
       height: 8,
       align: 5,
       wrap: true,
-      heuristic: false,
     });
     await solver.init();
 
@@ -68,7 +65,7 @@ describe("Extended Game Variants (Connect 5 & Wraparound)", () => {
     const res = await solver.solve("112233884");
     expect(res.evaluation?.outcome).toBe("Win");
     // Moves played = 9. Spaces remaining = 55. Half spaces = 27.
-    expect(res.evaluation?.score).toBe(31028);
+    expect(res.evaluation?.score).toBe(28);
 
     solver.release();
   });

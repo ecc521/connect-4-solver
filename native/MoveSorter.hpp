@@ -64,6 +64,29 @@ class GenericMoveSorter {
   }
 
   /**
+   * Same as getNext(), also reporting the move's ordering score.
+   */
+  position_t getNext(int &score_out) {
+    if(size) {
+      score_out = entries[size - 1].score;
+      return entries[--size].move;
+    }
+    return 0;
+  }
+
+  /**
+   * Peek the score of the next move without removing it.
+   * Returns false if the container is empty.
+   */
+  bool peekScore(int &score_out) const {
+    if(size) {
+      score_out = entries[size - 1].score;
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * reset (empty) the container
    */
   void reset() {

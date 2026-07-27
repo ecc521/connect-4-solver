@@ -28,6 +28,20 @@
 #include <cstdlib>
 #endif
 
+// Diagnostic-only knobs, both zero-cost when left at their defaults.
+// TT_BUCKET_ALIGN: override the Bucket alignment (e.g. -DTT_BUCKET_ALIGN=64 to pad
+// each bucket to a full cache line, isolating cross-bucket false sharing). Defaults
+// to 0, meaning "use sizeof(SlotType) * 2" (the production layout).
+#ifndef TT_BUCKET_ALIGN
+#define TT_BUCKET_ALIGN 0
+#endif
+
+// TT_CONTENTION_STATS: when nonzero, tracks CAS drops/retries in put() so a
+// benchmark can report contention directly instead of inferring it from timing.
+#ifndef TT_CONTENTION_STATS
+#define TT_CONTENTION_STATS 0
+#endif
+
 namespace GameSolver {
 namespace Connect4 {
 
@@ -74,7 +88,7 @@ class TranspositionTable {
     Slot() : data(0) {}
   };
 
-  struct alignas(sizeof(SlotType) * 2) Bucket {
+  struct alignas(TT_BUCKET_ALIGN != 0 ? TT_BUCKET_ALIGN : sizeof(SlotType) * 2) Bucket {
     Slot slots[2];
   };
 
@@ -85,6 +99,11 @@ class TranspositionTable {
   size_t index(KeyType key) const {
     return static_cast<size_t>(key % num_buckets);
   }
+
+#if TT_CONTENTION_STATS
+  mutable std::atomic<uint64_t> dropCount{0};
+  mutable std::atomic<uint64_t> retryCount{0};
+#endif
 
  public:
   TranspositionTable(size_t table_bytes) {
@@ -158,7 +177,12 @@ class TranspositionTable {
         if (first == new_data) return;
 
         // Lockless bound update: If contention occurs, drop the update (saves spinlock overhead)
-        Data[b].slots[0].data.compare_exchange_weak(first, new_data, std::memory_order_release, std::memory_order_relaxed);
+        bool ok = Data[b].slots[0].data.compare_exchange_weak(first, new_data, std::memory_order_release, std::memory_order_relaxed);
+#if TT_CONTENTION_STATS
+        if (!ok) dropCount.fetch_add(1, std::memory_order_relaxed);
+#else
+        (void)ok;
+#endif
         return;
     }
     
@@ -178,6 +202,9 @@ class TranspositionTable {
                     Data[b].slots[1].data.compare_exchange_weak(second, first, std::memory_order_release, std::memory_order_relaxed);
                     break;
                 } else {
+#if TT_CONTENTION_STATS
+                    retryCount.fetch_add(1, std::memory_order_relaxed);
+#endif
                     first_work = static_cast<uint8_t>((first >> ValueBits) & work_mask);
                 }
             } else {
@@ -199,6 +226,9 @@ class TranspositionTable {
                 }
                 break;
             } else {
+#if TT_CONTENTION_STATS
+                retryCount.fetch_add(1, std::memory_order_relaxed);
+#endif
                 first_work = static_cast<uint8_t>((first >> ValueBits) & work_mask);
             }
         } else {
@@ -210,6 +240,39 @@ class TranspositionTable {
 
   size_t getSize() const {
     return size;
+  }
+
+  size_t getNumBuckets() const {
+    return num_buckets;
+  }
+
+  static constexpr size_t getBucketBytes() {
+    return sizeof(Bucket);
+  }
+
+  // Contention diagnostics — always callable, return 0 unless built with
+  // -DTT_CONTENTION_STATS=1 so call sites don't need to be guarded.
+  uint64_t getDropCount() const {
+#if TT_CONTENTION_STATS
+    return dropCount.load(std::memory_order_relaxed);
+#else
+    return 0;
+#endif
+  }
+
+  uint64_t getRetryCount() const {
+#if TT_CONTENTION_STATS
+    return retryCount.load(std::memory_order_relaxed);
+#else
+    return 0;
+#endif
+  }
+
+  void resetContentionStats() {
+#if TT_CONTENTION_STATS
+    dropCount.store(0, std::memory_order_relaxed);
+    retryCount.store(0, std::memory_order_relaxed);
+#endif
   }
 
   void prefetch(KeyType key) const {

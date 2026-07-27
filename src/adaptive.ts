@@ -11,7 +11,6 @@
  * Usage:
  *   const solver = new AdaptiveSolver({ cacheSizeMb: 256 });
  *   await solver.setBoard(7, 6);
- *   console.log(solver.capability); // 'exact'
  *   console.log(solver.hasBook);    // true  (embedded book auto-loaded)
  *
  *   const result = await solver.analyze('443322');
@@ -21,22 +20,16 @@
 
 import {
   BaseConnect4Solver,
+  BookResult,
   PositionAnalysis,
   AnalyzeOptions,
   Connect4SolverOptions,
 } from "./core.js";
-import {
-  getSolverCapability,
-  SolverCapability,
-  EMBEDDED_BOOK_SIZES,
-} from "./capabilities.js";
-
-export type { SolverCapability };
-export { getSolverCapability };
+import { EMBEDDED_BOOK_SIZES } from "./embedded-book-sizes.js";
 
 // ─── Embedded book registry ───────────────────────────────────────────────────
 
-// EMBEDDED_BOOK_SIZES is imported from capabilities.ts — single source of truth.
+// EMBEDDED_BOOK_SIZES is the single source of truth (auto-generated).
 // Used to pre-determine solver type before init(), avoiding the
 // "create as heuristic → detect book → recreate as exact" anti-pattern.
 function hasEmbeddedBook(
@@ -60,9 +53,9 @@ export interface AdaptiveSolverOptions {
 
   /**
    * Default timeout in milliseconds applied to searches.
-   * If not specified, defaults to 5000 ms for all solver types.
-   * For heuristic searches (capability='nnue'|'tactical'), running without a timeout
-   * (explicitly setting to 0) is allowed but will trigger a console warning.
+   * If not specified, defaults to 5000 ms.
+   * Setting to 0 disables the timeout (the exact search runs to completion,
+   * which can be slow on large boards without an opening book).
    */
   defaultTimeoutMs?: number;
 
@@ -98,7 +91,6 @@ export class AdaptiveSolver {
   private _height = 0;
   private _align = 4;
   private _wrap = false;
-  private _capability: SolverCapability = "tactical";
   private _hasBook = false;
   private _isReady = false;
   private _isSwitching = false;
@@ -118,23 +110,14 @@ export class AdaptiveSolver {
     return this._wrap;
   }
 
-  /**
-   * Analysis quality for the current board size.
-   *
-   * - `'exact'`    Perfect minimax. Applies to small boards (w<7 && h<7) and
-   *                boards with an embedded or user-supplied opening book.
-   * - `'nnue'`     High-quality heuristic with trained NNUE evaluation.
-   * - `'tactical'` Tactical-only heuristic (no NNUE). Detect wins/losses within
-   *                search depth only. Analysis is not recommended; pass a
-   *                timeoutMs to analyze() or it will throw.
-   */
-  get capability(): SolverCapability {
-    return this._capability;
-  }
-
   /** True if an opening book is active (embedded or custom). */
   get hasBook(): boolean {
     return this._hasBook;
+  }
+
+  /** Kind of the currently-loaded opening book, or `null` if no book is loaded. */
+  get bookKind(): "exact" | "bounded" | null {
+    return this._solver?.bookKind ?? null;
   }
 
   /** True once setBoard() has completed successfully. */
@@ -189,11 +172,10 @@ export class AdaptiveSolver {
     this._wrap = wrap;
     this._hasBook = false;
 
-    // 2. Determine solver type upfront — no solver recreation needed.
-    //    Small boards and embedded-book boards always get an exact solver.
-    //    Everything else gets a heuristic solver.
+    // 2. v5 (Scopehammer): the solver is always exact — the heuristic/NNUE engine
+    //    has been removed. Larger boards without a book are simply slower; there is
+    //    no approximate fallback anymore.
     const willHaveEmbeddedBook = hasEmbeddedBook(width, height, align, wrap);
-    const useHeuristic = !(width < 7 && height < 7) && !willHaveEmbeddedBook;
 
     // 3. Create and init solver
     const solverOpts: Connect4SolverOptions = {
@@ -202,7 +184,6 @@ export class AdaptiveSolver {
       align,
       wrap,
       cacheSizeMb: this._opts.cacheSizeMb ?? 128,
-      heuristic: useHeuristic,
     };
     this._solver = await this._createSolver(solverOpts);
     await this._solver.init();
@@ -229,15 +210,6 @@ export class AdaptiveSolver {
       }
     }
 
-    // 6. Finalize capability (book state is now settled)
-    this._capability = getSolverCapability(
-      width,
-      height,
-      this._hasBook,
-      align,
-      wrap,
-    );
-
     this._isReady = true;
     this._isSwitching = false;
   }
@@ -247,9 +219,8 @@ export class AdaptiveSolver {
   /**
    * Analyze all moves at the given position.
    *
-   * For heuristic searches (capability='nnue'|'tactical'), running without a timeout
-   * is allowed but will trigger a console warning, as deep searches on large boards
-   * can take a long time or block indefinitely.
+   * Searches on large boards without an opening book can take a long time;
+   * pass a `timeoutMs` (or rely on the default) to bound the search.
    */
   async analyze(
     position: string,
@@ -279,6 +250,19 @@ export class AdaptiveSolver {
   }
 
   /**
+   * Book-only lookup — no search. Returns the booked result or `null` on a miss.
+   * Useful for showing an instant result before deciding whether to run a timed solve.
+   */
+  async queryBook(position: string): Promise<BookResult | null> {
+    this._assertReady();
+    if (!this._solver)
+      throw new Error(
+        "AdaptiveSolver: solver unexpectedly null after assertReady.",
+      );
+    return this._solver.queryBook(position);
+  }
+
+  /**
    * Replace the active book with a custom one.
    * Must not be called while a search is running — call stop() first.
    */
@@ -286,13 +270,6 @@ export class AdaptiveSolver {
     if (!this._solver) throw new Error("Call setBoard() before loadBook().");
     await this._solver.loadBook(data);
     this._hasBook = true;
-    this._capability = getSolverCapability(
-      this._width,
-      this._height,
-      true,
-      this._align,
-      this._wrap,
-    );
   }
 
   /**
@@ -330,13 +307,6 @@ export class AdaptiveSolver {
 
   private _withDefaults(opts?: AnalyzeOptions): AnalyzeOptions {
     const timeout = opts?.timeoutMs ?? this._opts.defaultTimeoutMs ?? 5000;
-
-    if (this._capability !== "exact" && timeout === 0) {
-      console.warn(
-        `AdaptiveSolver: Running a heuristic search (${this._capability}) without a timeout limit ` +
-          `can cause the engine to search indefinitely on complex positions. It is highly recommended to specify a timeout.`,
-      );
-    }
 
     return {
       ...opts,

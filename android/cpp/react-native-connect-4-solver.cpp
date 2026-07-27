@@ -25,20 +25,12 @@ T* stringToPtr(JNIEnv *env, jstring str) {
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_expo_modules_connect4solver_Connect4SolverModule_nativeCreateCache(JNIEnv *env, jobject, jint w, jint h, jdouble sizeBytes, jboolean is_heuristic, jint align, jboolean wrap) {
+Java_expo_modules_connect4solver_Connect4SolverModule_nativeCreateCache(JNIEnv *env, jobject, jint w, jint h, jdouble sizeBytes, jint align, jboolean wrap) {
     size_t bytes = static_cast<size_t>(sizeBytes);
-    void* ptr = nullptr;
-    if (is_heuristic) {
-        ptr = dispatch<void*>(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            return Size::HeuristicSolver::createCache(bytes).release();
-        });
-    } else {
-        ptr = dispatch<void*>(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            return Size::Solver::createCache(bytes).release();
-        });
-    }
+    void* ptr = dispatch<void*>(w, h, align, wrap, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        return Size::Solver::createCache(bytes).release();
+    });
     return ptrToString(env, ptr);
 }
 
@@ -78,59 +70,33 @@ Java_expo_modules_connect4solver_Connect4SolverModule_nativeDestroyCache(JNIEnv 
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_expo_modules_connect4solver_Connect4SolverModule_nativeCreateSolver(JNIEnv *env, jobject, jint w, jint h, jstring cachePtrStr, jboolean is_heuristic, jint align, jboolean wrap) {
+Java_expo_modules_connect4solver_Connect4SolverModule_nativeCreateSolver(JNIEnv *env, jobject, jint w, jint h, jstring cachePtrStr, jint align, jboolean wrap) {
     auto cache = stringToPtr<GameSolver::Connect4::Cache>(env, cachePtrStr);
-    void* ptr = nullptr;
-    if (is_heuristic) {
-        ptr = dispatch<void*>(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            return Size::HeuristicSolver::createWithCache(cache).release();
-        });
-    } else {
-        ptr = dispatch<void*>(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            return Size::Solver::createWithCache(cache).release();
-        });
-    }
+    void* ptr = dispatch<void*>(w, h, align, wrap, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        return Size::Solver::createWithCache(cache).release();
+    });
     return ptrToString(env, ptr);
 }
 
-
 extern "C" JNIEXPORT void JNICALL
-Java_expo_modules_connect4solver_Connect4SolverModule_nativeDestroySolver(JNIEnv *env, jobject, jstring solverPtrStr, jint w, jint h, jboolean is_heuristic, jint align, jboolean wrap) {
+Java_expo_modules_connect4solver_Connect4SolverModule_nativeDestroySolver(JNIEnv *env, jobject, jstring solverPtrStr, jint w, jint h, jint align, jboolean wrap) {
     void* solver = stringToPtr<void>(env, solverPtrStr);
     if (!solver) return;
-    
-    if (is_heuristic) {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            delete static_cast<typename Size::HeuristicSolver*>(solver);
-        });
-    } else {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            delete static_cast<typename Size::Solver*>(solver);
-        });
-    }
+    dispatch_void(w, h, align, wrap, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        delete static_cast<typename Size::Solver*>(solver);
+    });
 }
 
-
 extern "C" JNIEXPORT void JNICALL
-Java_expo_modules_connect4solver_Connect4SolverModule_nativeStop(JNIEnv *env, jobject, jstring solverPtrStr, jint w, jint h, jboolean is_heuristic, jint align, jboolean wrap) {
+Java_expo_modules_connect4solver_Connect4SolverModule_nativeStop(JNIEnv *env, jobject, jstring solverPtrStr, jint w, jint h, jint align, jboolean wrap) {
     void* solver = stringToPtr<void>(env, solverPtrStr);
     if (!solver) return;
-    
-    if (is_heuristic) {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            static_cast<typename Size::HeuristicSolver*>(solver)->stop();
-        });
-    } else {
-        dispatch_void(w, h, align, wrap, [&](auto tag) {
-            using Size = typename decltype(tag)::type;
-            static_cast<typename Size::Solver*>(solver)->stop();
-        });
-    }
+    dispatch_void(w, h, align, wrap, [&](auto tag) {
+        using Size = typename decltype(tag)::type;
+        static_cast<typename Size::Solver*>(solver)->stop();
+    });
 }
 
 // Resolves the effective book: user-supplied if set, else the embedded static book.
@@ -196,59 +162,6 @@ jintArray runNativeSolve(JNIEnv *env, int w, int h, CoreSolver& solver, const ch
   return jResult;
 }
 
-template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
-jintArray runNativeHeuristicAnalysis(JNIEnv *env, int w, int h, CoreSolver& solver, const char* positionStr, int max_depth, int threads, double timeout_ms, void* book_ptr) {
-  std::string positionString(positionStr);
-  CorePosition P(w, h);
-  int active_w = W == -1 ? w : W;
-  std::vector<int> result;
-  if(P.play(positionString) != positionString.size()) {
-    int lastColPlayed = positionString[P.nbMoves()] - '1';
-    result.push_back(P.isWinningMove(lastColPlayed) ? 1 : 2);
-    result.push_back(P.nbMoves());
-    for(int i = 0; i < active_w; i++) result.push_back(0);
-    result.push_back(0);
-  } else {
-    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookAndroid<W, H, CoreBook>(book_ptr)));
-    result.push_back(0);
-    result.push_back(P.nbMoves());
-    auto res = solver.analyze_heuristic(P, max_depth, threads, timeout_ms);
-    std::vector<int> scores = res.first;
-    for(int i = 0; i < active_w; i++) result.push_back(scores[i]);
-    result.push_back(res.second);
-  }
-  jintArray jResult = env->NewIntArray(result.size());
-  env->SetIntArrayRegion(jResult, 0, result.size(), &result[0]);
-  return jResult;
-}
-
-template <typename CoreSolver, typename CorePosition, int W, int H, typename CoreBook>
-jintArray runNativeHeuristicSolve(JNIEnv *env, int w, int h, CoreSolver& solver, const char* positionStr, int max_depth, int threads, double timeout_ms, void* book_ptr) {
-  std::string positionString(positionStr);
-  CorePosition P(w, h);
-  std::vector<int> result;
-  if(P.play(positionString) != positionString.size()) {
-    int lastColPlayed = positionString[P.nbMoves()] - '1';
-    result.push_back(P.isWinningMove(lastColPlayed) ? 1 : 2);
-    result.push_back(P.nbMoves());
-    for(int i = 2; i < 8; i++) result.push_back(0);
-  } else {
-    solver.loadBook(const_cast<CoreBook*>(getEffectiveBookAndroid<W, H, CoreBook>(book_ptr)));
-    auto res = solver.solve_heuristic(P, max_depth, timeout_ms, false, nullptr, threads);
-    result.push_back(0);
-    result.push_back(P.nbMoves());
-    result.push_back(res.score);
-    result.push_back(res.bestMove);
-    result.push_back(res.depth);
-    result.push_back((int)(res.nodes & 0xFFFFFFFF));
-    result.push_back((int)(res.nodes >> 32));
-    result.push_back(res.aborted ? 1 : 0);
-  }
-  jintArray jResult = env->NewIntArray(result.size());
-  env->SetIntArrayRegion(jResult, 0, result.size(), &result[0]);
-  return jResult;
-}
-
 extern "C" JNIEXPORT jintArray JNICALL
 Java_expo_modules_connect4solver_Connect4SolverModule_nativeAnalyze(JNIEnv *env, jobject, jstring solverPtrStr, jstring position, jint threads, jint w, jint h, jstring bookPtrStr, jint align, jboolean wrap) {
     const char *posChars = env->GetStringUTFChars(position, 0);
@@ -283,36 +196,3 @@ Java_expo_modules_connect4solver_Connect4SolverModule_nativeSolve(JNIEnv *env, j
     return result;
 }
 
-extern "C" JNIEXPORT jintArray JNICALL
-Java_expo_modules_connect4solver_Connect4SolverModule_nativeAnalyzeHeuristic(JNIEnv *env, jobject, jstring solverPtrStr, jstring position, jint maxDepth, jint threads, jdouble timeoutMs, jint w, jint h, jstring bookPtrStr, jint align, jboolean wrap) {
-    const char *posChars = env->GetStringUTFChars(position, 0);
-    void* solver = stringToPtr<void>(env, solverPtrStr);
-    void* bookPtr = stringToPtr<void>(env, bookPtrStr);
-    
-    jintArray result = dispatch<jintArray>(w, h, align, wrap, [&](auto tag) {
-        using Size = typename decltype(tag)::type;
-        return runNativeHeuristicAnalysis<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h, Size::align, Size::wrap>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
-            env, w, h, *static_cast<typename Size::HeuristicSolver*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr
-        );
-    });
-    
-    env->ReleaseStringUTFChars(position, posChars);
-    return result;
-}
-
-extern "C" JNIEXPORT jintArray JNICALL
-Java_expo_modules_connect4solver_Connect4SolverModule_nativeSolveHeuristic(JNIEnv *env, jobject, jstring solverPtrStr, jstring position, jint maxDepth, jint threads, jdouble timeoutMs, jint w, jint h, jstring bookPtrStr, jint align, jboolean wrap) {
-    const char *posChars = env->GetStringUTFChars(position, 0);
-    void* solver = stringToPtr<void>(env, solverPtrStr);
-    void* bookPtr = stringToPtr<void>(env, bookPtrStr);
-    
-    jintArray result = dispatch<jintArray>(w, h, align, wrap, [&](auto tag) {
-        using Size = typename decltype(tag)::type;
-        return runNativeHeuristicSolve<typename Size::HeuristicSolver, GameSolver::Connect4::GenericPosition<Size::w, Size::h, Size::align, Size::wrap>, Size::w, Size::h, GameSolver::Connect4::OpeningBookBase<Size::w, Size::h>>(
-            env, w, h, *static_cast<typename Size::HeuristicSolver*>(solver), posChars, maxDepth, threads, timeoutMs, bookPtr
-        );
-    });
-    
-    env->ReleaseStringUTFChars(position, posChars);
-    return result;
-}

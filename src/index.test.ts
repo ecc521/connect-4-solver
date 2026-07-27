@@ -73,15 +73,17 @@ describe("NodeConnect4Solver", () => {
       const testSolver = new NodeConnect4Solver({
         width: 8,
         height: 8,
-        heuristic: true,
       });
       await testSolver.init();
-      // Use heuristic with shallow depth to avoid timeout — this is a structural smoke test
+      // Exact 8x8 from near-empty is intractable; use a timeout so this is a
+      // structural smoke test that the board instantiates and analyze() returns.
       const result = await testSolver.analyze("12345678", {
-        maxDepth: 4,
-        timeoutMs: 2000,
+        timeoutMs: 500,
       });
-      expect(result.evaluation).not.toBeNull();
+      // With a timeout the intractable search aborts; we only assert it returns
+      // cleanly (no hang) with a well-formed result object.
+      expect(result.aborted).toBe(true);
+      expect(result.currentPlayer).toBeDefined();
       testSolver.release();
     });
   });

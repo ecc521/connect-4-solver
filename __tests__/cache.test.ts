@@ -7,7 +7,6 @@ describe("Small Cache Allocation Test", () => {
         width: 7,
         height: 6,
         cacheSizeMb: 0,
-        heuristic: true,
       });
     }).toThrow();
 
@@ -16,7 +15,6 @@ describe("Small Cache Allocation Test", () => {
         width: 7,
         height: 6,
         cacheSizeMb: 7,
-        heuristic: true,
       });
     }).toThrow();
   });
@@ -26,12 +24,11 @@ describe("Small Cache Allocation Test", () => {
       width: 7,
       height: 6,
       cacheSizeMb: 8,
-      heuristic: true,
     });
     await engine.init();
 
     const pos = "444452233";
-    const result = await engine.analyze(pos, { threads: 1, maxDepth: 4 });
+    const result = await engine.analyze(pos, { threads: 1 });
     expect(result.evaluation).toBeDefined();
     engine.release();
   });

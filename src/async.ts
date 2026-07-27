@@ -3,6 +3,7 @@ import {
   Connect4SolverOptions,
   AnalyzeOptions,
   BaseConnect4Solver,
+  BookResult,
   SolverAbortedError,
   Player,
 } from "./core.js";
@@ -15,7 +16,6 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
     width: number;
     height: number;
     cacheSizeMb: number;
-    heuristic: boolean;
   };
   private loadedBookData: Uint8Array | null = null;
   private messageId = 0;
@@ -54,7 +54,6 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
       width: this.width,
       height: this.height,
       cacheSizeMb,
-      heuristic: this.isHeuristic,
     };
 
     this.initPromise = this.sendMessage(
@@ -142,6 +141,13 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
     );
   }
 
+  async queryBook(positionStr: string): Promise<BookResult | null> {
+    await this.init();
+    return this.sendMessage("queryBook", {
+      position: positionStr,
+    }) as Promise<BookResult | null>;
+  }
+
   /**
    * Sends the abort signal to the WASM worker.
    * For WASM, the worker thread is blocked during search, so we must terminate
@@ -182,7 +188,6 @@ export abstract class AbstractAsyncWebWorkerSolver extends BaseConnect4Solver {
           currentPlayer,
           evaluation: null,
           moveOptions: [],
-          isHeuristic: this.isHeuristic,
           aborted: true,
         } satisfies PositionAnalysis);
       } else {

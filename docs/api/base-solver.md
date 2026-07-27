@@ -6,12 +6,13 @@
 
 Every solver accepts the following configuration object upon instantiation:
 
-| Parameter     | Default | Description                                              |
-| ------------- | ------- | -------------------------------------------------------- |
-| `width`       | 7       | Board width columns                                      |
-| `height`      | 6       | Board height rows                                        |
-| `cacheSizeMb` | 100     | Cache memory allocation in MB                            |
-| `heuristic`   | false   | Uses the heuristic evaluator instead of the exact solver |
+| Parameter     | Default | Description                                                                                                                                   |
+| ------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `width`       | 7       | Board width in columns.                                                                                                                       |
+| `height`      | 6       | Board height in rows.                                                                                                                         |
+| `cacheSizeMb` | 100     | Transposition table memory allocation in MB.                                                                                                  |
+| `align`       | 4       | Win condition — pieces in a row required to win. `4` = standard Connect 4; `5` = Connect-5. See [Supported Sizes](#supported-board-sizes).    |
+| `wrap`        | `false` | Cylindrical board — columns wrap horizontally. See [Supported Sizes](#supported-board-sizes) for which `(width, height, align)` combinations support wrapping. |
 
 ## Core Methods
 
@@ -28,8 +29,7 @@ Computes the score for the current board state and evaluates all valid child mov
 **Options:**
 
 - `threads`: Maximum number of worker threads allowed (default: `1`). Will be clamped to the maximum allowed by the specific solver used.
-- `maxDepth`: (Heuristic only) The maximum search depth before falling back to evaluation functions (default: `20`).
-- `timeoutMs`: Maximum time in milliseconds to spend searching. On exact solvers, returns `aborted: true` if the search cannot complete in time. On heuristic solvers, returns the best depth found so far (default: `0` = no limit).
+- `timeoutMs`: Maximum time in milliseconds to spend searching. Returns `aborted: true` if the search cannot complete in time. Useful for bounding long searches on large boards without an opening book (default: `0` = no limit).
 - `book`: An optional `OpeningBook` instance to query for instant early-game solutions.
 
 **Returns:** `Promise<PositionAnalysis>`
@@ -44,14 +44,21 @@ Unlike `analyze()`, which evaluates every possible column to create a heat-map, 
 
 **Options:**
 
-- `weak`: (Exact only) If `true`, the solver only determines if the position is a Win, Loss, or Draw, without calculating the exact number of moves to the end (default: `false`).
-- `maxDepth`: (Heuristic only) The maximum search depth.
-- `timeoutMs`: Maximum search time. Returns `aborted: true` if the exact solver cannot complete in time.
+- `weak`: If `true`, the solver only determines if the position is a Win, Loss, or Draw, without calculating the exact number of moves to the end (default: `false`).
+- `timeoutMs`: Maximum search time. Returns `aborted: true` if the search cannot complete in time.
 - `book`: An optional `OpeningBook` instance.
 
 **Returns:** `Promise<PositionAnalysis>`
 
 > **Result Difference:** When using `solve()`, the `moveOptions` array in the returned `PositionAnalysis` will be empty. The best move is instead available in the top-level `bestMove` field.
+
+### `queryBook(position: string)`
+
+Performs a book-only lookup — no search is run. Returns a `BookResult` on a hit, or `null` on a miss. Useful for displaying an instant result before deciding whether to run a timed solve.
+
+The native and WASM solvers fall back to the embedded book automatically; `queryBook` exposes that lookup directly.
+
+**Returns:** `Promise<BookResult | null>`
 
 ### `stop()`
 
@@ -75,12 +82,38 @@ Safely destroys the explicitly allocated pointers and frees the cache memory fro
 
 > **Note:** Once `release()` is called, the solver instance is permanently destroyed and cannot be reused. Create a new solver to continue evaluating.
 
+### `bookKind` (property)
+
+```typescript
+get bookKind(): "exact" | "bounded" | null
+```
+
+The kind of the currently-loaded opening book, decoded from the v2 file header. Returns `null` if no book is loaded.
+
+| Value       | Meaning                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| `"exact"`   | Full minimax scores (default). `BookResult.exact` is a distance-to-result.                |
+| `"bounded"` | Score interval `[lower, upper]`. The solver uses these as alpha-beta bounds during search. A book generated with `--weak` is a bounded book whose intervals span the full Win or Loss range. |
+
+---
+
 ### Supported Board Sizes
 
-The WASM bundle includes evaluators for the following board sizes:
-`"6x5", "6x6", "7x6", "7x7", "8x6", "9x6", "8x8", "9x7", "11x4"`
+**Standard Connect 4** (`align=4`, `wrap=false`) — specialized, full speed:
 
-> Additional sizes can be supported by compiling the C++ source with Emscripten yourself.
+`6×7`, `6×8`, `7×6`, `7×7`, `7×8`, `7×9`, `8×6`, `8×7`, `8×8`, `9×7`
+
+**Variants** — specialized:
+
+| `align` | `wrap`  | Board | Mode              |
+| ------- | ------- | ----- | ----------------- |
+| 5       | `false` | 8×8   | Connect-5         |
+| 4       | `true`  | 7×6   | C4 Wraparound     |
+| 5       | `true`  | 8×8   | C5 Wraparound     |
+
+**Generic fallback** — any standard C4 board whose bitboard fits in 127 bits resolves automatically at roughly half the speed of a specialized size. Unsupported sizes (>127 bits, or variant combos not listed above) throw at init time.
+
+> Additional sizes can be added by compiling the C++ source with custom `SUPPORTED_SIZES_X_MACRO` entries.
 
 ## Returned Types
 
@@ -95,11 +128,9 @@ export interface PositionAnalysis {
   currentPlayer: "P1" | "P2"; // Whose turn it is at the analyzed position
   evaluation: Evaluation | null; // Overall evaluation (null if aborted or invalid)
   moveOptions: (Evaluation | null)[]; // Per-column evaluations (empty when using solve())
-  depthReached?: number; // Actual search depth reached (heuristic only)
-  isHeuristic: boolean; // True if generated by the heuristic engine
   bestMove?: number; // 0-indexed column of the best move (solve() only)
   nodes?: number; // Total positions searched (solve() only)
-  aborted?: boolean; // True if the search was cut short by timeoutMs (exact only)
+  aborted?: boolean; // True if the search was cut short by timeoutMs
 }
 ```
 
@@ -109,16 +140,23 @@ Represents the calculated strength of a move or position.
 
 ```typescript
 export interface Evaluation {
-  eval: {
-    value: number; // Decimal score:
-    //   Exact wins → +Infinity, exact losses → -Infinity, draws → 0
-    //   Heuristic → raw_score / 100.0 (typically ±5)
-  };
-  outcome?: "Win" | "Loss" | "Draw"; // Only present on exact solutions
-  winner?: "P1" | "P2" | null; // null on draws; only present on exact solutions
+  outcome?: "Win" | "Loss" | "Draw"; // Win/Draw/Loss result
+  winner?: "P1" | "P2" | null; // null on draws
   movesToEnd?: number | null; // Plies to terminal state; null on draws
   score: number; // Raw C++ engine score (positive = current player winning)
 }
 ```
 
-> **Heuristic `eval.value`:** The heuristic engine does not produce Win/Draw/Loss probabilities. The decimal `eval.value` (score ÷ 100) is suitable for bar-chart display. A value of `+3.5` means the position is strongly winning; `0.0` is roughly equal.
+### `BookResult`
+
+Returned by `queryBook()` on a hit.
+
+```typescript
+export interface BookResult {
+  exact?: number;  // exact score (positive = player-to-move winning, 0 = draw)
+  lower?: number;  // lower bound (bounded books)
+  upper?: number;  // upper bound (bounded books)
+}
+```
+
+An exact book populates `exact`. A bounded book populates `lower`/`upper`. A miss returns `null`, not an empty object.

@@ -27,7 +27,7 @@ R dispatch_impl(int w, int h, int align, bool wrap, F&& f, std::tuple<Ts...>) {
     if (align != 4 || wrap) {
         throw std::invalid_argument("This game variant (align/wrap combination) is not supported for this board size.");
     }
-    return f(SizeTag<SupportedSize<-1, -1, 4, false, C4_Dynamic::Solver, C4_Dynamic::HeuristicSolver>>{});
+    return f(SizeTag<SupportedSize<-1, -1, 4, false, C4_Dynamic::Solver>>{});
 }
 
 // Void dispatcher function — matches on (w, h, align, wrap)
@@ -46,7 +46,7 @@ void dispatch_void_impl(int w, int h, int align, bool wrap, F&& f, std::tuple<Ts
         if (align != 4 || wrap) {
             throw std::invalid_argument("This game variant (align/wrap combination) is not supported for this board size.");
         }
-        f(SizeTag<SupportedSize<-1, -1, 4, false, C4_Dynamic::Solver, C4_Dynamic::HeuristicSolver>>{});
+        f(SizeTag<SupportedSize<-1, -1, 4, false, C4_Dynamic::Solver>>{});
     }
 }
 
@@ -60,6 +60,22 @@ void dispatch_void(int w, int h, int align, bool wrap, F&& f) {
     dispatch_void_impl(w, h, align, wrap, std::forward<F>(f), AllSupportedSizes{});
 }
 
+// Returns true iff (w,h,align,wrap) matches a SPECIALIZED (compile-time) instantiation —
+// i.e. it would NOT fall back to the generic WIDTH==-1 runtime solver. Used by tooling
+// (e.g. the book generator) to warn when work would run on the ~50% generic path.
+template <typename... Ts>
+bool is_fast_path_impl(int w, int h, int align, bool wrap, std::tuple<Ts...>) {
+    bool found = false;
+    (void)(((Ts::w != -1 && w == Ts::w && h == Ts::h && align == Ts::align && wrap == Ts::wrap)
+                ? (found = true)
+                : false) || ...);
+    return found;
+}
+
+inline bool is_fast_path(int w, int h, int align, bool wrap) {
+    return is_fast_path_impl(w, h, align, wrap, AllSupportedSizes{});
+}
+
 // Macros provided to wrap the dispatch functions.
 // NOTE: 'align' and 'wrap' must be in scope when macros are invoked (provided by caller).
 
@@ -69,37 +85,10 @@ void dispatch_void(int w, int h, int align, bool wrap, F&& f) {
         return ACTION<Size::w, Size::h, Size::align, Size::wrap>(*static_cast<typename Size::Solver*>(solver), __VA_ARGS__); \
     });
 
-#define DISPATCH_HEURISTIC_VOID(ACTION, ...) \
-    dispatch_void(w, h, align, wrap, [&](auto tag) { \
-        using Size = typename decltype(tag)::type; \
-        ACTION<Size::w, Size::h>(*static_cast<typename Size::HeuristicSolver*>(solver), __VA_ARGS__); \
-    }); \
-    return;
-
-#define DISPATCH_HEURISTIC_RETURN(ACTION, ...) \
-    return dispatch<decltype(ACTION<7,6>(*static_cast<C4_7x6::HeuristicSolver*>(solver), __VA_ARGS__))>(w, h, align, wrap, [&](auto tag) { \
-        using Size = typename decltype(tag)::type; \
-        return ACTION<Size::w, Size::h>(*static_cast<typename Size::HeuristicSolver*>(solver), __VA_ARGS__); \
-    });
-
-#define DISPATCH_HEURISTIC_DOUBLE(ACTION, ...) \
-    return dispatch<double>(w, h, align, wrap, [&](auto tag) { \
-        using Size = typename decltype(tag)::type; \
-        return ACTION<Size::w, Size::h>(*static_cast<typename Size::HeuristicSolver*>(solver), __VA_ARGS__); \
-    });
-
-#define DISPATCH_HEURISTIC DISPATCH_HEURISTIC_RETURN
-
 #define DISPATCH_CREATE_EXACT(W, H, ALIGN, WRAP, CACHE_PTR) \
     return dispatch<void*>(W, H, ALIGN, WRAP, [&](auto tag) { \
         using Size = typename decltype(tag)::type; \
         return Size::Solver::createWithCache(static_cast<::GameSolver::Connect4::Cache*>(CACHE_PTR), W, H).release(); \
-    });
-
-#define DISPATCH_CREATE_HEURISTIC(W, H, ALIGN, WRAP, CACHE_PTR) \
-    return dispatch<void*>(W, H, ALIGN, WRAP, [&](auto tag) { \
-        using Size = typename decltype(tag)::type; \
-        return Size::HeuristicSolver::createWithCache(static_cast<::GameSolver::Connect4::Cache*>(CACHE_PTR), W, H).release(); \
     });
 
 #define DISPATCH_DELETE(W, H, ALIGN, WRAP, SOLVER) \
@@ -113,12 +102,6 @@ void dispatch_void(int w, int h, int align, bool wrap, F&& f) {
     return dispatch<void*>(W, H, ALIGN, WRAP, [&](auto tag) { \
         using Size = typename decltype(tag)::type; \
         return Size::Solver::createCache(TABLE_BYTES, W, H).release(); \
-    });
-
-#define DISPATCH_CREATE_HEURISTIC_CACHE(W, H, ALIGN, WRAP, TABLE_BYTES) \
-    return dispatch<void*>(W, H, ALIGN, WRAP, [&](auto tag) { \
-        using Size = typename decltype(tag)::type; \
-        return Size::HeuristicSolver::createCache(TABLE_BYTES, W, H).release(); \
     });
 
 #define DISPATCH_DELETE_BOOK(W, H, ALIGN, WRAP, BOOK) \

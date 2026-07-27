@@ -17,6 +17,12 @@ tools/pos*.txt
 tools/scored*.txt
 tools/c4solver*
 tools/bench_*
+!tools/bench_*.cpp
+tools/test_mutable_book
+tools/test_book_depth_boundary
+tools/test_collect_book_guard
+tools/gen_depth12_book
+tools/build_strategy_book_[0-9]*
 tools/verify_book
 tools/generator_*
 tools/pack_dense_book

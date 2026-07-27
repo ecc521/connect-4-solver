@@ -1,10 +1,10 @@
-import { PositionAnalysis, AnalyzeOptions } from "./core.js";
+import { PositionAnalysis, AnalyzeOptions, BookResult } from "./core.js";
 import { AbstractSyncSolver } from "./abstract-solver.js";
 import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
-const require = createRequire(import.meta.url);
+const _require = createRequire(import.meta.url);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -13,7 +13,6 @@ export interface NativeModuleType {
     w: number,
     h: number,
     cache: unknown,
-    heuristic: boolean,
     align: number,
     wrap: boolean,
   ): unknown;
@@ -21,7 +20,6 @@ export interface NativeModuleType {
     w: number,
     h: number,
     solver: unknown,
-    heuristic: boolean,
     align: number,
     wrap: boolean,
   ): void;
@@ -29,7 +27,6 @@ export interface NativeModuleType {
     w: number,
     h: number,
     size: number,
-    heuristic: boolean,
     align: number,
     wrap: boolean,
   ): unknown;
@@ -46,16 +43,6 @@ export interface NativeModuleType {
     align: number,
     wrap: boolean,
   ): Promise<Int32Array>;
-  _analyzeHeuristic(
-    w: number,
-    h: number,
-    solver: unknown,
-    pos: string,
-    threads: number,
-    depth: number,
-    timeout: number,
-    book: unknown,
-  ): Promise<Int32Array>;
   _solveExact(
     w: number,
     h: number,
@@ -68,21 +55,10 @@ export interface NativeModuleType {
     align: number,
     wrap: boolean,
   ): Promise<Int32Array>;
-  _solveHeuristic(
-    w: number,
-    h: number,
-    solver: unknown,
-    pos: string,
-    threads: number,
-    depth: number,
-    timeout: number,
-    book: unknown,
-  ): Promise<Int32Array>;
   _stopSolver(
     w: number,
     h: number,
     solver: unknown,
-    isHeuristic: boolean,
     align: number,
     wrap: boolean,
   ): void;
@@ -98,12 +74,12 @@ export interface NativeModuleType {
     format: string,
   ): void;
   _getBookFormat(w: number, h: number, book: unknown): string;
-  _getBookScore(
+  _getBookLookup(
     w: number,
     h: number,
     book: unknown,
     pos: string,
-  ): number | undefined;
+  ): Int32Array | undefined;
   _getBookBuffer(
     w: number,
     h: number,
@@ -115,10 +91,10 @@ export interface NativeModuleType {
     w: number,
     h: number,
     solver: unknown,
-    heuristic: boolean,
     align: number,
     wrap: boolean,
   ): number;
+  _isFastPath(w: number, h: number, align?: number, wrap?: boolean): boolean;
   _generatePositions(
     w: number,
     h: number,
@@ -133,6 +109,7 @@ export interface NativeModuleType {
     add(key: bigint, score: number): void;
     addPosition(pos: string, score: number): void;
     loadFromBook(bookPtr: number): void;
+    setBounded(bounded: boolean): void;
     saveDense(path: string): void;
     getDenseBuffer(): Uint8Array;
     saveEliasFano(path: string): void;
@@ -148,7 +125,7 @@ export function getNativeModule(): NativeModuleType | null {
     nativeModuleAttempted = true;
     try {
       if (typeof process !== "undefined" && process?.versions?.node) {
-        const path = require("path") as { join: (...args: string[]) => string };
+        const path = _require("path") as { join: (...args: string[]) => string };
         const nodePath = path.join(
           __dirname,
           "..",
@@ -156,13 +133,31 @@ export function getNativeModule(): NativeModuleType | null {
           "Release",
           "connect4.node",
         );
-        NativeModule = require(nodePath) as NativeModuleType;
+        NativeModule = _require(nodePath) as NativeModuleType;
       }
     } catch {
       // Fail silently
     }
   }
   return NativeModule;
+}
+
+/**
+ * Returns true if the native addon has a compiled, specialized solver for this
+ * board geometry (the fast path). Returns false if a solve would fall back to the
+ * generic runtime-width solver (~50% slower), or if the native addon isn't loaded.
+ *
+ * Intended for tooling (e.g. the book generator) to warn before doing heavy work on
+ * the generic path. Node-only.
+ */
+export function isFastPath(
+  width: number,
+  height: number,
+  align = 4,
+  wrap = false,
+): boolean {
+  const native = getNativeModule();
+  return native ? native._isFastPath(width, height, align, wrap) : false;
 }
 
 export class NativeCache {
@@ -173,7 +168,6 @@ export class NativeCache {
     public width: number,
     public height: number,
     public cacheSizeMb: number,
-    public isHeuristic: boolean,
     public align = 4,
     public wrap = false,
   ) {
@@ -187,7 +181,6 @@ export class NativeCache {
         width,
         height,
         sizeMb * 1024 * 1024,
-        isHeuristic,
         align,
         wrap,
       );
@@ -250,7 +243,6 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
           this.width,
           this.height,
           sizeMb * 1024 * 1024,
-          this.isHeuristic,
           this.align,
           this.wrap,
         );
@@ -267,13 +259,12 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       this.width,
       this.height,
       this._cachePtr,
-      this.isHeuristic,
       this.align,
       this.wrap,
     ) as number;
     if (!this._solverPtr) {
       throw new Error(
-        `Failed to create ${this.isHeuristic ? "heuristic" : "exact"} solver for ` +
+        `Failed to create exact solver for ` +
           `${this.width}x${this.height}. This board size may not be supported by the current native addon build.`,
       );
     }
@@ -304,8 +295,26 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
             `The book data may be invalid or the wrong format for this board size.`,
         );
       }
+      this._bookKind = NodeConnect4Solver.parseBookHeaderKind(_data);
     }
     return Promise.resolve();
+  }
+
+  queryBook(positionStr: string): Promise<BookResult | null> {
+    const native = getNativeModule();
+    if (!native) return Promise.resolve(null);
+    // null (not 0) when no explicit book — the native side falls back to the
+    // embedded book for this size, so this works for embedded-book sizes too.
+    const lu = native._getBookLookup(
+      this.width,
+      this.height,
+      this._bookPtr || null,
+      positionStr,
+    );
+    if (lu === undefined) return Promise.resolve(null);
+    const [lo, hi] = lu;
+    if (lo === hi) return Promise.resolve({ exact: lo });
+    return Promise.resolve({ lower: lo, upper: hi });
   }
 
   async analyze(
@@ -317,35 +326,20 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     return this.runTask(async () => {
       const native = getNativeModule();
       if (!native) throw new Error("Native module not loaded");
-      const { threads, maxDepth, timeoutMs, bookPtr, weak } =
-        this.sanitizeOpts(opts);
+      const { threads, timeoutMs, bookPtr, weak } = this.sanitizeOpts(opts);
 
-      let resArr: Int32Array | number[];
-      if (this.isHeuristic) {
-        resArr = await native._analyzeHeuristic(
-          this.width,
-          this.height,
-          this._solverPtr,
-          positionStr,
-          threads,
-          maxDepth,
-          timeoutMs,
-          bookPtr === 0 ? null : bookPtr,
-        );
-      } else {
-        resArr = await native._analyzeExact(
-          this.width,
-          this.height,
-          this._solverPtr,
-          positionStr,
-          weak,
-          threads,
-          bookPtr === 0 ? null : bookPtr,
-          timeoutMs,
-          this.align,
-          this.wrap,
-        );
-      }
+      const resArr = await native._analyzeExact(
+        this.width,
+        this.height,
+        this._solverPtr,
+        positionStr,
+        weak,
+        threads,
+        bookPtr === 0 ? null : bookPtr,
+        timeoutMs,
+        this.align,
+        this.wrap,
+      );
       return this.parseResArr(resArr, positionStr);
     });
   }
@@ -359,38 +353,21 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
     return this.runTask(async () => {
       const native = getNativeModule();
       if (!native) throw new Error("Native module not loaded");
-      const { threads, maxDepth, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
+      const { threads, timeoutMs, bookPtr } = this.sanitizeOpts(opts);
       const weak = opts?.weak ?? false;
 
-      let resArr: Int32Array | number[];
-      if (this.isHeuristic) {
-        // Heuristic solve() does not benefit from LazySMP threading:
-        // deterministic NNUE evaluation = no search diversity between threads.
-        // analyze_heuristic() root-splitting still benefits from threads.
-        resArr = await native._solveHeuristic(
-          this.width,
-          this.height,
-          this._solverPtr,
-          positionStr,
-          threads,
-          maxDepth,
-          timeoutMs,
-          bookPtr === 0 ? null : bookPtr,
-        );
-      } else {
-        resArr = await native._solveExact(
-          this.width,
-          this.height,
-          this._solverPtr,
-          positionStr,
-          weak,
-          threads,
-          bookPtr === 0 ? null : bookPtr,
-          timeoutMs,
-          this.align,
-          this.wrap,
-        );
-      }
+      const resArr = await native._solveExact(
+        this.width,
+        this.height,
+        this._solverPtr,
+        positionStr,
+        weak,
+        threads,
+        bookPtr === 0 ? null : bookPtr,
+        timeoutMs,
+        this.align,
+        this.wrap,
+      );
       return this.parseSolveResArr(resArr, positionStr);
     });
   }
@@ -403,7 +380,6 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         this._solverPtr,
-        this.isHeuristic,
         this.align,
         this.wrap,
       );
@@ -418,7 +394,6 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         this._solverPtr,
-        this.isHeuristic,
         this.align,
         this.wrap,
       );
@@ -428,6 +403,7 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
       if (this._bookPtr) {
         native._destroyBook(this.width, this.height, this._bookPtr);
         this._bookPtr = 0;
+        this._bookKind = null;
       }
     }
     this.initialized = false;
@@ -443,7 +419,6 @@ export class NodeConnect4Solver extends AbstractSyncSolver {
             this.width,
             this.height,
             this._solverPtr,
-            this.isHeuristic,
             this.align,
             this.wrap,
           ),

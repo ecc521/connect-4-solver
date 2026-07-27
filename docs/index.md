@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Connect 4 Solver"
   text: "C++ & WASM Bitboard Solver"
-  tagline: "High-performance solver for a variety of board sizes using NNUE + alpha-beta pruning. Bindings for WASM, Node.js, and React Native."
+  tagline: "High-performance solver for a variety of board sizes using alpha-beta pruning. Bindings for WASM, Node.js, and React Native."
   actions:
     - theme: brand
       text: Getting Started
@@ -19,8 +19,6 @@ hero:
 features:
   - title: Universal C++ Power
     details: Built in C++ for maximum evaluation speed. Runs natively across Node.js, mobile apps, and directly in the browser via WebAssembly.
-  - title: Heuristic NNUE Engine
-    details: Includes a fast heuristic evaluator powered by a lightweight Neural Network (NNUE) to instantly assess complex positions.
   - title: Pre-Computed Opening Books
     details: Use pre-computed Opening Books to solve early-game positions immediately.
 ---

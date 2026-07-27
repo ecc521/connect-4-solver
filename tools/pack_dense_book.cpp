@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
   int depth = atoi(argv[1]);
   bool use_ef = (argc > 2 && std::string(argv[2]) == "--ef");
 
-  std::vector<std::pair<Position::position_t, uint8_t>> all_items;
+  std::vector<std::pair<Position::position_t, uint16_t>> all_items;
   for(std::string line; getline(std::cin, line);) {
     if(line.length() == 0) break;
     std::istringstream iss(line);

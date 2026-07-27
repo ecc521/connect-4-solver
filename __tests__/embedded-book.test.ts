@@ -16,14 +16,13 @@
 
 import { NodeConnect4Solver } from "../src/node.js";
 import { AdaptiveSolver } from "../src/adaptive.js";
-import { EMBEDDED_BOOK_SIZES } from "../src/capabilities.js";
+import { EMBEDDED_BOOK_SIZES } from "../src/embedded-book-sizes.js";
 import { getNativeModule } from "../src/node.js";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _dir = path.dirname(fileURLToPath(import.meta.url));
 
 describe("Embedded book transparent fallback", () => {
   // Skip all tests if native module is not available (CI without compiled addon)
@@ -108,7 +107,7 @@ describe("Embedded book transparent fallback", () => {
 
       // Load the actual embedded efbook file as a custom book to simulate override
       const efbookPath = path.join(
-        __dirname,
+        _dir,
         "..",
         "data",
         "7x6_dense7.efbook",
@@ -149,7 +148,6 @@ describe("Embedded book transparent fallback", () => {
       const solver = new AdaptiveSolver();
       await solver.setBoard(7, 6);
       expect(solver.hasBook).toBe(true);
-      expect(solver.capability).toBe("exact");
       await solver.destroy();
     });
 
@@ -157,7 +155,6 @@ describe("Embedded book transparent fallback", () => {
       const solver = new AdaptiveSolver();
       await solver.setBoard(8, 8);
       expect(solver.hasBook).toBe(false);
-      expect(solver.capability).not.toBe("exact");
       await solver.destroy();
     });
 
@@ -165,7 +162,7 @@ describe("Embedded book transparent fallback", () => {
       // Use the real 7x6 efbook for a non-embedded-book size if available, else skip.
       // (We need valid book data — passing garbage to the native C++ causes a crash.)
       const efbookPath = path.join(
-        __dirname,
+        _dir,
         "..",
         "data",
         "7x6_dense7.efbook",
@@ -183,7 +180,36 @@ describe("Embedded book transparent fallback", () => {
       // Use 7x6 — it has an embedded book already, but the bookLoader overrides it
       await solver.setBoard(7, 6);
       expect(solver.hasBook).toBe(true);
-      expect(solver.capability).toBe("exact");
+      await solver.destroy();
+    });
+  });
+
+  describe("queryBook (book-only lookup, no search)", () => {
+    it("returns an exact result for booked positions and null for misses", async () => {
+      const solver = new AdaptiveSolver();
+      await solver.setBoard(7, 6); // auto-loads embedded 7x6 book
+      expect(solver.hasBook).toBe(true);
+
+      // At least one shallow position is covered by the embedded book → exact hit.
+      const probes = await Promise.all(
+        ["", "4", "44", "443"].map((p) => solver.queryBook(p)),
+      );
+      expect(
+        probes.some((r) => r !== null && typeof r.exact === "number"),
+      ).toBe(true);
+
+      // A position not resolved by the book (here an over-full column) → null.
+      const miss = await solver.queryBook("4444444444444");
+      expect(miss).toBeNull();
+
+      await solver.destroy();
+    });
+
+    it("returns null when no book is loaded (8x8 has no embedded book)", async () => {
+      const solver = new AdaptiveSolver();
+      await solver.setBoard(8, 8);
+      expect(solver.hasBook).toBe(false);
+      expect(await solver.queryBook("44")).toBeNull();
       await solver.destroy();
     });
   });

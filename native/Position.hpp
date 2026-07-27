@@ -19,6 +19,13 @@
 #ifndef POSITION_HPP
 #define POSITION_HPP
 
+// EXPERIMENTAL, off by default: fold dead-stone detection into the hash key
+// (see findDeadStones()/deadStonesInDirection() below). Not validated for
+// production use yet -- see tools/benchmarks/deadstone_validate.cpp.
+#ifndef EXPERIMENTAL_DEAD_STONE_HASH
+#define EXPERIMENTAL_DEAD_STONE_HASH 0
+#endif
+
 #include <string>
 #include <iostream>
 #include <cstdint>
@@ -165,6 +172,28 @@ struct wasm_uint128_t {
     constexpr bool operator>(const wasm_uint128_t& o) const { return !(*this <= o); }
     constexpr bool operator>=(const wasm_uint128_t& o) const { return !(*this < o); }
 };
+
+} // namespace Connect4
+} // namespace GameSolver
+
+// phmap's generic Hash<T> fallback calls std::hash<T>(), which has no
+// specialization for this hand-rolled 128-bit type (unlike unsigned __int128
+// on native builds, which libc++/libstdc++ already specialize) — required for
+// MutableBook's phmap::flat_hash_map<pos_t, uint16_t> to compile under Emscripten.
+namespace std {
+template <>
+struct hash<GameSolver::Connect4::wasm_uint128_t> {
+    size_t operator()(const GameSolver::Connect4::wasm_uint128_t& v) const noexcept {
+        size_t h1 = hash<uint64_t>{}(v.low);
+        size_t h2 = hash<uint64_t>{}(v.high);
+        return h1 ^ (h2 + 0x9e3779b97f4a7c15ULL + (h1 << 6) + (h1 >> 2));
+    }
+};
+} // namespace std
+
+namespace GameSolver {
+namespace Connect4 {
+
 #endif
 
 template <int W, int H, int ALIGN = 4, bool WRAP = false>
@@ -237,7 +266,11 @@ class GenericPosition {
   }
 
   position_t key() const {
+#if EXPERIMENTAL_DEAD_STONE_HASH
+    return (current_position | findDeadStones()) + mask;
+#else
     return current_position + mask;
+#endif
   }
 
   template <int W_CONST, int H_CONST>
@@ -390,73 +423,6 @@ class GenericPosition {
 
   int moveScore(position_t move) const {
     return popcount_impl(compute_winning_position(current_position | move, mask));
-  }
-
-  template <typename CenterMasksT, typename CenterWeightsT>
-  int heuristic_evaluate(const CenterMasksT& center_masks, const CenterWeightsT& center_weights, int double_threat_weight = 10, int uncontested_parity_weight = 57, int tempo_weight = 76, int center_multiplier = 5, int base_threat_weight = 23) const {
-    int score = 0;
-    position_t opp_position = current_position ^ mask;
-    position_t my_threats = compute_winning_position(current_position, mask);
-    position_t opp_threats = compute_winning_position(opp_position, mask);
-    position_t playable = possible();
-    position_t double_edged = (playable << 1) & get_board_mask();
-
-    score += popcount(my_threats & double_edged) * double_threat_weight;
-    score -= popcount(opp_threats & double_edged) * double_threat_weight;
-
-    position_t opp_threats_above = (opp_threats << 1) & get_board_mask();
-    opp_threats_above |= (opp_threats_above << 1) & get_board_mask();
-    opp_threats_above |= (opp_threats_above << 2) & get_board_mask();
-    opp_threats_above |= (opp_threats_above << 4) & get_board_mask();
-    if (height() >= 8) opp_threats_above |= (opp_threats_above << 8) & get_board_mask();
-
-    position_t my_threats_above = (my_threats << 1) & get_board_mask();
-    my_threats_above |= (my_threats_above << 1) & get_board_mask();
-    my_threats_above |= (my_threats_above << 2) & get_board_mask();
-    my_threats_above |= (my_threats_above << 4) & get_board_mask();
-    if (height() >= 8) my_threats_above |= (my_threats_above << 8) & get_board_mask();
-
-    position_t my_useless_threats = my_threats & opp_threats_above;
-    position_t opp_useless_threats = opp_threats & my_threats_above;
-
-    position_t even_rows = 0;
-    for (int r = 0; r < height(); r += 2) {
-        even_rows |= (get_bottom_mask() << r);
-    }
-    position_t odd_rows = (even_rows << 1) & get_board_mask();
-    
-    position_t my_parity = (moves % 2 == 0) ? even_rows : odd_rows;
-    position_t opp_parity = (moves % 2 == 0) ? odd_rows : even_rows;
-
-    position_t lowest_my_threats = my_threats & ~my_threats_above;
-    position_t lowest_opp_threats = opp_threats & ~opp_threats_above;
-
-    position_t my_uncontested_parity = (lowest_my_threats & my_parity) & ~my_useless_threats;
-    position_t opp_uncontested_parity = (lowest_opp_threats & opp_parity) & ~opp_useless_threats;
-
-    score += popcount(my_uncontested_parity) * uncontested_parity_weight;
-    score -= popcount(opp_uncontested_parity) * uncontested_parity_weight;
-    
-    position_t all_threats = my_threats | opp_threats;
-    position_t empty_squares = get_board_mask() ^ (current_position | opp_position);
-
-    position_t all_threats_above = all_threats;
-    all_threats_above |= (all_threats_above << 1) & get_board_mask();
-    all_threats_above |= (all_threats_above << 2) & get_board_mask();
-    all_threats_above |= (all_threats_above << 4) & get_board_mask();
-    if (height() >= 8) all_threats_above |= (all_threats_above << 8) & get_board_mask();
-
-    int safe_squares = popcount(empty_squares & ~all_threats_above);
-    
-    score += ((safe_squares % 2) != (moves % 2) ? tempo_weight : -tempo_weight);
-    
-    score += (popcount(lowest_my_threats & ~my_useless_threats) - popcount(lowest_opp_threats & ~opp_useless_threats)) * base_threat_weight;
-    
-    for(int i = 0; i < width(); i++) {
-      score += (popcount(current_position & center_masks[i]) - popcount(opp_position & center_masks[i])) * center_weights[i] * center_multiplier;
-    }
-    
-    return score;
   }
 
   GenericPosition(uint8_t w = W == -1 ? 7 : W, uint8_t h = W == -1 ? 6 : H) : dynamic_w(w), dynamic_h(h), current_position{0}, mask{0}, moves{0} {}
@@ -833,6 +799,81 @@ private:
           return -1;
         }
         return 0;
+    }
+  }
+
+  // --- Dead-stone detection (EXPERIMENTAL, gated by EXPERIMENTAL_DEAD_STONE_HASH) ---
+  // Ported from c4 (ChristopheSteininger/c4)'s Position::find_dead_stones: a stone
+  // is "dead" if it can be proven to never participate in any future 4-in-a-row,
+  // in ALL FOUR directions. Dead stones can be assigned to either color in the
+  // hash key without changing the position's game value, which lets otherwise-
+  // distinct positions (differing only in dead-stone ownership) share one TT
+  // entry. See tools/benchmarks/deadstone_validate.cpp for the correctness check
+  // (c4's own are_dead_stones_valid invariant) this was validated against before
+  // being wired in here — 0 invalid masks across 6260 real 7x6 positions.
+  // Geometric per-direction masks are position-independent: bake them at
+  // compile time (c4 does the same via constexpr; recomputing them per call
+  // was ~1/3 of the per-direction cost of the original port).
+  template <int shift, int W_CONST, int H_CONST>
+  static constexpr position_t deadBorderMask() {
+    position_t valid = PositionConstants<W_CONST, H_CONST>::board_mask();
+    position_t stones_right_of_border = (valid << shift) & valid;
+    position_t stones_left_of_border = (valid >> shift) & valid;
+    return ~(stones_right_of_border & stones_left_of_border);
+  }
+
+  template <int shift, int W_CONST, int H_CONST>
+  static constexpr position_t deadTooShortMask() {
+    position_t valid = PositionConstants<W_CONST, H_CONST>::board_mask();
+    position_t pairs_v = (valid >> shift) & valid;
+    position_t triples_v = (pairs_v >> shift) & valid;
+    position_t quads_v = (triples_v >> shift) & valid;
+    position_t quads_shifted = quads_v | (quads_v << shift);
+    position_t possible_wins = quads_shifted | (quads_shifted << (2 * shift));
+    return valid & ~possible_wins;
+  }
+
+  template <int shift, int W_CONST, int H_CONST>
+  position_t deadStonesInDirection(position_t b0, position_t b1, position_t valid) const {
+    constexpr position_t border = deadBorderMask<shift, W_CONST, H_CONST>();
+    constexpr position_t too_short = deadTooShortMask<shift, W_CONST, H_CONST>();
+    position_t played = b0 | b1;
+    position_t empty = valid & ~played;
+    position_t uncovered = ((empty >> shift) & played) | ((empty << shift) & played);
+    position_t covered_by_1 = ((uncovered >> shift) & played) | ((uncovered << shift) & played);
+    position_t pairs = ((b0 >> shift) & b0) | ((b1 >> shift) & b1);
+    position_t covered_by_pair = ((covered_by_1 >> shift) & (pairs >> shift))
+                                | ((covered_by_1 << shift) & (pairs << (2 * shift)));
+    position_t covered_stones = played & ~uncovered & ~covered_by_1 & ~covered_by_pair;
+    position_t between = ((b0 >> shift) & (b1 << shift)) | ((b1 >> shift) & (b0 << shift));
+    position_t pinned = border & played & ((between >> (2 * shift)) | (between << (2 * shift)));
+    return covered_stones | pinned | too_short;
+  }
+
+  template <int W_CONST, int H_CONST>
+  position_t findDeadStonesImpl() const {
+    position_t b0 = current_position;
+    position_t b1 = current_position ^ mask;
+    position_t valid = PositionConstants<W_CONST, H_CONST>::board_mask();
+    position_t vertical = deadStonesInDirection<1, W_CONST, H_CONST>(b0, b1, valid);
+    if (!vertical) return 0;
+    position_t horizontal = deadStonesInDirection<H_CONST + 1, W_CONST, H_CONST>(b0, b1, valid);
+    if (!horizontal) return 0;
+    position_t pos_diag = deadStonesInDirection<H_CONST + 2, W_CONST, H_CONST>(b0, b1, valid);
+    if (!pos_diag) return 0;
+    position_t neg_diag = deadStonesInDirection<H_CONST, W_CONST, H_CONST>(b0, b1, valid);
+    return vertical & horizontal & pos_diag & neg_diag;
+  }
+
+  position_t findDeadStones() const {
+    if constexpr (WRAP || ALIGN != 4) return 0;
+    if constexpr (W != -1) {
+      return findDeadStonesImpl<W, H>();
+    } else {
+      if (width() == 7 && height() == 6) return findDeadStonesImpl<7, 6>();
+      if (width() == 8 && height() == 6) return findDeadStonesImpl<8, 6>();
+      if (width() == 8 && height() == 8) return findDeadStonesImpl<8, 8>();
+      return 0; // dynamic sizes outside the specialized set: not wired up yet
     }
   }
 

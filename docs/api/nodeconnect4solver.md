@@ -1,6 +1,6 @@
 # NodeConnect4Solver
 
-The Node.js solver for exact and heuristic evaluation. Uses **Node N-API** to call the C++ engine directly — no WASM involved.
+The Node.js solver for exact evaluation. Uses **Node N-API** to call the C++ engine directly — no WASM involved.
 
 **Import:**
 
@@ -13,7 +13,7 @@ import { NodeConnect4Solver } from "connect-4-solver";
 **Implements:** [`BaseConnect4Solver`](./base-solver)
 
 ```typescript
-new NodeConnect4Solver(options?: { width?: number, height?: number, cacheSizeMb?: number, heuristic?: boolean });
+new NodeConnect4Solver(options?: { width?: number, height?: number, cacheSizeMb?: number });
 ```
 
 ## Methods
@@ -41,7 +41,7 @@ import { getNativeModule } from "connect-4-solver";
 const native = getNativeModule();
 ```
 
-### `_createCache(width: number, height: number, bytes: number, isHeuristic: boolean): number`
+### `_createCache(width: number, height: number, bytes: number): number`
 
 Allocates a shared Transposition Table in C++ RAM. Returns a raw pointer to the instance.
 
@@ -49,21 +49,17 @@ Allocates a shared Transposition Table in C++ RAM. Returns a raw pointer to the 
 
 Frees the memory allocated by `_createCache`.
 
-### `_createSolver(width: number, height: number, cachePtr: number, isHeuristic: boolean): number`
+### `_createSolver(width: number, height: number, cachePtr: number): number`
 
 Instantiates an evaluator bound to the specified shared cache. Returns a raw pointer to the solver instance.
 
-### `_destroySolver(width: number, height: number, solverPtr: number, isHeuristic: boolean): void`
+### `_destroySolver(width: number, height: number, solverPtr: number): void`
 
 Frees the memory allocated by `_createSolver`.
 
 ### `_analyzeExact(width: number, height: number, solverPtr: number, position: string, weak: boolean, threads: number, bookPtr: number | null): Promise<number[]>`
 
 Executes an asynchronous exact evaluation natively via a persistent C++ thread pool. Returns a raw array of scores mapping to the evaluation outcomes.
-
-### `_analyzeHeuristic(width: number, height: number, solverPtr: number, position: string, threads: number, maxDepth: number, timeoutMs: number): Promise<number[]>`
-
-Executes an asynchronous heuristic evaluation. Returns a raw array of scores.
 
 ### `BookBuilder` Class
 

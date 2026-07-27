@@ -1,6 +1,6 @@
 # Connect 4 Game Solver
 
-High-performance, multi-board-size Connect 4 solver with NNUE heuristic evaluation and alpha-beta pruning. Native C++ core compiled to WebAssembly and Node.js native addons, wrapped in a strongly-typed TypeScript API.
+High-performance, multi-board-size Connect 4 solver with exact alpha-beta pruning. Native C++ core compiled to WebAssembly and Node.js native addons, wrapped in a strongly-typed TypeScript API.
 
 ## Installation
 
@@ -13,11 +13,10 @@ On Node.js, the native C++ addon will automatically compile for maximum performa
 ## Features
 
 - **Exact Solver** — Perfect play via alpha-beta pruning with Lazy SMP multi-threading
-- **Heuristic Solver** — NNUE neural network evaluation for fast approximate analysis
 - **Multi-Board Support** — Boards from 4×4 to 12×12 (up to 128-bit position masks)
 - **Opening Books** — Dense and Elias-Fano compressed book formats for instant early-game lookups
 - **Multi-Runtime** — Node.js native addon, single-threaded WASM, threaded WASM (SharedArrayBuffer), and React Native (iOS/Android JSI)
-- **TypeScript First** — Full type definitions, object-oriented API, exact Win/Loss/Draw outcomes and heuristic scores
+- **TypeScript First** — Full type definitions, object-oriented API, exact Win/Loss/Draw outcomes
 
 ## Quick Start
 
@@ -35,22 +34,6 @@ console.log(result.moveOptions); // Per-column evaluations
 // Solve for the optimal score
 const solve = await solver.solve("44445223");
 console.log(solve.evaluation?.score); // Exact minimax score
-```
-
-### Heuristic Mode
-
-```typescript
-import { createSolver } from "connect-4-solver";
-
-const solver = await createSolver({ heuristic: true });
-await solver.init();
-
-// Fast approximate evaluation with depth/time limits
-const result = await solver.analyze("44445223", {
-  maxDepth: 15,
-  timeoutMs: 50,
-  threads: 4,
-});
 ```
 
 ### Custom Board Sizes
@@ -159,8 +142,8 @@ npm run bench:pgo:native
 
 | Board         | Position Bits | Status                           |
 | ------------- | ------------- | -------------------------------- |
-| 7×6           | 56-bit (u64)  | ✅ Primary — NNUE, opening books |
-| 8×8           | 72-bit (u128) | ✅ Primary — NNUE, full support  |
+| 7×6           | 56-bit (u64)  | ✅ Primary — opening books        |
+| 8×8           | 72-bit (u128) | ✅ Primary — full support         |
 | 6×5, 6×6, 8×6 | ≤56-bit       | ✅ Supported                     |
 | 9×7, 7×7, 7×8 | >56-bit       | ✅ 128-bit fallback              |
 | Up to 12×12   | ≤128-bit      | ✅ Generic template              |
@@ -188,4 +171,4 @@ The exact number of legal game states for various Connect-4 board sizes.
 
 - Published under **AGPL v3** license.
 - Partially based off the work of [Pascal Pons](http://blog.gamesolver.org), [John Tromp](https://tromp.github.io/c4/c4.html), and [Christophe Steininger](https://github.com/ChristopheSteininger/c4).
-- Extensively modified to add multi-threaded support, NNUE, tiered-cache tables, and a variety of other optimizations as well as multi-platform support.
+- Extensively modified to add multi-threaded support, tiered-cache tables, and a variety of other optimizations as well as multi-platform support.

@@ -19,8 +19,8 @@ In those environments, the explicit base `NodeConnect4Solver` and `ReactNativeCo
 **Implements:** [`BaseConnect4Solver`](./base-solver)
 
 ```typescript
-new WebWorkerWasmConnect4Solver(workerProvider: () => Worker, options: { width: number, height: number, cacheSizeMb?: number, heuristic?: boolean });
-new WebWorkerWasmNoSABConnect4Solver(workerProvider: () => Worker, options: { width: number, height: number, cacheSizeMb?: number, heuristic?: boolean });
+new WebWorkerWasmConnect4Solver(workerProvider: () => Worker, options: { width: number, height: number, cacheSizeMb?: number });
+new WebWorkerWasmNoSABConnect4Solver(workerProvider: () => Worker, options: { width: number, height: number, cacheSizeMb?: number });
 ```
 
 ### Which class should I use? (SharedArrayBuffer)
@@ -82,9 +82,9 @@ async function play() {
 }
 ```
 
-### Using Threads or Heuristics
+### Using Threads
 
-The worker-handler supports heuristics and threads automatically via `init()`. Just pass the options:
+The worker-handler supports threads automatically via `init()`. Just pass the options:
 
 ```typescript
 import { WebWorkerWasmConnect4Solver } from "connect-4-solver/async";
@@ -100,15 +100,6 @@ const threadedSolver = new WebWorkerWasmConnect4Solver(workerProvider, {
 });
 await threadedSolver.init();
 await threadedSolver.analyze("1122", { threads: 4 });
-
-// Offload the Heuristic WASM engine
-const heuristicSolver = new WebWorkerWasmConnect4Solver(workerProvider, {
-  width: 7,
-  height: 6,
-  heuristic: true,
-});
-await heuristicSolver.init();
-await heuristicSolver.analyze("1122");
 ```
 
 ::: tip 💡 Memory Management & Stopping

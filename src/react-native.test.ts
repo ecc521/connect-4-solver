@@ -19,16 +19,8 @@ describe("ReactNativeConnect4Solver Bridge Tests", () => {
           destroySolver: jest.fn(),
           destroyCache: jest.fn(),
           analyze: jest.fn(
-            (
-              _solverPtr: string,
-              pos: string,
-              _threads: number,
-              _timeoutMs: number,
-              _w: number,
-              _h: number,
-              _weak: boolean,
-              _bookPtr: string,
-            ) => {
+            (args: { solverPtr: string; pos: string; threads: number; w: number; h: number; bookPtr: string; align: number; wrap: boolean }) => {
+              const { pos } = args;
               return new Promise((resolve) => {
                 if (pos === "121212") {
                   resolve([0, 6, 11, -1000, -10, 0, -2, -1, 3, 0]); // aborted=0

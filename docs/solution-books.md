@@ -1,6 +1,6 @@
 # Solution Books
 
-Perfectly solving a Connect 4 position can be CPU-intensive, so the exact solver supports loading pre-computed **Solution Books** (Opening Books). The heuristic solver (`heuristic: true`) can also optionally accept books to eliminate search latency and guarantee perfect play in the early game.
+Perfectly solving a Connect 4 position can be CPU-intensive, so the exact solver supports loading pre-computed **Solution Books** (Opening Books).
 
 These books map early-game and mid-game position sequences to their evaluations (supporting both Weak and Strong solution mappings). When the exact solver encounters a position that exists within a loaded book, it returns the solution immediately and avoids deep Alpha-Beta tree searches.
 
@@ -81,6 +81,6 @@ npx ts-node tools/generate-book.ts --width 7 --height 7 --depth 10 --cacheMB 409
 
 The orchestrator generates standard **Dense Array** books by default. The engine also supports **Elias-Fano** compression, which greatly reduces file sizes and memory usage. While Elias-Fano supports O(1) random lookups at <1ms, it is still substantially slower per lookup than Dense Arrays.
 
-Sparse books are supported, however using extremely sparse books is not recommended. Books will be queried for all solver evaluations where `depth <= maxDepthContainedInBook`.
+Sparse books are supported, however using extremely sparse books is not recommended.
 
 > **Note:** The `generate-book.ts` script saves in Dense Array format automatically. If you want to compress the book using Elias-Fano, simply append the `--ef` flag to your generator command!

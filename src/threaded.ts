@@ -1,15 +1,21 @@
-import { PositionAnalysis, AnalyzeOptions, SolverModule } from "./core.js";
+import {
+  PositionAnalysis,
+  AnalyzeOptions,
+  BookResult,
+  SolverModule,
+} from "./core.js";
 import { AbstractSyncSolver } from "./abstract-solver.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import createModule from "../build/analyze_threaded.js";
+import createModule from "../wasm-out/analyze_threaded.js";
 
 type CreateModule = (options: {
   locateFile: (path: string) => string;
 }) => Promise<SolverModule>;
 
 const baseUrl =
-  typeof import.meta !== "undefined" && import.meta && import.meta.url
+  // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
+  typeof import.meta !== "undefined" && import.meta?.url
     ? import.meta.url
     : typeof location !== "undefined"
       ? location.href
@@ -22,15 +28,17 @@ let ThreadedModule: SolverModule | null = null;
 let _threadedInitPromise: Promise<void> | null = null;
 
 export function getThreadedModuleInitPromise(): Promise<void> {
-  wasmUrl ??= new URL("../build/analyze_threaded.wasm", baseUrl);
+  wasmUrl ??= new URL("../wasm-out/analyze_threaded.wasm", baseUrl);
   workerUrl ??= new URL(
-    "../build/analyze_threaded.worker.js",
+    "../wasm-out/analyze_threaded.worker.js",
     baseUrl,
   );
+  const wasm = wasmUrl;
+  const worker = workerUrl;
   _threadedInitPromise ??= (createModule as unknown as CreateModule)({
     locateFile: (path: string) => {
-      if (path.endsWith(".wasm")) return wasmUrl!.href;
-      if (path.endsWith(".worker.js")) return workerUrl!.href;
+      if (path.endsWith(".wasm")) return wasm.href;
+      if (path.endsWith(".worker.js")) return worker.href;
       return path;
     },
   }).then((mod: SolverModule) => {
@@ -62,7 +70,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         sizeMb * 1024 * 1024,
-        this.isHeuristic,
+        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -78,13 +86,13 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
       this.width,
       this.height,
       this._cachePtr,
-      this.isHeuristic,
+      false, // legacy is_heuristic slot (removed in v5)
       this.align,
       this.wrap,
     );
     if (this._solverPtr === 0) {
       throw new Error(
-        `Failed to create ${this.isHeuristic ? "heuristic" : "exact"} solver for ` +
+        `Failed to create exact solver for ` +
           `${this.width}x${this.height}. This board size may not be supported by the current WASM build.`,
       );
     }
@@ -125,7 +133,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
       this.width,
       this.height,
       this._solverPtr,
-      this.isHeuristic,
+      false, // legacy is_heuristic slot (removed in v5)
       this.align,
       this.wrap,
     );
@@ -158,7 +166,14 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
           `The book data may be invalid or the wrong format for this board size.`,
       );
     }
+    this._bookKind = SyncWasmConnect4Solver.parseBookHeaderKind(_data);
     return Promise.resolve();
+  }
+
+  queryBook(positionStr: string): Promise<BookResult | null> {
+    return Promise.resolve(
+      this.queryBookWithModule(getThreadedModule(), positionStr),
+    );
   }
 
   release(): void {
@@ -169,7 +184,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         this._solverPtr,
-        this.isHeuristic,
+        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       );
@@ -177,6 +192,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
     if (this._bookPtr) {
       mod._destroyBook(this.width, this.height, this._bookPtr as number);
       this._bookPtr = 0;
+      this._bookKind = null;
     }
     this._solverPtr = 0;
     this._cachePtr = 0;
@@ -191,7 +207,7 @@ export class SyncWasmConnect4Solver extends AbstractSyncSolver {
         this.width,
         this.height,
         this._solverPtr,
-        this.isHeuristic,
+        false, // legacy is_heuristic slot (removed in v5)
         this.align,
         this.wrap,
       ),

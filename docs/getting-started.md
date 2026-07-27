@@ -28,10 +28,8 @@ If you need explicit control over the engine architecture or are targeting speci
 
 ## Quick Start
 
-::: warning ⚠️ Exact Solving vs. Heuristics on Large Boards
-**Exact Solver (Default):** On 7x6 boards or larger, calculating a mathematically perfect sequence can take minutes or hours on early-game positions. For practical use, you must load a pre-computed [Solution Book](/solution-books) alongside the engine.
-
-**Heuristic Solver:** The [Heuristic Solver](/heuristic-solver) (`heuristic: true`) does not require books at any size and returns instantly. However, it returns an _estimated_ score (positive means winning) and the `outcome` will always default to `Draw` unless it sees a forced win.
+::: warning ⚠️ Exact Solving on Large Boards
+The engine is always an exact solver. On 7x6 boards or larger, calculating a mathematically perfect sequence can take minutes or hours on early-game positions. For practical use, load a pre-computed [Solution Book](/solution-books) alongside the engine, or pass a `timeoutMs` to bound long searches (the call returns `aborted: true` if it cannot complete in time).
 :::
 
 ::: code-group
